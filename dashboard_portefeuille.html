@@ -1449,7 +1449,7 @@ function renderDashboard() {
     // Catégorie d'après typeInv
     let cat = 'Actions & ETFs';
     if (r.typeInv === 'Crypto') cat = 'Crypto';
-    else if (r.typeInv === 'Produit structuré' || r.typeInv === 'Épargne') cat = 'Produits structurés & Épargne';
+    else if (r.typeInv === 'Produit structuré' || r.typeInv === 'Produit structure' || r.typeInv === 'Épargne' || r.typeInv === 'Epargne') cat = 'Produits structurés & Épargne';
     else if (r.typeInv && r.typeInv.toLowerCase().includes('obligation')) cat = 'Obligations non cotées';
     pfByCat[cat] = (pfByCat[cat] || 0) + val;
 
