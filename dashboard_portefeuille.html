@@ -3664,26 +3664,24 @@ async function gsLoadAll() {
 async function gsLoadPrices() {
   const status = document.getElementById('fetchStatus');
   if (!_gsToken) return;
-  if (status) status.innerHTML = '<span style="color:#60a5fa">⏳ Chargement des prix depuis Google Sheets...</span>';
+  if (status) status.innerHTML = `<span style="color:#60a5fa">⏳ Chargement des prix depuis Google Sheets...</span>`;
   try {
     const res  = await gsRequest('GET', '/values/Prices!A:E');
     const rows = res.values || [];
     if (rows.length < 2) {
-      if (status) status.innerHTML = '<span style="color:#f59e0b">⚠️ Onglet Prices vide — lancez update_prix_gsheet.py</span>';
+      if (status) status.innerHTML = `<span style="color:#f59e0b">⚠️ Onglet Prices vide — lancez update_prix_gsheet.py</span>`;
       return;
     }
 
-    // Première ligne = headers, détecter les colonnes
-    const headers   = rows[0].map(h => h.toLowerCase());
-    const iTicker   = headers.findIndex(h => h.includes('ticker'));
-    const iPrice    = headers.findIndex(h => h.includes('price') || h.includes('prix') || h.includes('close'));
-    const iCurrency = headers.findIndex(h => h.includes('curr') || h.includes('devise'));
+    const headers   = rows[0].map(hh => hh.toLowerCase());
+    const iTicker   = headers.findIndex(hh => hh.includes('ticker'));
+    const iPrice    = headers.findIndex(hh => hh.includes('price') || hh.includes('prix') || hh.includes('close'));
+    const iCurrency = headers.findIndex(hh => hh.includes('curr') || hh.includes('devise'));
     if (iTicker < 0 || iPrice < 0) {
-      if (status) status.innerHTML = '<span style="color:#ef4444">❌ Colonnes Ticker/Price introuvables dans l'onglet Prices</span>';
+      if (status) status.innerHTML = `<span style="color:#ef4444">❌ Colonnes Ticker/Price introuvables dans l'onglet Prices</span>`;
       return;
     }
 
-    // Extraire les taux de change (EUR/CZK, USD/CZK, GBP/CZK)
     let eurCzk = null, usdCzk = null, gbpCzk = null;
     rows.slice(1).forEach(r => {
       const t = (r[iTicker] || '').trim().toUpperCase();
@@ -3700,7 +3698,6 @@ async function gsLoadPrices() {
     if (!FX_RATES.USD) FX_RATES.USD = 0.893;
     if (!FX_RATES.GBP) FX_RATES.GBP = 1.172;
 
-    // Mettre à jour la barre FX
     const fxBar = document.getElementById('fxBar');
     if (fxBar) {
       fxBar.style.display = 'flex';
@@ -3709,7 +3706,6 @@ async function gsLoadPrices() {
       document.getElementById('fxDate').textContent = 'Source: GSheets (CNB) — ' + new Date().toLocaleDateString('fr');
     }
 
-    // Construire la map ticker → {price, currency}
     const FX_PAIRS = new Set(['EUR/CZK','USD/CZK','GBP/CZK','EUR/USD','EUR/GBP','USD/EUR','GBP/EUR']);
     const priceMap = {};
     rows.slice(1).forEach(r => {
@@ -3720,7 +3716,6 @@ async function gsLoadPrices() {
       priceMap[t] = { price: p, currency: curr };
     });
 
-    // Appliquer aux tickers du portefeuille
     const portfolioTickers = [...new Set(BOOK2_ROWS.map(r => r.ticker))];
     let matched = 0, unmatched = [];
     portfolioTickers.forEach(t => {
@@ -3739,9 +3734,9 @@ async function gsLoadPrices() {
     const now = new Date().toLocaleString('fr', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
     if (status) {
       if (unmatched.length === 0) {
-        status.innerHTML = '<span style="color:#22c55e">✅ ' + matched + '/' + portfolioTickers.length + ' prix chargés depuis GSheets — ' + now + '</span>';
+        status.innerHTML = `<span style="color:#22c55e">✅ ${matched}/${portfolioTickers.length} prix chargés depuis GSheets — ${now}</span>`;
       } else {
-        status.innerHTML = '<span style="color:#f97316">⚠️ ' + matched + '/' + portfolioTickers.length + ' prix chargés — manquants : ' + unmatched.join(', ') + '</span>';
+        status.innerHTML = `<span style="color:#f97316">⚠️ ${matched}/${portfolioTickers.length} prix chargés — manquants : ${unmatched.join(', ')}</span>`;
       }
     }
 
@@ -3749,14 +3744,13 @@ async function gsLoadPrices() {
     console.error('gsLoadPrices:', e);
     if (status) {
       if (e.message && e.message.includes('Unable to parse range')) {
-        status.innerHTML = '<span style="color:#f59e0b">⚠️ Onglet "Prices" introuvable — lancez update_prix_gsheet.py</span>';
+        status.innerHTML = `<span style="color:#f59e0b">⚠️ Onglet "Prices" introuvable — lancez update_prix_gsheet.py</span>`;
       } else {
-        status.innerHTML = '<span style="color:#ef4444">❌ ' + (e.message || e).toString().slice(0,80) + '</span>';
+        status.innerHTML = `<span style="color:#ef4444">❌ ${String(e.message || e).slice(0,80)}</span>`;
       }
     }
   }
 }
-
 // ══════════════════════════════════════════════════════════════════════════════
 // CHARGEMENT COMPOSITION ETF DEPUIS GOOGLE SHEETS
 // ══════════════════════════════════════════════════════════════════════════════
