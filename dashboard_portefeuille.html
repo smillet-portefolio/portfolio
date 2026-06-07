@@ -3736,13 +3736,25 @@ async function gsLoadPrices() {
 
 async function gsLoadETFComp() {
   const status = document.getElementById('etfCompStatus');
-  if (!_gsToken) {
-    status.innerHTML = "<span style='color:#f59e0b'>⚠️ Connectez-vous d'abord à Google (bouton 🔐 en haut)</span>";
+
+  // Si compositions déjà en mémoire (chargées depuis localStorage) : appliquer directement
+  if (Object.keys(ETF_COMP_OVERRIDE).length > 0) {
+    applyETFCompositionOverride();
+    renderETFFiches();
+    renderCompTables();
+    renderETFGeoTables();
+    const date = localStorage.getItem('etf_comp_date');
+    if (status && date) {
+      const fmt = new Date(date).toLocaleString('fr',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+      status.innerHTML = `<span style="color:var(--text2)">Compositions du ${fmt}</span>`;
+    }
     return;
   }
-  status.innerHTML = '<span style="color:#60a5fa">⏳ Chargement depuis Google Sheets…</span>';
+
+  // Sinon charger depuis GSheets (onglets ETF_Country/ETF_Sector/ETF_Top10)
+  if (!_gsToken) return;
+  if (status) status.innerHTML = `<span style="color:#60a5fa">⏳ Chargement compositions ETF depuis Google Sheets…</span>`;
   try {
-    // Lire les 3 onglets en parallèle
     const [rCountry, rSector, rTop10] = await Promise.all([
       gsRequest('GET', '/values/ETF_Country!A:ZZ'),
       gsRequest('GET', '/values/ETF_Sector!A:ZZ'),
@@ -3755,7 +3767,7 @@ async function gsLoadETFComp() {
       const headers = rows[0];
       return rows.slice(1).map(r => {
         const obj = {};
-        headers.forEach((h, i) => { obj[h] = r[i] != null ? r[i] : null; });
+        headers.forEach((hh, i) => { obj[hh] = r[i] != null ? r[i] : null; });
         return obj;
       });
     };
@@ -3763,12 +3775,10 @@ async function gsLoadETFComp() {
     const geoRows  = parseSheet(rCountry);
     const secRows  = parseSheet(rSector);
     const top10Raw = rTop10.values || [];
-
-    const result = {};
+    const result   = {};
     const GEO_SKIP = new Set(['Nom','ISIN','ticker']);
     const SEC_SKIP = new Set(['Nom','ISIN','ticker']);
 
-    // ── Géographie ───────────────────────────────────────────────────────────
     geoRows.forEach(row => {
       const ticker = row['ticker'];
       if (!ticker || !/^[A-Z0-9.]+$/.test(ticker)) return;
@@ -3781,7 +3791,6 @@ async function gsLoadETFComp() {
       result[ticker].geo    = all.filter(([l]) => l !== 'Autres pays').slice(0,3);
     });
 
-    // ── Secteurs ──────────────────────────────────────────────────────────────
     secRows.forEach(row => {
       const ticker = row['ticker'];
       if (!ticker || !/^[A-Z0-9.]+$/.test(ticker)) return;
@@ -3794,9 +3803,8 @@ async function gsLoadETFComp() {
       result[ticker].sectors    = all.filter(([l]) => l !== 'Autres').slice(0,3);
     });
 
-    // ── TOP 10 positions ─────────────────────────────────────────────────────
     if (top10Raw.length > 1) {
-      const posHeaders = top10Raw[0];   // ['position', ISIN1, ISIN2, …]
+      const posHeaders = top10Raw[0];
       const posData    = top10Raw.slice(1);
       const SKIP_NAMES = new Set(['others','actual value','']);
       posHeaders.slice(1).forEach((isin, colIdx) => {
@@ -3814,7 +3822,6 @@ async function gsLoadETFComp() {
       });
     }
 
-    // ── Sauvegarde ────────────────────────────────────────────────────────────
     const now = new Date().toISOString();
     Object.keys(result).forEach(t => { result[t].date = now; });
     ETF_COMP_OVERRIDE = result;
@@ -3827,24 +3834,34 @@ async function gsLoadETFComp() {
     renderETFFiches();
     renderCompTables();
     renderETFGeoTables();
-    if (document.getElementById('pos_lt')?.classList.contains('active')) renderLTChart('all');
-    if (document.getElementById('pos_eff')?.classList.contains('active')) renderEffChart();
-    if (document.getElementById('geo')?.classList.contains('active'))     renderGeoCharts();
-    if (document.getElementById('sect')?.classList.contains('active'))    renderSectCharts();
 
     const n   = Object.keys(result).length;
     const fmt = new Date(now).toLocaleString('fr',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-    status.innerHTML = `<span style="color:#22c55e">✅ ${n} ETFs chargés depuis GSheets — ${fmt}</span>`;
+    if (status) status.innerHTML = `<span style="color:#22c55e">✅ ${n} ETFs chargés depuis GSheets — ${fmt}</span>`;
 
   } catch(e) {
-    console.error(e);
-    if (e.message && e.message.includes('Unable to parse range')) {
-      status.innerHTML = "<span style='color:#f59e0b'>⚠️ Onglets ETF_Country/ETF_Sector/ETF_Top10 introuvables — lancez d'abord upload_etf_to_gsheet.py</span>";
+    console.warn('gsLoadETFComp:', e.message);
+    // Si onglets ETF_Country inexistants, utiliser etf_comp_override du localStorage (sauvegardé via gsSaveAll)
+    const saved = localStorage.getItem('etf_comp_override');
+    if (saved) {
+      try {
+        ETF_COMP_OVERRIDE = JSON.parse(saved);
+        applyETFCompositionOverride();
+        renderETFFiches();
+        renderCompTables();
+        renderETFGeoTables();
+        const date = localStorage.getItem('etf_comp_date');
+        const fmt  = date ? new Date(date).toLocaleString('fr',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+        if (status) status.innerHTML = `<span style="color:var(--text2)">Compositions du ${fmt} (depuis sauvegarde)</span>`;
+      } catch(e2) {
+        if (status) status.innerHTML = `<span style="color:#f59e0b">⚠️ Lancez upload_etf_to_gsheet.py pour charger les compositions</span>`;
+      }
     } else {
-      status.innerHTML = `<span style="color:#ef4444">❌ ${e.message ? e.message.slice(0,80) : e}</span>`;
+      if (status) status.innerHTML = `<span style="color:#f59e0b">⚠️ Lancez upload_etf_to_gsheet.py pour charger les compositions</span>`;
     }
   }
 }
+
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OBLIGATIONS NON COTÉES
