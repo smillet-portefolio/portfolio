@@ -1748,7 +1748,7 @@ function buildGeoExposure() {
   Object.keys(ETF_COMP_OVERRIDE).forEach(ticker => {
     const valEur = _compValMap[ticker] ?? 0;
     if (!valEur) return;
-    const geoAll = ETF_COMP_OVERRIDE[ticker]?.geoAll || [];
+    const geoAll = (ETF_COMP_OVERRIDE[ticker]?.geoAll || []).length > 0 ? ETF_COMP_OVERRIDE[ticker].geoAll : (ETF_META[ticker]?.geo || []);
     geoAll.forEach(([pays, pct]) => {
       payMap[pays] = (payMap[pays] || 0) + (valEur * pct / 100);
     });
@@ -1797,7 +1797,7 @@ function buildSectExposure() {
   Object.keys(ETF_COMP_OVERRIDE).forEach(ticker => {
     const valEur = _compValMap[ticker] ?? 0;
     if (!valEur) return;
-    const sectorsAll = ETF_COMP_OVERRIDE[ticker]?.sectorsAll || [];
+    const sectorsAll = (ETF_COMP_OVERRIDE[ticker]?.sectorsAll || []).length > 0 ? ETF_COMP_OVERRIDE[ticker].sectorsAll : (ETF_META[ticker]?.sectors || []);
     sectorsAll.forEach(([sect, pct]) => {
       etfMap[sect] = (etfMap[sect] || 0) + (valEur * pct / 100);
     });
@@ -1830,7 +1830,7 @@ function buildSectExposure() {
 function renderSectCharts() {
   const msg = document.getElementById('secMsg');
 
-  const hasComp = Object.keys(ETF_COMP_OVERRIDE).some(t => (ETF_COMP_OVERRIDE[t]?.sectorsAll || []).length > 0);
+  const hasComp = Object.keys(ETF_META).some(t => (ETF_COMP_OVERRIDE[t]?.sectorsAll || ETF_META[t]?.sectors || []).length > 0);
   const hasVal  = Object.keys(_compValMap).some(t => _compValMap[t] > 0);
 
   if (!hasComp || !hasVal) {
@@ -1899,7 +1899,7 @@ function renderSectCharts() {
 function renderGeoCharts() {
   const msg = document.getElementById('geoMsg');
 
-  const hasComp = Object.keys(ETF_COMP_OVERRIDE).some(t => (ETF_COMP_OVERRIDE[t]?.geoAll || []).length > 0);
+  const hasComp = Object.keys(ETF_META).some(t => (ETF_COMP_OVERRIDE[t]?.geoAll || ETF_META[t]?.geo || []).length > 0);
   const hasVal  = Object.keys(_compValMap).some(t => _compValMap[t] > 0);
 
   if (!hasComp || !hasVal) {
@@ -2097,7 +2097,7 @@ function buildLTData(filter) {
   tickers.forEach(ticker => {
     const valEur = _compValMap[ticker];
     if (!valEur) return;
-    const positions = ETF_COMP_OVERRIDE[ticker]?.positionsAll || [];
+    const positions = (ETF_COMP_OVERRIDE[ticker]?.positionsAll || []).length > 0 ? ETF_COMP_OVERRIDE[ticker].positionsAll : (ETF_META[ticker]?.positions || []);
     positions.forEach(([name, pct]) => {
       const exposed = Math.round(valEur * pct / 100);
       if (!posMap[name]) posMap[name] = { valEur: 0, ticker };
@@ -2114,7 +2114,7 @@ function buildLTData(filter) {
 }
 
 function renderLTChart(filter) {
-  const hasComp = Object.keys(ETF_COMP_OVERRIDE).some(t => (ETF_COMP_OVERRIDE[t]?.positionsAll || []).length > 0);
+  const hasComp = Object.keys(ETF_META).some(t => (ETF_COMP_OVERRIDE[t]?.positionsAll || ETF_META[t]?.positions || []).length > 0);
   const hasVal  = Object.keys(_compValMap).length > 0;
 
   const wrap = document.getElementById('ltChartWrap');
@@ -2175,7 +2175,7 @@ function buildEffData() {
   Object.keys(ETF_COMP_OVERRIDE).forEach(ticker => {
     const valEur    = _compValMap[ticker];
     if (!valEur) return;
-    const positions = ETF_COMP_OVERRIDE[ticker]?.positionsAll || [];
+    const positions = (ETF_COMP_OVERRIDE[ticker]?.positionsAll || []).length > 0 ? ETF_COMP_OVERRIDE[ticker].positionsAll : (ETF_META[ticker]?.positions || []);
     const color     = LT_ETF_COLORS[ticker] || '#60a5fa';
 
     positions.forEach(([name, pct]) => {
@@ -2217,7 +2217,7 @@ function renderEffChart() {
   const leg  = document.getElementById('effLegend');
   if (!wrap) return;
 
-  const hasComp = Object.keys(ETF_COMP_OVERRIDE).some(t => (ETF_COMP_OVERRIDE[t]?.positionsAll || []).length > 0);
+  const hasComp = Object.keys(ETF_META).some(t => (ETF_COMP_OVERRIDE[t]?.positionsAll || ETF_META[t]?.positions || []).length > 0);
   const hasVal  = Object.keys(_compValMap).length > 0 || BOOK2_ROWS.some(r => !ETF_TICKERS.has(r.ticker));
 
   if (!hasComp) {
@@ -5658,6 +5658,114 @@ function swCompTab(id, btn) {
   if (btn) btn.classList.add('active');
 }
 
+// ── Tableau géographie : 1 ligne/ETF × 1 col/pays, valeur actuelle € ─────────
+function buildCompGeoTable(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const tickers = Object.keys(ETF_META)
+    .filter(t => {
+      // Seulement les ETFs en portefeuille avec une valeur actuelle
+      const rows = BOOK2_ROWS.filter(r => r.ticker === t && ETF_TICKERS.has(r.ticker));
+      return rows.length > 0;
+    })
+    .sort((a, b) => (_compValMap[b] ?? 0) - (_compValMap[a] ?? 0));
+
+  // Récupérer les données géo (ETF_COMP_OVERRIDE ou ETF_META fallback)
+  const getGeo = t => {
+    const ov = ETF_COMP_OVERRIDE[t]?.geoAll || [];
+    return ov.length > 0 ? ov : (ETF_META[t]?.geo || []);
+  };
+
+  const hasData = tickers.some(t => getGeo(t).length > 0);
+  if (!hasData) {
+    container.innerHTML = `<p style="color:var(--text2);font-size:13px;padding:20px 0">Compositions chargées automatiquement depuis Google Sheets au démarrage.</p>`;
+    return;
+  }
+
+  // Collecter tous les pays (union), triés par exposition totale € décroissante
+  const colTotEur = {};
+  tickers.forEach(t => {
+    const valEur = _compValMap[t] ?? 0;
+    getGeo(t).forEach(([pays, pct]) => {
+      colTotEur[pays] = (colTotEur[pays] || 0) + valEur * pct / 100;
+    });
+  });
+  // Séparer "Autres pays" et trier le reste par € décroissant
+  const cols = Object.entries(colTotEur)
+    .filter(([l]) => l !== 'Autres pays')
+    .sort((a, b) => b[1] - a[1])
+    .map(([l]) => l);
+  if (colTotEur['Autres pays']) cols.push('Autres pays');
+
+  const fmtEur = n => n > 0 ? Math.round(n).toLocaleString('fr') + ' €' : '—';
+  const fmtPct = p => p != null ? (Math.round(p * 10) / 10).toFixed(1).replace('.', ',') + '%' : '';
+  const cellStyle = (valEur) => {
+    if (!valEur || valEur <= 0) return 'color:var(--text2);font-size:10px';
+    const max = Math.max(...Object.values(colTotEur));
+    const intensity = Math.min(valEur / max, 1);
+    const alpha = 0.08 + intensity * 0.45;
+    return `background:rgba(37,99,235,${alpha.toFixed(2)});color:${intensity > 0.4 ? '#fff' : 'var(--text)'};font-weight:${intensity > 0.3 ? '600' : '400'}`;
+  };
+
+  let html = `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+    <table style="border-collapse:collapse;font-size:11px;white-space:nowrap;width:100%">
+      <thead><tr>
+        <th style="text-align:left;padding:7px 10px;background:var(--bg3);border-bottom:2px solid var(--border2);position:sticky;left:0;z-index:2;min-width:130px">ETF</th>
+        <th style="padding:7px 10px;background:var(--bg3);border-bottom:2px solid var(--border2);color:var(--text2);font-weight:500;text-align:right">Valeur €</th>
+        ${cols.map(c => `<th style="padding:7px 8px;background:var(--bg3);border-bottom:2px solid var(--border2);color:var(--text2);font-weight:500;text-align:right" title="${c}">${c.length > 12 ? c.slice(0,12)+'…' : c}</th>`).join('')}
+        <th style="padding:7px 8px;background:var(--bg3);border-bottom:2px solid var(--border2);color:var(--text2);font-weight:500;text-align:right">Autres</th>
+      </tr></thead>
+      <tbody>`;
+
+  tickers.forEach((t, i) => {
+    const meta   = ETF_META[t] || {};
+    const valEur = _compValMap[t] ?? 0;
+    const geoData = getGeo(t);
+    const pctMap = Object.fromEntries(geoData);
+    const autresPct = pctMap['Autres pays'] ?? 0;
+    const bg = i % 2 === 0 ? 'var(--bg)' : 'var(--bg2)';
+
+    html += `<tr style="background:${bg}">
+      <td style="padding:6px 10px;font-weight:600;position:sticky;left:0;background:${bg};z-index:1;border-right:1px solid var(--border2)">${meta.short || t}</td>
+      <td style="padding:6px 10px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2);font-size:10px">${valEur > 0 ? fmtEur(valEur) : '—'}</td>`;
+
+    cols.forEach(c => {
+      if (c === 'Autres pays') return;
+      const pct = pctMap[c];
+      const euros = pct != null && valEur > 0 ? valEur * pct / 100 : 0;
+      if (pct == null) {
+        html += `<td style="padding:6px 8px;text-align:right;color:var(--text2)">—</td>`;
+      } else {
+        html += `<td style="padding:6px 8px;text-align:right;${cellStyle(euros)}" title="${c}: ${fmtPct(pct)} = ${fmtEur(euros)}">
+          <div style="font-size:11px">${fmtPct(pct)}</div>
+          <div style="font-size:10px;opacity:0.8">${valEur > 0 ? fmtEur(euros) : ''}</div>
+        </td>`;
+      }
+    });
+
+    // Colonne Autres pays
+    html += `<td style="padding:6px 8px;text-align:right;color:var(--text2);font-size:10px">${autresPct > 0 ? fmtPct(autresPct) : '—'}</td>`;
+    html += `</tr>`;
+  });
+
+  // Ligne TOTAL
+  html += `<tr style="background:var(--bg3);font-weight:700;border-top:2px solid var(--border2)">
+    <td style="padding:7px 10px;position:sticky;left:0;background:var(--bg3);z-index:1;border-right:1px solid var(--border2)">TOTAL</td>
+    <td style="padding:7px 10px;text-align:right;font-family:'DM Mono',monospace">${fmtEur(tickers.reduce((s,t) => s + (_compValMap[t] ?? 0), 0))}</td>`;
+
+  cols.forEach(c => {
+    if (c === 'Autres pays') return;
+    const tot = colTotEur[c] ?? 0;
+    html += `<td style="padding:7px 8px;text-align:right;font-family:'DM Mono',monospace">${tot > 0 ? fmtEur(tot) : '—'}</td>`;
+  });
+  const autresTotal = colTotEur['Autres pays'] ?? 0;
+  html += `<td style="padding:7px 8px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${autresTotal > 0 ? fmtEur(autresTotal) : '—'}</td>`;
+  html += `</tr></tbody></table></div>`;
+
+  container.innerHTML = html;
+}
+
 function renderCompTables() {
   // ── ETF rows triées par valeur décroissante (même ordre que le portefeuille)
   const tickers = Object.keys(ETF_META).sort((a, b) => {
@@ -5673,19 +5781,16 @@ function renderCompTables() {
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    // Vérifier qu'on a des données de composition
-    const hasData = tickers.some(t => (ETF_COMP_OVERRIDE[t]?.[dataKey] || []).length > 0);
+    // Données de composition : ETF_COMP_OVERRIDE en priorité, ETF_META en fallback
+    const getCompData = (t, key) => {
+      const ov = (ETF_COMP_OVERRIDE[t]?.[key] || []);
+      if (ov.length > 0) return ov;
+      return ETF_META[t]?.[key] || [];
+    };
+    const hasData = tickers.some(t => getCompData(t, dataKey).length > 0);
     if (!hasData) {
       container.innerHTML = `<p style="color:var(--text2);font-size:13px;padding:20px 0">
-        Aucune donnée — importez d'abord le fichier <code>repartition_ETFs.xlsx</code> via le bouton 📂 en haut.
-      </p>`;
-      return;
-    }
-
-    const hasPrices = tickers.some(t => _compValMap[t] != null);
-    if (!hasPrices) {
-      container.innerHTML = `<p style="color:var(--text2);font-size:13px;padding:20px 0">
-        Valeurs actuelles non disponibles — importez les prix depuis l'onglet <strong>Portefeuille</strong> pour afficher les montants en €.
+        Compositions chargées automatiquement depuis Google Sheets au démarrage.
       </p>`;
       return;
     }
@@ -5695,7 +5800,7 @@ function renderCompTables() {
     const colTotalsEur = {};
     tickers.forEach(t => {
       const valEur = _compValMap[t] ?? 0;
-      const data   = ETF_COMP_OVERRIDE[t]?.[dataKey] || [];
+      const data   = getCompData(t, dataKey);
       data.forEach(([label, pct]) => {
         const eur = valEur * pct / 100;
         colTotalsEur[label] = (colTotalsEur[label] || 0) + eur;
@@ -5726,7 +5831,7 @@ function renderCompTables() {
     tickers.forEach((t, i) => {
       const meta   = ETF_META[t] || {};
       const valEur = _compValMap[t] ?? 0;
-      const data   = ETF_COMP_OVERRIDE[t]?.[dataKey] || [];
+      const data   = getCompData(t, dataKey);
       const pctMap = Object.fromEntries(data);
       const bg     = i % 2 === 0 ? 'var(--bg)' : 'var(--bg2)';
       const valStr = valEur > 0 ? fmtEur(valEur) : '—';
@@ -5756,7 +5861,7 @@ function renderCompTables() {
     container.innerHTML = html;
   }
 
-  buildTable('comp_geo', 'geoAll');
+  buildCompGeoTable('comp_geo');
   buildTable('comp_sec', 'sectorsAll');
   buildTable('comp_pos', 'positionsAll');
 }
