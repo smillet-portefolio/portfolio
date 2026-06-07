@@ -1744,11 +1744,12 @@ function isActiveInv(r) {
 function buildGeoExposure() {
   const payMap = {};  // { pays: valEur (float, arrondi à la fin) }
 
-  // ── ETFs : copie exacte de renderCompTables ligne 3737 ────────────────────
-  Object.keys(ETF_COMP_OVERRIDE).forEach(ticker => {
+  // ── ETFs : itérer sur ETF_META avec fallback ETF_COMP_OVERRIDE ─────────────
+  Object.keys(ETF_META).forEach(ticker => {
     const valEur = _compValMap[ticker] ?? 0;
     if (!valEur) return;
-    const geoAll = (ETF_COMP_OVERRIDE[ticker]?.geoAll || []).length > 0 ? ETF_COMP_OVERRIDE[ticker].geoAll : (ETF_META[ticker]?.geo || []);
+    const ov = ETF_COMP_OVERRIDE[ticker]?.geoAll || [];
+    const geoAll = ov.length > 0 ? ov : (ETF_META[ticker]?.geo || []);
     geoAll.forEach(([pays, pct]) => {
       payMap[pays] = (payMap[pays] || 0) + (valEur * pct / 100);
     });
@@ -1793,11 +1794,12 @@ function buildSectExposure() {
   const etfMap = {};  // secteur → € (ETFs uniquement)
   const actMap = {};  // secteur → € (actions directes uniquement)
 
-  // ── ETFs : même calcul que renderCompTables / sectorsAll ─────────────────
-  Object.keys(ETF_COMP_OVERRIDE).forEach(ticker => {
+  // ── ETFs : itérer sur ETF_META avec fallback ETF_COMP_OVERRIDE ─────────────
+  Object.keys(ETF_META).forEach(ticker => {
     const valEur = _compValMap[ticker] ?? 0;
     if (!valEur) return;
-    const sectorsAll = (ETF_COMP_OVERRIDE[ticker]?.sectorsAll || []).length > 0 ? ETF_COMP_OVERRIDE[ticker].sectorsAll : (ETF_META[ticker]?.sectors || []);
+    const ovs = ETF_COMP_OVERRIDE[ticker]?.sectorsAll || [];
+    const sectorsAll = ovs.length > 0 ? ovs : (ETF_META[ticker]?.sectors || []);
     sectorsAll.forEach(([sect, pct]) => {
       etfMap[sect] = (etfMap[sect] || 0) + (valEur * pct / 100);
     });
@@ -2086,27 +2088,35 @@ const LT_SHORT_TO_TICKER = {
 };
 
 function buildLTData(filter) {
-  // Construire la liste des tickers à inclure
+  // Source de vérité : ETF_META, données : ETF_COMP_OVERRIDE avec fallback ETF_META
+  const getPos = t => {
+    const ov = ETF_COMP_OVERRIDE[t]?.positionsAll || [];
+    return ov.length > 0 ? ov : (ETF_META[t]?.positions || []);
+  };
+
+  const allTickers = Object.keys(ETF_META);
   const tickers = filter === 'all'
-    ? Object.keys(ETF_COMP_OVERRIDE)
+    ? allTickers
     : [LT_SHORT_TO_TICKER[filter]].filter(Boolean);
 
-  // Agréger les positions : { "NVIDIA Corp." : { valEur, sources:[{etf,pct}] } }
+  // Agréger : { "NVIDIA Corp." : { valEur, ticker (plus gros contributeur) } }
   const posMap = {};
 
   tickers.forEach(ticker => {
     const valEur = _compValMap[ticker];
     if (!valEur) return;
-    const positions = (ETF_COMP_OVERRIDE[ticker]?.positionsAll || []).length > 0 ? ETF_COMP_OVERRIDE[ticker].positionsAll : (ETF_META[ticker]?.positions || []);
-    positions.forEach(([name, pct]) => {
+    getPos(ticker).forEach(([name, pct]) => {
       const exposed = Math.round(valEur * pct / 100);
+      if (exposed <= 0) return;
       if (!posMap[name]) posMap[name] = { valEur: 0, ticker };
       posMap[name].valEur += exposed;
-      posMap[name].ticker = ticker; // garde le ticker du plus gros contributeur
+      // Garder le ticker du plus gros contributeur pour la couleur
+      if ((_compValMap[ticker] || 0) > (_compValMap[posMap[name].ticker] || 0)) {
+        posMap[name].ticker = ticker;
+      }
     });
   });
 
-  // Trier par valeur décroissante
   return Object.entries(posMap)
     .map(([name, d]) => ({ l: name, v: d.valEur, c: LT_ETF_COLORS[d.ticker] || '#60a5fa' }))
     .filter(d => d.v > 0)
@@ -2142,7 +2152,7 @@ function renderLTChart(filter) {
   // Légende : ETFs concernés
   if (leg) {
     const tickers = filter === 'all'
-      ? Object.keys(ETF_COMP_OVERRIDE).filter(t => _compValMap[t] > 0)
+      ? Object.keys(ETF_META).filter(t => _compValMap[t] > 0)
       : [LT_SHORT_TO_TICKER[filter]].filter(t => t && _compValMap[t] > 0);
     leg.innerHTML = tickers.map(t => {
       const meta = ETF_META[t] || {};
@@ -2172,10 +2182,11 @@ function buildEffData() {
   const posMap = {};  // { "NVIDIA Corp." : { v, c, isETF } }
 
   // ── 1. ETFs décomposés — agrégés par nom de position ───────────────────
-  Object.keys(ETF_COMP_OVERRIDE).forEach(ticker => {
+  Object.keys(ETF_META).forEach(ticker => {
     const valEur    = _compValMap[ticker];
     if (!valEur) return;
-    const positions = (ETF_COMP_OVERRIDE[ticker]?.positionsAll || []).length > 0 ? ETF_COMP_OVERRIDE[ticker].positionsAll : (ETF_META[ticker]?.positions || []);
+    const ov = ETF_COMP_OVERRIDE[ticker]?.positionsAll || [];
+    const positions = ov.length > 0 ? ov : (ETF_META[ticker]?.positions || []);
     const color     = LT_ETF_COLORS[ticker] || '#60a5fa';
 
     positions.forEach(([name, pct]) => {
@@ -2232,7 +2243,7 @@ function renderEffChart() {
 
   // Légende : ETFs + actions directes
   if (leg) {
-    const etfEntries = Object.keys(ETF_COMP_OVERRIDE)
+    const etfEntries = Object.keys(ETF_META)
       .filter(t => _compValMap[t] > 0)
       .map(t => {
         const meta = ETF_META[t] || {};
@@ -3737,8 +3748,11 @@ async function gsLoadPrices() {
 async function gsLoadETFComp() {
   const status = document.getElementById('etfCompStatus');
 
-  // Si compositions déjà en mémoire (chargées depuis localStorage) : appliquer directement
-  if (Object.keys(ETF_COMP_OVERRIDE).length > 0) {
+  // Si compositions déjà en mémoire avec 10 positions : appliquer directement
+  const hasFullPositions = Object.keys(ETF_COMP_OVERRIDE).some(t =>
+    (ETF_COMP_OVERRIDE[t]?.positionsAll || []).length >= 5
+  );
+  if (Object.keys(ETF_COMP_OVERRIDE).length > 0 && hasFullPositions) {
     applyETFCompositionOverride();
     renderETFFiches();
     renderCompTables();
@@ -3818,7 +3832,7 @@ async function gsLoadETFComp() {
           .sort((a,b) => b[1]-a[1]);
         if (!result[ticker]) result[ticker] = {};
         result[ticker].positionsAll = all;
-        result[ticker].positions    = all.slice(0,3);
+        result[ticker].positions    = all.slice(0,10);
       });
     }
 
@@ -5564,7 +5578,7 @@ function importETFComposition(file) {
           .sort((a,b) => b[1]-a[1]);
         if (!result[ticker]) result[ticker] = {};
         result[ticker].positionsAll = all;
-        result[ticker].positions    = all.slice(0,3);
+        result[ticker].positions    = all.slice(0,10);
       });
 
       // Stamp date and save
@@ -5656,6 +5670,10 @@ function swCompTab(id, btn) {
     if (el) el.classList.remove('active');
   });
   if (btn) btn.classList.add('active');
+  // Re-render le contenu à chaque clic
+  if (id === 'comp_geo') buildCompGeoTable('comp_geo');
+  else if (id === 'comp_sec') buildCompSecTable('comp_sec');
+  else if (id === 'comp_pos') buildCompPosTable('comp_pos');
 }
 
 // ── Tableau géographie : 1 ligne/ETF × 1 col/pays, valeur actuelle € ─────────
@@ -5663,12 +5681,8 @@ function buildCompGeoTable(containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
 
+  // Tous les ETFs de ETF_META, triés par valeur actuelle décroissante
   const tickers = Object.keys(ETF_META)
-    .filter(t => {
-      // Seulement les ETFs en portefeuille avec une valeur actuelle
-      const rows = BOOK2_ROWS.filter(r => r.ticker === t && ETF_TICKERS.has(r.ticker));
-      return rows.length > 0;
-    })
     .sort((a, b) => (_compValMap[b] ?? 0) - (_compValMap[a] ?? 0));
 
   // Récupérer les données géo (ETF_COMP_OVERRIDE ou ETF_META fallback)
@@ -5761,6 +5775,193 @@ function buildCompGeoTable(containerId) {
   });
   const autresTotal = colTotEur['Autres pays'] ?? 0;
   html += `<td style="padding:7px 8px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${autresTotal > 0 ? fmtEur(autresTotal) : '—'}</td>`;
+  html += `</tr></tbody></table></div>`;
+
+  container.innerHTML = html;
+}
+
+// ── Tableau secteurs : 1 ligne/ETF × 1 col/secteur, valeur actuelle € ────────
+function buildCompSecTable(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const tickers = Object.keys(ETF_META)
+    .sort((a, b) => (_compValMap[b] ?? 0) - (_compValMap[a] ?? 0));
+
+  const getSec = t => {
+    const ov = ETF_COMP_OVERRIDE[t]?.sectorsAll || [];
+    return ov.length > 0 ? ov : (ETF_META[t]?.sectors || []);
+  };
+
+  const hasData = tickers.some(t => getSec(t).length > 0);
+  if (!hasData) {
+    container.innerHTML = `<p style="color:var(--text2);font-size:13px;padding:20px 0">Compositions chargées automatiquement depuis Google Sheets au démarrage.</p>`;
+    return;
+  }
+
+  // Collecter tous les secteurs, triés par exposition totale € décroissante
+  const colTotEur = {};
+  tickers.forEach(t => {
+    const valEur = _compValMap[t] ?? 0;
+    getSec(t).forEach(([sect, pct]) => {
+      colTotEur[sect] = (colTotEur[sect] || 0) + valEur * pct / 100;
+    });
+  });
+  const cols = Object.entries(colTotEur)
+    .filter(([l]) => l !== 'Autres')
+    .sort((a, b) => b[1] - a[1])
+    .map(([l]) => l);
+  if (colTotEur['Autres']) cols.push('Autres');
+
+  const fmtEur = n => n > 0 ? Math.round(n).toLocaleString('fr') + ' €' : '—';
+  const fmtPct = p => p != null ? (Math.round(p * 10) / 10).toFixed(1).replace('.', ',') + '%' : '';
+
+  // Couleur par secteur
+  const sectorColor = s => SECTOR_UNIFIED_COLORS?.[s] || '#6366f1';
+  const cellStyle = (valEur, sect) => {
+    if (!valEur || valEur <= 0) return 'color:var(--text2);font-size:10px';
+    const max = Math.max(...Object.values(colTotEur).filter(v => v > 0));
+    const intensity = Math.min(valEur / max, 1);
+    const col = sectorColor(sect);
+    // Convertir hex en rgb pour rgba
+    const r = parseInt(col.slice(1,3),16), g = parseInt(col.slice(3,5),16), b = parseInt(col.slice(5,7),16);
+    const alpha = 0.1 + intensity * 0.5;
+    return `background:rgba(${r},${g},${b},${alpha.toFixed(2)});color:${intensity > 0.35 ? '#fff' : 'var(--text)'};font-weight:${intensity > 0.25 ? '600' : '400'}`;
+  };
+
+  let html = `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+    <table style="border-collapse:collapse;font-size:11px;white-space:nowrap;width:100%">
+      <thead><tr>
+        <th style="text-align:left;padding:7px 10px;background:var(--bg3);border-bottom:2px solid var(--border2);position:sticky;left:0;z-index:2;min-width:130px">ETF</th>
+        <th style="padding:7px 10px;background:var(--bg3);border-bottom:2px solid var(--border2);color:var(--text2);font-weight:500;text-align:right">Valeur €</th>
+        ${cols.map(c => `<th style="padding:7px 8px;background:var(--bg3);border-bottom:2px solid var(--border2);color:var(--text2);font-weight:500;text-align:right" title="${c}">${c.length > 14 ? c.slice(0,14)+'…' : c}</th>`).join('')}
+      </tr></thead>
+      <tbody>`;
+
+  tickers.forEach((t, i) => {
+    const meta    = ETF_META[t] || {};
+    const valEur  = _compValMap[t] ?? 0;
+    const secData = getSec(t);
+    const pctMap  = Object.fromEntries(secData);
+    const bg      = i % 2 === 0 ? 'var(--bg)' : 'var(--bg2)';
+
+    html += `<tr style="background:${bg}">
+      <td style="padding:6px 10px;font-weight:600;position:sticky;left:0;background:${bg};z-index:1;border-right:1px solid var(--border2)">${meta.short || t}</td>
+      <td style="padding:6px 10px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2);font-size:10px">${valEur > 0 ? fmtEur(valEur) : '—'}</td>`;
+
+    cols.forEach(c => {
+      const pct   = pctMap[c];
+      const euros = pct != null && valEur > 0 ? valEur * pct / 100 : 0;
+      if (pct == null) {
+        html += `<td style="padding:6px 8px;text-align:right;color:var(--text2)">—</td>`;
+      } else {
+        html += `<td style="padding:6px 8px;text-align:right;${cellStyle(euros, c)}" title="${c}: ${fmtPct(pct)} = ${fmtEur(euros)}">
+          <div style="font-size:11px">${fmtPct(pct)}</div>
+          <div style="font-size:10px;opacity:0.85">${valEur > 0 ? fmtEur(euros) : ''}</div>
+        </td>`;
+      }
+    });
+    html += `</tr>`;
+  });
+
+  // Ligne TOTAL
+  html += `<tr style="background:var(--bg3);font-weight:700;border-top:2px solid var(--border2)">
+    <td style="padding:7px 10px;position:sticky;left:0;background:var(--bg3);z-index:1;border-right:1px solid var(--border2)">TOTAL</td>
+    <td style="padding:7px 10px;text-align:right;font-family:'DM Mono',monospace">${fmtEur(tickers.reduce((s,t) => s + (_compValMap[t] ?? 0), 0))}</td>`;
+  cols.forEach(c => {
+    const tot = colTotEur[c] ?? 0;
+    html += `<td style="padding:7px 8px;text-align:right;font-family:'DM Mono',monospace">${tot > 0 ? fmtEur(tot) : '—'}</td>`;
+  });
+  html += `</tr></tbody></table></div>`;
+
+  container.innerHTML = html;
+}
+
+// ── Tableau positions : 1 ligne/ETF × 1 col/position, valeur actuelle € ─────
+function buildCompPosTable(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const tickers = Object.keys(ETF_META)
+    .sort((a, b) => (_compValMap[b] ?? 0) - (_compValMap[a] ?? 0));
+
+  const getPos = t => {
+    const ov = ETF_COMP_OVERRIDE[t]?.positionsAll || [];
+    return ov.length > 0 ? ov : (ETF_META[t]?.positions || []);
+  };
+
+  const hasData = tickers.some(t => getPos(t).length > 0);
+  if (!hasData) {
+    container.innerHTML = `<p style="color:var(--text2);font-size:13px;padding:20px 0">Compositions chargées automatiquement depuis Google Sheets au démarrage.</p>`;
+    return;
+  }
+
+  // Collecter toutes les positions (union), triées par exposition totale € décroissante
+  const colTotEur = {};
+  tickers.forEach(t => {
+    const valEur = _compValMap[t] ?? 0;
+    getPos(t).forEach(([pos, pct]) => {
+      colTotEur[pos] = (colTotEur[pos] || 0) + valEur * pct / 100;
+    });
+  });
+  const cols = Object.entries(colTotEur)
+    .sort((a, b) => b[1] - a[1])
+    .map(([l]) => l);
+
+  const fmtEur = n => n > 0 ? Math.round(n).toLocaleString('fr') + ' €' : '—';
+  const fmtPct = p => p != null ? (Math.round(p * 10) / 10).toFixed(1).replace('.', ',') + '%' : '';
+
+  const cellStyle = valEur => {
+    if (!valEur || valEur <= 0) return 'color:var(--text2)';
+    const max = Math.max(...Object.values(colTotEur).filter(v => v > 0));
+    const intensity = Math.min(valEur / max, 1);
+    const alpha = 0.08 + intensity * 0.5;
+    return `background:rgba(99,102,241,${alpha.toFixed(2)});color:${intensity > 0.35 ? '#fff' : 'var(--text)'};font-weight:${intensity > 0.25 ? '600' : '400'}`;
+  };
+
+  let html = `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+    <table style="border-collapse:collapse;font-size:11px;white-space:nowrap;width:100%">
+      <thead><tr>
+        <th style="text-align:left;padding:7px 10px;background:var(--bg3);border-bottom:2px solid var(--border2);position:sticky;left:0;z-index:2;min-width:130px">ETF</th>
+        <th style="padding:7px 10px;background:var(--bg3);border-bottom:2px solid var(--border2);color:var(--text2);font-weight:500;text-align:right">Valeur €</th>
+        ${cols.map(c => `<th style="padding:7px 8px;background:var(--bg3);border-bottom:2px solid var(--border2);color:var(--text2);font-weight:500;text-align:right" title="${c}">${c.length > 14 ? c.slice(0,14)+'…' : c}</th>`).join('')}
+      </tr></thead>
+      <tbody>`;
+
+  tickers.forEach((t, i) => {
+    const meta   = ETF_META[t] || {};
+    const valEur = _compValMap[t] ?? 0;
+    const posData = getPos(t);
+    const pctMap  = Object.fromEntries(posData);
+    const bg      = i % 2 === 0 ? 'var(--bg)' : 'var(--bg2)';
+
+    html += `<tr style="background:${bg}">
+      <td style="padding:6px 10px;font-weight:600;position:sticky;left:0;background:${bg};z-index:1;border-right:1px solid var(--border2)">${meta.short || t}</td>
+      <td style="padding:6px 10px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2);font-size:10px">${valEur > 0 ? fmtEur(valEur) : '—'}</td>`;
+
+    cols.forEach(c => {
+      const pct   = pctMap[c];
+      const euros = pct != null && valEur > 0 ? valEur * pct / 100 : 0;
+      if (pct == null) {
+        html += `<td style="padding:6px 8px;text-align:right;color:var(--text2)">—</td>`;
+      } else {
+        html += `<td style="padding:6px 8px;text-align:right;${cellStyle(euros)}" title="${c}: ${fmtPct(pct)} = ${fmtEur(euros)}">
+          <div style="font-size:11px">${fmtPct(pct)}</div>
+          <div style="font-size:10px;opacity:0.85">${valEur > 0 ? fmtEur(euros) : ''}</div>
+        </td>`;
+      }
+    });
+    html += `</tr>`;
+  });
+
+  // Ligne TOTAL
+  html += `<tr style="background:var(--bg3);font-weight:700;border-top:2px solid var(--border2)">
+    <td style="padding:7px 10px;position:sticky;left:0;background:var(--bg3);z-index:1;border-right:1px solid var(--border2)">TOTAL</td>
+    <td style="padding:7px 10px;text-align:right;font-family:'DM Mono',monospace">${fmtEur(tickers.reduce((s,t) => s + (_compValMap[t] ?? 0), 0))}</td>`;
+  cols.forEach(c => {
+    const tot = colTotEur[c] ?? 0;
+    html += `<td style="padding:7px 8px;text-align:right;font-family:'DM Mono',monospace">${tot > 0 ? fmtEur(tot) : '—'}</td>`;
+  });
   html += `</tr></tbody></table></div>`;
 
   container.innerHTML = html;
@@ -5862,8 +6063,8 @@ function renderCompTables() {
   }
 
   buildCompGeoTable('comp_geo');
-  buildTable('comp_sec', 'sectorsAll');
-  buildTable('comp_pos', 'positionsAll');
+  buildCompSecTable('comp_sec');
+  buildCompPosTable('comp_pos');
 }
 
 // ── Tableaux géographie ETF (% et €) ─────────────────────────────────────────
