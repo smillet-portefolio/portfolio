@@ -1075,6 +1075,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderETFFiches();
         renderCompTables();
         renderETFGeoTables();
+        setTimeout(() => { renderLTChart('all'); renderEffChart(); }, 300);
         const date = localStorage.getItem('etf_comp_date');
         const status = document.getElementById('etfCompStatus');
         if (status && date) {
@@ -1127,7 +1128,7 @@ function swS(parent, id, btn) {
   if (!chartInited[id]) {
     chartInited[id] = true;
     setTimeout(() => {
-      if (id === 'pos_lt')  renderLTChart('all');
+      renderLTChart('all');
       if (id === 'pos_eff') renderEffChart();
     }, 50);
   }
@@ -2124,24 +2125,22 @@ function buildLTData(filter) {
 }
 
 function renderLTChart(filter) {
+  const wrap = document.getElementById('ltChartWrap');
+  const leg  = document.getElementById('ltChartLegend');
+  if (!wrap) return;
+
   const hasComp = Object.keys(ETF_META).some(t => (ETF_COMP_OVERRIDE[t]?.positionsAll || ETF_META[t]?.positions || []).length > 0);
   const hasVal  = Object.keys(_compValMap).length > 0;
 
-  const wrap = document.getElementById('ltChartWrap');
-  const leg  = document.getElementById('ltChartLegend');
-
   if (!hasComp || !hasVal) {
     if (ltChartInstance) { ltChartInstance.destroy(); ltChartInstance = null; }
-    if (wrap) wrap.innerHTML = `<p style="color:var(--text2);font-size:12px;padding:16px 0">
-      ${!hasComp ? 'Compositions chargées automatiquement depuis Google Sheets au démarrage.' :
-                   'Importez les prix depuis l\'onglet <strong>Portefeuille</strong> pour calculer les valeurs exposées.'}
+    wrap.innerHTML = `<p style="color:var(--text2);font-size:12px;padding:16px 0">
+      ${!hasComp ? 'Connectez-vous à Google Sheets pour charger les compositions ETF.' :
+                   'Connectez-vous à Google Sheets pour charger les prix.'}
     </p>`;
     if (leg) leg.innerHTML = '';
     return;
   }
-
-  // Rebuild canvas if needed
-  if (!document.getElementById('ltChart') || !wrap) return;
 
   const data = buildLTData(filter);
   const tot  = data.reduce((s, d) => s + d.v, 0);
@@ -2149,7 +2148,7 @@ function renderLTChart(filter) {
   // Ajuster hauteur
   wrap.style.height = Math.max(300, data.length * 34 + 40) + 'px';
 
-  // Légende : ETFs concernés
+  // Légende
   if (leg) {
     const tickers = filter === 'all'
       ? Object.keys(ETF_META).filter(t => _compValMap[t] > 0)
@@ -2163,12 +2162,8 @@ function renderLTChart(filter) {
     }).join('');
   }
 
-  // Détruire l'ancien chart
   if (ltChartInstance) { ltChartInstance.destroy(); ltChartInstance = null; }
-
-  // Recréer le canvas (pour éviter les conflits Chart.js)
   wrap.innerHTML = '<canvas id="ltChart" role="img"></canvas>';
-
   ltChartInstance = makeBar('ltChart', data, tot || 1);
 }
 
@@ -2897,7 +2892,7 @@ function updateTableRows() {
   setTimeout(renderPosChart, 100);
   if (document.getElementById('dashboard')?.classList.contains('active')) renderDashboard();
   setTimeout(() => {
-    if (document.getElementById('pos_lt')?.classList.contains('active')) renderLTChart('all');
+    renderLTChart('all');
     if (document.getElementById('pos_eff')?.classList.contains('active')) renderEffChart();
     if (document.getElementById('geo')?.classList.contains('active'))     renderGeoCharts();
     if (document.getElementById('sect')?.classList.contains('active'))    renderSectCharts();
@@ -3855,6 +3850,10 @@ async function gsLoadETFComp() {
     // Re-render après délai pour s'assurer que _compValMap est à jour
     setTimeout(() => {
       renderCompTables();
+      renderLTChart('all');
+      if (document.getElementById('pos_eff')?.classList.contains('active')) renderEffChart();
+      renderLTChart('all');
+      renderEffChart();
     }, 500);
 
     const n   = Object.keys(result).length;
@@ -3872,6 +3871,7 @@ async function gsLoadETFComp() {
         renderETFFiches();
         renderCompTables();
         renderETFGeoTables();
+        setTimeout(() => { renderLTChart('all'); renderEffChart(); }, 300);
         const date = localStorage.getItem('etf_comp_date');
         const fmt  = date ? new Date(date).toLocaleString('fr',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
         if (status) status.innerHTML = `<span style="color:var(--text2)">Compositions du ${fmt} (depuis sauvegarde)</span>`;
@@ -5605,7 +5605,7 @@ function importETFComposition(file) {
       renderCompTables();
       renderETFGeoTables();
       // Rafraîchir le look-through si l'onglet est visible
-      if (document.getElementById('pos_lt')?.classList.contains('active')) renderLTChart('all');
+      renderLTChart('all');
       if (document.getElementById('pos_eff')?.classList.contains('active')) renderEffChart();
       if (document.getElementById('geo')?.classList.contains('active'))     renderGeoCharts();
       if (document.getElementById('sect')?.classList.contains('active'))    renderSectCharts();
