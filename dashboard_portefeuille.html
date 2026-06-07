@@ -559,17 +559,7 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
         <button class="sub-tab" onclick="swS('etfs','etf_ter',this)">Analyse TER</button>
         <button class="sub-tab" onclick="swS('etfs','etf_comp',this)">Composition complète</button>
       </div>
-      <input type="file" id="etfCompInput" accept=".xlsx,.xls" style="display:none"
-             onchange="importETFComposition(this.files[0])">
-      <button onclick="document.getElementById('etfCompInput').click()"
-        style="margin-left:auto;padding:6px 13px;background:var(--bg2);color:var(--text);border:1px solid var(--border2);border-radius:var(--radius-sm);font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px">
-        📂 repartition_ETFs.xlsx
-      </button>
-      <button onclick="gsLoadETFComp()"
-        style="padding:6px 13px;background:#1e3a5f;color:#93c5fd;border:1px solid #2563eb;border-radius:var(--radius-sm);font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px">
-        ☁️ Charger depuis GSheets
-      </button>
-      <span id="etfCompStatus" style="font-size:11px;color:var(--text2)"></span>
+      <span id="etfCompStatus" style="font-size:11px;color:var(--text2);margin-left:auto"></span>
     </div>
 
     <div id="etf_ov" class="sub-section active">
@@ -822,7 +812,7 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
 
     <!-- ── Composition complète ────────────────────────────────────────── -->
     <div id="etf_comp" class="sub-section">
-      <p class="section-desc" style="margin-bottom:14px">Données issues du dernier import <code>repartition_ETFs.xlsx</code>. Chaque ligne = un ETF, chaque colonne = un pays / secteur / position.</p>
+      <p class="section-desc" style="margin-bottom:14px">Données chargées depuis Google Sheets (onglets ETF_Country, ETF_Sector, ETF_Top10).</p>
       <div class="sub-tabs" style="margin-bottom:14px">
         <button class="sub-tab active" onclick="swCompTab('comp_geo',this)" id="btn_comp_geo">Géographie</button>
         <button class="sub-tab" onclick="swCompTab('comp_sec',this)" id="btn_comp_sec">Secteurs</button>
@@ -1078,7 +1068,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.removeItem('etf_comp_override');
         localStorage.removeItem('etf_comp_date');
         const status = document.getElementById('etfCompStatus');
-        if (status) status.innerHTML = `<span style="color:#f97316">⚠️ Données obsolètes — veuillez réimporter <code>repartition_ETFs.xlsx</code></span>`;
+        if (status) status.innerHTML = `<span style="color:#f97316">⚠️ Données obsolètes — connectez-vous à Google Sheets pour recharger</span>`;
       } else {
         ETF_COMP_OVERRIDE = parsed;
         applyETFCompositionOverride();
@@ -1849,7 +1839,7 @@ function renderSectCharts() {
     });
     if (msg) msg.innerHTML = `<p style="color:var(--text2);font-size:12px;padding:8px 0">
       ${!hasComp
-        ? 'Importez <code>repartition_ETFs.xlsx</code> (bouton 📂 onglet ETFs) pour afficher les graphiques sectoriels.'
+        ? 'Compositions chargées automatiquement depuis Google Sheets au démarrage.'
         : 'Importez les prix depuis l\'onglet <strong>Portefeuille</strong> pour calculer les valeurs exposées.'}
     </p>`;
     return;
@@ -1917,7 +1907,7 @@ function renderGeoCharts() {
     Object.keys(_geoCharts).forEach(id => { _geoCharts[id]?.destroy(); delete _geoCharts[id]; });
     if (msg) msg.innerHTML = `<p style="color:var(--text2);font-size:12px;padding:8px 0">
       ${!hasComp
-        ? 'Importez <code>repartition_ETFs.xlsx</code> (bouton 📂 onglet ETFs) pour afficher les graphiques géographiques.'
+        ? 'Compositions chargées automatiquement depuis Google Sheets au démarrage.'
         : 'Importez les prix depuis l\'onglet <strong>Portefeuille</strong> pour calculer les valeurs exposées.'}
     </p>`;
     return;
@@ -2133,7 +2123,7 @@ function renderLTChart(filter) {
   if (!hasComp || !hasVal) {
     if (ltChartInstance) { ltChartInstance.destroy(); ltChartInstance = null; }
     if (wrap) wrap.innerHTML = `<p style="color:var(--text2);font-size:12px;padding:16px 0">
-      ${!hasComp ? 'Importez <code>repartition_ETFs.xlsx</code> (bouton 📂 dans l\'onglet ETFs) pour afficher le look-through.' :
+      ${!hasComp ? 'Compositions chargées automatiquement depuis Google Sheets au démarrage.' :
                    'Importez les prix depuis l\'onglet <strong>Portefeuille</strong> pour calculer les valeurs exposées.'}
     </p>`;
     if (leg) leg.innerHTML = '';
@@ -2232,7 +2222,7 @@ function renderEffChart() {
 
   if (!hasComp) {
     if (wrap) wrap.innerHTML = `<p style="color:var(--text2);font-size:12px;padding:16px 0">
-      Importez <code>repartition_ETFs.xlsx</code> (bouton 📂 dans l'onglet ETFs) pour décomposer les ETFs.</p>`;
+      Compositions chargées automatiquement depuis Google Sheets au démarrage.</p>`;
     if (leg) leg.innerHTML = '';
     return;
   }
@@ -3585,8 +3575,9 @@ function gsSignIn() {
       document.getElementById('syncLoginBtn').style.display = 'none';
       document.getElementById('syncSaveBtn').style.display  = '';
       document.getElementById('syncLoadBtn').style.display  = '';
-      gsSetMsg('Connecté ! Chargement des prix...', '#22c55e');
+      gsSetMsg('Connecté ! Chargement des prix et compositions ETF...', '#22c55e');
       gsLoadPrices();
+      gsLoadETFComp();
     }
   }).requestAccessToken();
 }
