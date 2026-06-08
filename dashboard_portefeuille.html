@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0062)file:///C:/Users/smill/Downloads/dashboard_portefeuille_3.html -->
+<!-- saved from url=(0062)file:///C:/Users/smill/Downloads/dashboard_portefeuille_4.html -->
 <html lang="fr"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -4625,12 +4625,17 @@ function mergeEvoRows() {
 }
 
 function renderEvolution() {
-  // Créer la section si elle n'existe pas
-  if (!document.getElementById('evolution')) {
-    const div = document.createElement('div');
-    div.id        = 'evolution';
-    div.className = 'section';
-    div.innerHTML = `
+  // Créer ou mettre à jour la section
+  let evoDiv = document.getElementById('evolution');
+  if (!evoDiv) {
+    evoDiv = document.createElement('div');
+    evoDiv.id        = 'evolution';
+    evoDiv.className = 'section';
+    document.querySelector('.container').appendChild(evoDiv);
+  }
+  // Toujours injecter le HTML (div peut être vide)
+  if (!document.getElementById('evo_kpis')) {
+    evoDiv.innerHTML = `
       <h2 style="margin-bottom:4px">📈 Évolution du portefeuille</h2>
       <p class="section-desc" style="margin-bottom:20px">Historique quotidien — valeur actuelle et montant investi</p>
       <div id="evo_kpis" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:24px"></div>
@@ -4678,7 +4683,6 @@ function renderEvolution() {
           <tbody id="evoTableBody"></tbody>
         </table>
       </div>`;
-    document.querySelector('.container').appendChild(div);
   }
 
   const rows = mergeEvoRows();
