@@ -2502,6 +2502,7 @@ function buildPosTable(rebuild) {
     const pnlPct   = pnl != null && costEur > 0 ? pnl / costEur * 100 : null;
     return {
       _i: i,
+      isin: r.isin || '',
       name: r.name, ticker: r.ticker, broker: r.broker,
       date: r.date, currency: r.currency,
       qty: r.qty, cost: r.cost, costTotal: r.cost * r.qty,
@@ -2515,6 +2516,7 @@ function buildPosTable(rebuild) {
   // ── Filtre ────────────────────────────────────────────────────────────────
   const f = _edFilter;
   rows = rows.filter(r => {
+    if (f.isin     && !r.isin.toLowerCase().includes(f.isin))         return false;
     if (f.name     && !r.name.toLowerCase().includes(f.name))         return false;
     if (f.typeInv  && !r.typeInv.toLowerCase().includes(f.typeInv))   return false;
     if (f.ticker   && !r.ticker.toLowerCase().includes(f.ticker))     return false;
@@ -5708,43 +5710,164 @@ const STOCK_COLORS = {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ONGLET "ACTIONS ETFs +/-" — une ligne par investissement + variations de cours
+//   • n'affiche que les types : Action / ETF / Crypto (ou non typé hérité)
+//   • tri par colonne (clic en-tête) + filtres par colonne
 // ══════════════════════════════════════════════════════════════════════════════
-function renderActEtf() {
-  const sec = document.getElementById('actetf');
-  if (!sec) return;
+const AE_VARCOLS = ['YTD','1D','1W','1M','3M','6M','1Y'];
+const AE_COLS = [
+  { k:'name',    label:'Nom',         type:'str', align:'left'  },
+  { k:'isin',    label:'ISIN',        type:'str', align:'left'  },
+  { k:'qty',     label:'Qté',         type:'num', align:'right' },
+  { k:'pxAchat', label:'Prix achat',  type:'num', align:'right' },
+  { k:'pxCurr',  label:'Prix actuel', type:'num', align:'right' },
+  { k:'valEur',  label:'Valeur €',    type:'num', align:'right' },
+  { k:'pnl',     label:'P&L €',       type:'num', align:'right' },
+  { k:'pnlPct',  label:'P&L %',       type:'num', align:'right' },
+];
+let _aeSort = { col:'valEur', dir:-1 };
+let _aeFilter = {};
 
-  const VAR_COLS = ['YTD','1D','1W','1M','3M','6M','1Y'];
+// Valeur d'une cellule pour tri/filtre (gère les colonnes de variation)
+function _aeVal(r, col) {
+  return AE_VARCOLS.includes(col) ? (r.vars ? r.vars[col] : null) : r[col];
+}
 
-  // ── Agrégation : une ligne par investissement (ticker + ISIN) ──────────────
+// Construit la liste complète (filtrée par type Action/ETF/Crypto, une ligne / investissement)
+function _aeBuildRows() {
+  const allowed = r => {
+    const t = (r.typeInv || '').toLowerCase();
+    return t === '' || t === 'action' || t === 'etf' || t === 'crypto';
+  };
   const map = {};
   BOOK2_ROWS.forEach(r => {
+    if (!allowed(r)) return;
     const key = r.ticker + '|' + (r.isin || '');
     if (!map[key]) {
       map[key] = {
         name: r.name, ticker: r.ticker, isin: r.isin || '',
         currency: r.currency, qty: 0, costEur: 0, pxQtySum: 0,
-        isEtf: ETF_TICKERS.has(r.ticker)
+        typeInv: r.typeInv || (ETF_TICKERS.has(r.ticker) ? 'ETF' : 'Action')
       };
     }
     const eur = r.costEur != null ? r.costEur : (toEur(r.cost, r.currency) || 0);
-    map[key].qty     += r.qty;
-    map[key].costEur += eur;
-    map[key].pxQtySum += (r.pxAchat || 0) * r.qty;   // pour prix achat moyen pondéré
+    map[key].qty      += r.qty;
+    map[key].costEur  += eur;
+    map[key].pxQtySum += (r.pxAchat || 0) * r.qty;
+  });
+  return Object.values(map).map(row => {
+    const info    = CURRENT_PRICES[row.ticker];
+    const pxCurr  = info?.price ?? null;
+    const pxCur   = info?.currency || row.currency;
+    const pxAchat = row.qty > 0 ? row.pxQtySum / row.qty : 0;
+    const valEur  = pxCurr != null ? toEur(row.qty * pxCurr, pxCur) : null;
+    const pnl     = valEur != null ? valEur - row.costEur : null;
+    const pnlPct  = valEur != null && row.costEur > 0 ? pnl / row.costEur * 100 : null;
+    const vars    = CURRENT_VARIATIONS[row.ticker] || {};
+    return { ...row, pxCurr, pxCur, pxAchat, valEur, pnl, pnlPct, vars };
+  });
+}
+
+// Coquille de l'onglet (en-têtes + filtres) — construite une seule fois par affichage
+function renderActEtf() {
+  const sec = document.getElementById('actetf');
+  if (!sec) return;
+
+  const allRows = _aeBuildRows();
+  const hasVars = allRows.some(r => AE_VARCOLS.some(k => r.vars[k] != null));
+  const note = hasVars
+    ? `<span style="color:var(--text2)">Types affichés : Action · ETF · Crypto. Cliquez un en-tête pour trier, utilisez les champs pour filtrer.</span>`
+    : `<span style="color:#f59e0b">⚠️ Variations non chargées — connectez Google puis relancez update_prix_gsheet.py (colonnes 1D…YTD).</span>`;
+
+  const inputStyle = "width:100%;box-sizing:border-box;padding:3px 6px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:10px;outline:none";
+  const mainHead = AE_COLS.map(c =>
+    `<th data-aecol="${c.k}" onclick="aeSort('${c.k}')" style="text-align:${c.align};cursor:pointer;user-select:none;white-space:nowrap;padding:6px 8px">${c.label} <span class="ae-arrow" style="font-size:9px;opacity:.35">⇅</span></th>`
+  ).join('');
+  const varHead = AE_VARCOLS.map(k =>
+    `<th data-aecol="${k}" onclick="aeSort('${k}')" style="text-align:right;cursor:pointer;user-select:none;white-space:nowrap;padding:6px 8px">${k} <span class="ae-arrow" style="font-size:9px;opacity:.35">⇅</span></th>`
+  ).join('');
+
+  const mainFilters = AE_COLS.map(c => {
+    const ph = c.type === 'str' ? 'Filtrer…' : '≥ valeur';
+    const ta = c.align === 'right' ? ';text-align:right' : '';
+    const val = _aeFilter[c.k] ? ` value="${_aeFilter[c.k]}"` : '';
+    return `<td style="padding:2px 6px"><input type="text" placeholder="${ph}"${val} oninput="aeFilter('${c.k}',this.value)" style="${inputStyle}${ta}"></td>`;
+  }).join('');
+  const varFilters = AE_VARCOLS.map(k => {
+    const val = _aeFilter[k] ? ` value="${_aeFilter[k]}"` : '';
+    return `<td style="padding:2px 6px"><input type="text" placeholder="≥ %"${val} oninput="aeFilter('${k}',this.value)" style="${inputStyle};text-align:right"></td>`;
+  }).join('');
+
+  sec.innerHTML = `
+    <div class="card" style="padding:22px 24px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px">
+        <h2 style="font-size:18px;font-weight:700;margin:0">📉 Actions &amp; ETFs — Performance &amp; variations</h2>
+        <div id="ae_summary" style="font-size:13px"></div>
+      </div>
+      <div style="font-size:12px;margin-bottom:14px">${note}</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+          <thead>
+            <tr id="ae_headRow" style="border-bottom:2px solid var(--border);color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.4px">
+              ${mainHead}${varHead}
+            </tr>
+            <tr style="background:var(--bg3)">
+              ${mainFilters}${varFilters}
+            </tr>
+          </thead>
+          <tbody id="ae_tbody"></tbody>
+        </table>
+      </div>
+    </div>`;
+
+  _aeRenderRows();
+}
+
+// Remplit le corps du tableau (tri + filtre) sans reconstruire les champs de saisie
+function _aeRenderRows() {
+  const tbody = document.getElementById('ae_tbody');
+  if (!tbody) return;
+  let rows = _aeBuildRows();
+
+  // ── Filtres ────────────────────────────────────────────────────────────────
+  const fmeta = {};
+  AE_COLS.forEach(c => fmeta[c.k] = c.type);
+  AE_VARCOLS.forEach(k => fmeta[k] = 'num');
+  rows = rows.filter(r => {
+    for (const [col, fv] of Object.entries(_aeFilter)) {
+      if (fv == null || fv === '') continue;
+      const v = _aeVal(r, col);
+      if (fmeta[col] === 'str') {
+        if (!String(v || '').toLowerCase().includes(fv)) return false;
+      } else {
+        const num = parseFloat(String(fv).replace(',', '.'));
+        if (!isNaN(num) && (v == null || v < num)) return false;
+      }
+    }
+    return true;
   });
 
-  let rows = Object.values(map).map(row => {
-    const info     = CURRENT_PRICES[row.ticker];
-    const pxCurr   = info?.price;                         // prix actuel (devise cotation)
-    const pxCur    = info?.currency || row.currency;
-    const pxAchat  = row.qty > 0 ? row.pxQtySum / row.qty : 0; // prix achat moyen (devise ligne)
-    const valEur   = pxCurr != null ? toEur(row.qty * pxCurr, pxCur) : null;
-    const pnl      = valEur != null ? valEur - row.costEur : null;
-    const pnlPct   = valEur != null && row.costEur > 0 ? pnl / row.costEur * 100 : null;
-    const vars     = CURRENT_VARIATIONS[row.ticker] || {};
-    return { ...row, pxCurr, pxCur, pxAchat, valEur, pnl, pnlPct, vars };
-  }).sort((a,b) => (b.valEur ?? b.costEur) - (a.valEur ?? a.costEur));
+  // ── Tri ──────────────────────────────────────────────────────────────────--
+  if (_aeSort.col) {
+    const { col, dir } = _aeSort;
+    rows.sort((a, b) => {
+      let va = _aeVal(a, col), vb = _aeVal(b, col);
+      if (va == null) va = dir === 1 ? Infinity : -Infinity;
+      if (vb == null) vb = dir === 1 ? Infinity : -Infinity;
+      if (typeof va === 'string') return va.localeCompare(vb) * dir;
+      return (va - vb) * dir;
+    });
+  }
 
-  // ── Helpers de formatage ───────────────────────────────────────────────────
+  // ── Flèches de tri ───────────────────────────────────────────────────────--
+  document.querySelectorAll('#ae_headRow th[data-aecol]').forEach(th => {
+    const arrow = th.querySelector('.ae-arrow');
+    if (!arrow) return;
+    const on = th.dataset.aecol === _aeSort.col;
+    arrow.textContent = on ? (_aeSort.dir === 1 ? '▲' : '▼') : '⇅';
+    arrow.style.opacity = on ? '1' : '0.35';
+  });
+
+  // ── Helpers de formatage ─────────────────────────────────────────────────--
   const fmt   = n => Math.round(n).toLocaleString('fr');
   const fmtF  = (n,d=2) => n.toLocaleString('fr', {minimumFractionDigits:d, maximumFractionDigits:d});
   const col   = n => n >= 0 ? '#4caf82' : '#e06c6c';
@@ -5759,74 +5882,52 @@ function renderActEtf() {
   const varCell = v => (v == null || isNaN(v))
     ? '<td style="text-align:right;color:var(--text2)">—</td>'
     : `<td style="text-align:right;color:${col(v)};font-weight:600">${v>=0?'+':''}${v.toFixed(2)}%</td>`;
+  const typeBadge = t => `<span class="badge badge-gray" style="font-size:9px">${t}</span>`;
+  const mono = "font-family:'DM Mono',monospace";
 
-  // ── Totaux ─────────────────────────────────────────────────────────────────
+  // ── Corps ────────────────────────────────────────────────────────────────--
+  const body = rows.map(r => `<tr>
+      <td style="white-space:nowrap;padding:6px 8px"><strong>${r.name}</strong> ${typeBadge(r.typeInv)}</td>
+      <td class="mono" style="color:var(--text2);font-size:11px;padding:6px 8px">${r.isin || '—'}</td>
+      <td style="text-align:right;padding:6px 8px;${mono}">${r.qty.toLocaleString('fr',{maximumFractionDigits:4})}</td>
+      <td style="text-align:right;padding:6px 8px;${mono}">${pxTxt(r.pxAchat, r.currency)}</td>
+      <td style="text-align:right;padding:6px 8px;${mono}">${pxTxt(r.pxCurr, r.pxCur)}</td>
+      <td style="text-align:right;padding:6px 8px;${mono}"><strong>${eurTxt(r.valEur)}</strong></td>
+      <td style="text-align:right;padding:6px 8px;${mono}">${pnlEurTxt(r.pnl)}</td>
+      <td style="text-align:right;padding:6px 8px;${mono}">${pctTxt(r.pnlPct)}</td>
+      ${AE_VARCOLS.map(k => varCell(r.vars[k])).join('')}
+    </tr>`).join('');
+
+  // ── Totaux (sur lignes filtrées) ─────────────────────────────────────────--
   const hasPrices = rows.some(r => r.valEur != null);
   const totCost = rows.reduce((s,r) => s + r.costEur, 0);
   const totVal  = hasPrices ? rows.reduce((s,r) => s + (r.valEur ?? r.costEur), 0) : totCost;
   const totPnl  = totVal - totCost;
   const totPnlPct = totCost ? totPnl / totCost * 100 : 0;
-  const hasVars = rows.some(r => VAR_COLS.some(k => r.vars[k] != null));
-
-  // ── En-tête + note ─────────────────────────────────────────────────────────
-  const note = hasVars
-    ? `<span style="color:var(--text2)">Variations de cours chargées depuis Google Sheets (onglet Prices).</span>`
-    : `<span style="color:#f59e0b">⚠️ Variations non chargées — connectez Google puis relancez update_prix_gsheet.py (colonnes 1D…YTD).</span>`;
-
-  // ── Lignes du tableau ──────────────────────────────────────────────────────
-  const body = rows.map(r => {
-    const icon = r.isEtf ? '📦' : '🏛️';
-    const tag  = r.isEtf
-      ? '<span class="badge badge-gray" style="font-size:9px">ETF</span>'
-      : '<span class="badge badge-gray" style="font-size:9px">Action</span>';
-    return `<tr>
-      <td style="white-space:nowrap"><span style="margin-right:6px">${icon}</span><strong>${r.name}</strong> ${tag}</td>
-      <td class="mono" style="color:var(--text2);font-size:11px">${r.isin || '—'}</td>
-      <td style="text-align:right;font-family:'DM Mono',monospace">${r.qty.toLocaleString('fr',{maximumFractionDigits:4})}</td>
-      <td style="text-align:right;font-family:'DM Mono',monospace">${pxTxt(r.pxAchat, r.currency)}</td>
-      <td style="text-align:right;font-family:'DM Mono',monospace">${pxTxt(r.pxCurr, r.pxCur)}</td>
-      <td style="text-align:right;font-family:'DM Mono',monospace"><strong>${eurTxt(r.valEur)}</strong></td>
-      <td style="text-align:right;font-family:'DM Mono',monospace">${pnlEurTxt(r.pnl)}</td>
-      <td style="text-align:right;font-family:'DM Mono',monospace">${pctTxt(r.pnlPct)}</td>
-      ${VAR_COLS.map(k => varCell(r.vars[k])).join('')}
-    </tr>`;
-  }).join('');
-
   const totRow = `<tr style="border-top:2px solid var(--border);font-weight:700;background:var(--bg2)">
-    <td colspan="5" style="text-align:right">TOTAL (${rows.length} lignes)</td>
-    <td style="text-align:right;font-family:'DM Mono',monospace">${eurTxt(totVal)}</td>
-    <td style="text-align:right;font-family:'DM Mono',monospace">${pnlEurTxt(totPnl)}</td>
-    <td style="text-align:right;font-family:'DM Mono',monospace">${pctTxt(totPnlPct)}</td>
+    <td colspan="5" style="text-align:right;padding:6px 8px">TOTAL (${rows.length} lignes)</td>
+    <td style="text-align:right;padding:6px 8px;${mono}">${eurTxt(totVal)}</td>
+    <td style="text-align:right;padding:6px 8px;${mono}">${pnlEurTxt(totPnl)}</td>
+    <td style="text-align:right;padding:6px 8px;${mono}">${pctTxt(totPnlPct)}</td>
     <td colspan="7"></td>
   </tr>`;
 
-  const thStyle = 'style="text-align:right;white-space:nowrap"';
-  sec.innerHTML = `
-    <div class="card" style="padding:22px 24px">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px">
-        <h2 style="font-size:18px;font-weight:700;margin:0">📉 Actions &amp; ETFs — Performance &amp; variations</h2>
-        <div style="font-size:13px">Valeur ${eurTxt(totVal)} &nbsp;·&nbsp; P&amp;L ${pnlEurTxt(totPnl)} (${pctTxt(totPnlPct)})</div>
-      </div>
-      <div style="font-size:12px;margin-bottom:14px">${note}</div>
-      <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:12.5px">
-          <thead>
-            <tr style="border-bottom:2px solid var(--border);color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.4px">
-              <th style="text-align:left">Nom</th>
-              <th style="text-align:left">ISIN</th>
-              <th ${thStyle}>Qté</th>
-              <th ${thStyle}>Prix achat</th>
-              <th ${thStyle}>Prix actuel</th>
-              <th ${thStyle}>Valeur €</th>
-              <th ${thStyle}>P&amp;L €</th>
-              <th ${thStyle}>P&amp;L %</th>
-              ${VAR_COLS.map(k => `<th ${thStyle}>${k}</th>`).join('')}
-            </tr>
-          </thead>
-          <tbody>${body}${totRow}</tbody>
-        </table>
-      </div>
-    </div>`;
+  tbody.innerHTML = body + totRow;
+
+  const sumEl = document.getElementById('ae_summary');
+  if (sumEl) sumEl.innerHTML = `Valeur ${eurTxt(totVal)} &nbsp;·&nbsp; P&L ${pnlEurTxt(totPnl)} (${pctTxt(totPnlPct)})`;
+}
+
+function aeSort(col) {
+  if (_aeSort.col === col) _aeSort.dir *= -1;
+  else { _aeSort.col = col; _aeSort.dir = (AE_VARCOLS.includes(col) || ['qty','pxAchat','pxCurr','valEur','pnl','pnlPct'].includes(col)) ? -1 : 1; }
+  _aeRenderRows();
+}
+
+function aeFilter(col, val) {
+  if (val.trim() === '') delete _aeFilter[col];
+  else _aeFilter[col] = val.trim().toLowerCase();
+  _aeRenderRows();
 }
 
 function renderActions() {
