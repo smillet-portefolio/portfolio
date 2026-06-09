@@ -3205,6 +3205,11 @@ function submitNewLine() {
   }
   refreshTotalFromRows();           // toujours mettre à jour TOTAL et header
 
+  // ── Récupérer le prix du nouveau ticker s'il n'est pas encore chargé ───────
+  if (_gsToken && !CURRENT_PRICES[newRow.ticker]) {
+    setTimeout(() => { gsLoadPrices().then(() => { buildPosTable(true); updateTableRows(); refreshTotalFromRows(); }); }, 300);
+  }
+
   // ── Close & confirm ───────────────────────────────────────────────────────
   closeNewLineModal();
 
@@ -3861,16 +3866,18 @@ async function gsLoadPrices() {
       varMap[t] = v;
     });
 
+    // Stocker TOUS les prix du Sheet (y compris des tickers pas encore détenus,
+    // pour qu'une nouvelle ligne ait sa valeur actuelle immédiatement).
+    Object.keys(priceMap).forEach(t => {
+      CURRENT_PRICES[t] = { ...priceMap[t], source: 'gsheets' };
+      if (varMap[t]) CURRENT_VARIATIONS[t] = varMap[t];
+    });
+
     const portfolioTickers = [...new Set(BOOK2_ROWS.map(r => r.ticker))];
     let matched = 0, unmatched = [];
     portfolioTickers.forEach(t => {
-      if (priceMap[t]) {
-        CURRENT_PRICES[t] = { ...priceMap[t], source: 'gsheets' };
-        if (varMap[t]) CURRENT_VARIATIONS[t] = varMap[t];
-        matched++;
-      } else {
-        unmatched.push(t);
-      }
+      if (priceMap[t]) matched++;
+      else unmatched.push(t);
     });
 
     updateTableRows();
@@ -6040,7 +6047,7 @@ function renderActions() {
       const refVal = r.valEur ?? r.costEur;
       const pctPF  = totPF ? (refVal/totPF*100).toFixed(1) : '—';
       const country = STOCK_COUNTRY[r.ticker] || stockFlag(r.ticker);
-      const sector  = STOCK_SECTORS[r.ticker] || '—';
+      const sector  = STOCK_SECTORS[r.ticker] || DIRECT_SECTOR[r.ticker] || '—';
       const badge   = STOCK_BADGE[r.ticker] || 'badge-gray';
       return `<tr>
         <td>
@@ -6090,7 +6097,7 @@ function renderActions() {
         <div>
           <div style="font-size:15px;font-weight:700">${flag} ${r.name}</div>
           <div style="font-size:10px;font-family:'DM Mono',monospace;color:var(--text2);margin-top:2px">${r.ticker} &nbsp;·&nbsp; ${r.qty.toLocaleString('fr',{maximumFractionDigits:4})} titres &nbsp;·&nbsp; dernier achat ${lastDate}</div>
-          <div style="font-size:10px;color:var(--blue);margin-top:3px;font-weight:500">${STOCK_SECTORS[r.ticker] || ''}</div>
+          <div style="font-size:10px;color:var(--blue);margin-top:3px;font-weight:500">${STOCK_SECTORS[r.ticker] || DIRECT_SECTOR[r.ticker] || ''}</div>
         </div>
         <div style="text-align:right;flex-shrink:0;margin-left:8px">
           <div style="font-size:16px;font-weight:700;color:${pnlCol}">${pctTxt}</div>
