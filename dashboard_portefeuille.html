@@ -3212,9 +3212,27 @@ function submitNewLine() {
   const status = document.getElementById('fetchStatus');
   const prev   = status.innerHTML;
   const saved  = JSON.parse(localStorage.getItem('book2_extra_rows')||'[]').length;
-  status.innerHTML = `✅ Ligne <strong>${nom} (${ticker})</strong> ajoutée et sauvegardée (${saved} ligne(s) extra au total)`;
+  status.innerHTML = `✅ Ligne <strong>${nom} (${ticker})</strong> ajoutée (${saved} ligne(s) extra au total)`;
   status.style.color = '#4caf82';
-  setTimeout(() => { status.innerHTML = prev; status.style.color = ''; }, 5000);
+
+  // ── Sauvegarde automatique vers Google Sheets (évite la perte au prochain 📥 Charger) ──
+  if (_gsToken) {
+    status.innerHTML += ' · 💾 sauvegarde Google...';
+    Promise.resolve(gsSaveAll())
+      .then(() => {
+        status.innerHTML = `✅ Ligne <strong>${nom} (${ticker})</strong> ajoutée et sauvegardée sur Google Sheets`;
+        setTimeout(() => { status.innerHTML = prev; status.style.color = ''; }, 5000);
+      })
+      .catch(() => {
+        status.innerHTML = `⚠️ Ligne ajoutée localement mais la sauvegarde Google a échoué — cliquez 💾 Sauvegarder`;
+        status.style.color = '#f59e0b';
+        setTimeout(() => { status.innerHTML = prev; status.style.color = ''; }, 7000);
+      });
+  } else {
+    status.innerHTML += ' — ⚠️ <strong>pensez à 🔐 Connecter Google puis 💾 Sauvegarder</strong> pour ne pas la perdre';
+    status.style.color = '#f59e0b';
+    setTimeout(() => { status.innerHTML = prev; status.style.color = ''; }, 8000);
+  }
 }
 
 
