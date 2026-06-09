@@ -3731,19 +3731,31 @@ async function gsSaveAll() {
   if (!_gsToken) { gsSetMsg('⚠️ Connectez-vous d\'abord', '#f59e0b'); return; }
   gsSetMsg('💾 Sauvegarde...', '#60a5fa');
   try {
-    const values = GS_KEYS.map(k => [k, localStorage.getItem(k) || '']);
+    // Google Sheets limite chaque cellule à 50 000 caractères → on découpe les
+    // grandes valeurs sur plusieurs colonnes (B, C, D, …) recollées au chargement.
+    const CHUNK = 45000;
+    const values = GS_KEYS.map(k => {
+      const v = localStorage.getItem(k) || '';
+      const row = [k];
+      if (v.length <= CHUNK) row.push(v);
+      else for (let i = 0; i < v.length; i += CHUNK) row.push(v.slice(i, i + CHUNK));
+      return row;
+    });
     values.push(['_saved_at', new Date().toISOString()]);
-    await gsRequest('PUT', '/values/Data!A1:B' + values.length + '?valueInputOption=RAW', {
-      range: 'Data!A1:B' + values.length, majorDimension: 'ROWS', values
+
+    // S'assurer que l'onglet Data existe (ignore l'erreur s'il existe déjà)
+    try {
+      await gsRequest('POST', ':batchUpdate', { requests: [{ addSheet: { properties: { title: 'Data' } } }] });
+    } catch(_) {}
+    // Effacer l'ancien contenu (les valeurs peuvent occuper plusieurs colonnes)
+    await gsRequest('POST', '/values/Data!A:Z:clear', {});
+    // Écrire le nouveau contenu (lignes de largeur variable)
+    await gsRequest('PUT', '/values/Data!A1?valueInputOption=RAW', {
+      range: 'Data!A1', majorDimension: 'ROWS', values
     });
     gsSetMsg('✅ Sauvegardé — ' + new Date().toLocaleTimeString('fr'), '#4caf82');
   } catch(e) {
-    if (e.message.includes('Unable to parse range')) {
-      try {
-        await gsRequest('POST', ':batchUpdate', { requests: [{ addSheet: { properties: { title: 'Data' } } }] });
-        await gsSaveAll();
-      } catch(e2) { gsSetMsg('❌ ' + e2.message.slice(0,60), '#e06c6c'); }
-    } else { gsSetMsg('❌ ' + e.message.slice(0,60), '#e06c6c'); }
+    gsSetMsg('❌ ' + String(e.message || e).slice(0,80), '#e06c6c');
   }
 }
 
@@ -3752,14 +3764,16 @@ async function gsLoadAll() {
   if (!confirm('Charger les données depuis Google Sheets ?\n\n⚠️ Ceci remplacera les données locales par celles du Sheet.\nCliquez Annuler pour conserver les données locales.')) return;
   gsSetMsg('📥 Chargement...', '#60a5fa');
   try {
-    const res = await gsRequest('GET', '/values/Data!A:B');
+    const res = await gsRequest('GET', '/values/Data!A:Z');
     const rows = res.values || [];
     if (!rows.length || rows.length < 3) {
       gsSetMsg('⚠️ Sheet vide ou insuffisant — chargement annulé', '#f59e0b');
       return;
     }
     let loaded = 0;
-    rows.forEach(([key, val]) => {
+    rows.forEach(row => {
+      const key = row[0];
+      const val = row.slice(1).join('');   // recoller les morceaux répartis sur plusieurs colonnes
       if (key && key !== '_saved_at' && val && val.length > 2) {
         localStorage.setItem(key, val);
         loaded++;
