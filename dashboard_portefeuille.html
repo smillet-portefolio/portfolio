@@ -306,6 +306,7 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
     <button class="tab" onclick="sw('positions',this)">Positions</button>
     <button class="tab" onclick="sw('etfs',this)">ETFs</button>
     <button class="tab" onclick="sw('actions',this)">Actions directes</button>
+    <button class="tab" onclick="sw('actetf',this)">📉 Actions ETFs +/−</button>
     <button class="tab" onclick="sw('editeur',this)">✏️ Éditer</button>
     <button class="tab" onclick="sw('portefeuille',this)">💼 Portefeuille</button>
     <button class="tab" onclick="sw('clotures',this)">📤 Clôturées</button>
@@ -970,6 +971,7 @@ var EVO_CHART_INSTANCE = null;
 var EVO_DELTA_CHART_INSTANCE = null;
 let FX_RATES = { USD: null, GBP: null, CZK: null };
 let CURRENT_PRICES = {};
+let CURRENT_VARIATIONS = {};   // { ticker: {'1D':x,'1W':x,'1M':x,'3M':x,'6M':x,'1Y':x,'YTD':x} }
 
 const chartInited = {};
 function sw(id, btn) {
@@ -1011,6 +1013,7 @@ function sw(id, btn) {
     setTimeout(renderEvolution, 50);
   }
   if (id === 'actions')      setTimeout(renderActions, 50);
+  if (id === 'actetf')       setTimeout(renderActEtf, 50);
   if (id === 'etfs')         setTimeout(renderETFValues, 50);
   // Init charts that were previously lazy-loaded via sub-tabs
   if (id === 'positions') {
@@ -1030,6 +1033,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!document.getElementById('evolution')) {
       const div = document.createElement('div');
       div.id = 'evolution';
+      div.className = 'section';
+      document.querySelector('.container').appendChild(div);
+    }
+  })();
+
+  // 0b. Créer la section "Actions ETFs +/-" au chargement
+  (function() {
+    if (!document.getElementById('actetf')) {
+      const div = document.createElement('div');
+      div.id = 'actetf';
       div.className = 'section';
       document.querySelector('.container').appendChild(div);
     }
@@ -2668,6 +2681,7 @@ async function fetchFxRates() {
 function saveToLocalStorage() {
   try {
     localStorage.setItem('portfolio_prices', JSON.stringify(CURRENT_PRICES));
+    localStorage.setItem('portfolio_variations', JSON.stringify(CURRENT_VARIATIONS));
     localStorage.setItem('portfolio_fx', JSON.stringify({
       USD: FX_RATES.USD, GBP: FX_RATES.GBP, CZK: FX_RATES.CZK, _source: FX_RATES._source
     }));
@@ -2685,6 +2699,10 @@ function restorePersistedPrices() {
     const savedDate = localStorage.getItem('portfolio_prices_date');
 
     Object.assign(CURRENT_PRICES, prices);
+    try {
+      const sv = JSON.parse(localStorage.getItem('portfolio_variations') || '{}');
+      if (sv && Object.keys(sv).length) Object.assign(CURRENT_VARIATIONS, sv);
+    } catch(_) {}
     if (fx.USD) FX_RATES.USD = fx.USD;
     if (fx.GBP) FX_RATES.GBP = fx.GBP;
     if (fx.CZK) FX_RATES.CZK = fx.CZK;
@@ -3640,7 +3658,7 @@ let _gsToken = null;
 const GS_KEYS = [
   'book2_extra_rows','book2_all_rows','book2_overrides',
   'sold_rows','closed_positions',
-  'portfolio_prices','portfolio_fx',
+  'portfolio_prices','portfolio_variations','portfolio_fx',
   'cash_data','oblig_data',
   'etf_comp_override','etf_comp_date',
   'direct_sector_overrides',
@@ -3742,17 +3760,21 @@ async function gsLoadPrices() {
   if (!_gsToken) return;
   if (status) status.innerHTML = `<span style="color:#60a5fa">⏳ Chargement des prix depuis Google Sheets...</span>`;
   try {
-    const res  = await gsRequest('GET', '/values/Prices!A:E');
+    const res  = await gsRequest('GET', '/values/Prices!A:L');
     const rows = res.values || [];
     if (rows.length < 2) {
       if (status) status.innerHTML = `<span style="color:#f59e0b">⚠️ Onglet Prices vide — lancez update_prix_gsheet.py</span>`;
       return;
     }
 
-    const headers   = rows[0].map(hh => hh.toLowerCase());
+    const headers   = rows[0].map(hh => hh.toLowerCase().trim());
     const iTicker   = headers.findIndex(hh => hh.includes('ticker'));
     const iPrice    = headers.findIndex(hh => hh.includes('price') || hh.includes('prix') || hh.includes('close'));
     const iCurrency = headers.findIndex(hh => hh.includes('curr') || hh.includes('devise'));
+    // Colonnes de variations (1D / 1W / 1M / 3M / 6M / 1Y / YTD)
+    const VAR_KEYS  = ['1D','1W','1M','3M','6M','1Y','YTD'];
+    const iVar = {};
+    VAR_KEYS.forEach(k => { iVar[k] = headers.findIndex(hh => hh === k.toLowerCase()); });
     if (iTicker < 0 || iPrice < 0) {
       if (status) status.innerHTML = `<span style="color:#e06c6c">❌ Colonnes Ticker/Price introuvables dans l'onglet Prices</span>`;
       return;
@@ -3784,12 +3806,25 @@ async function gsLoadPrices() {
 
     const FX_PAIRS = new Set(['EUR/CZK','USD/CZK','GBP/CZK','EUR/USD','EUR/GBP','USD/EUR','GBP/EUR']);
     const priceMap = {};
+    const varMap   = {};
     rows.slice(1).forEach(r => {
       const t    = (r[iTicker] || '').trim();
       const p    = parseFloat(r[iPrice]);
       const curr = iCurrency >= 0 ? (r[iCurrency] || 'EUR').trim() : 'EUR';
       if (!t || FX_PAIRS.has(t.toUpperCase()) || isNaN(p) || p <= 0) return;
       priceMap[t] = { price: p, currency: curr };
+      // Variations en % (décimale virgule possible → remplacer par point)
+      const v = {};
+      VAR_KEYS.forEach(k => {
+        const idx = iVar[k];
+        if (idx >= 0 && r[idx] != null && String(r[idx]).trim() !== '') {
+          const num = parseFloat(String(r[idx]).replace(',', '.'));
+          v[k] = isNaN(num) ? null : num;
+        } else {
+          v[k] = null;
+        }
+      });
+      varMap[t] = v;
     });
 
     const portfolioTickers = [...new Set(BOOK2_ROWS.map(r => r.ticker))];
@@ -3797,6 +3832,7 @@ async function gsLoadPrices() {
     portfolioTickers.forEach(t => {
       if (priceMap[t]) {
         CURRENT_PRICES[t] = { ...priceMap[t], source: 'gsheets' };
+        if (varMap[t]) CURRENT_VARIATIONS[t] = varMap[t];
         matched++;
       } else {
         unmatched.push(t);
@@ -3809,6 +3845,10 @@ async function gsLoadPrices() {
     // Si l'onglet ETF composition est visible, re-render les tableaux avec les nouveaux prix
     if (document.getElementById('etf_comp')?.classList.contains('active')) {
       setTimeout(() => renderCompTables(), 200);
+    }
+    // Si l'onglet "Actions ETFs +/-" est visible, le rafraîchir avec les variations
+    if (document.getElementById('actetf')?.classList.contains('active')) {
+      setTimeout(() => renderActEtf(), 200);
     }
 
     const now = new Date().toLocaleString('fr', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
@@ -5665,6 +5705,129 @@ const STOCK_COLORS = {
   'FGR.PA':  '#10b981',
   'VIE.PA':  '#10b981',
 };
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ONGLET "ACTIONS ETFs +/-" — une ligne par investissement + variations de cours
+// ══════════════════════════════════════════════════════════════════════════════
+function renderActEtf() {
+  const sec = document.getElementById('actetf');
+  if (!sec) return;
+
+  const VAR_COLS = ['YTD','1D','1W','1M','3M','6M','1Y'];
+
+  // ── Agrégation : une ligne par investissement (ticker + ISIN) ──────────────
+  const map = {};
+  BOOK2_ROWS.forEach(r => {
+    const key = r.ticker + '|' + (r.isin || '');
+    if (!map[key]) {
+      map[key] = {
+        name: r.name, ticker: r.ticker, isin: r.isin || '',
+        currency: r.currency, qty: 0, costEur: 0, pxQtySum: 0,
+        isEtf: ETF_TICKERS.has(r.ticker)
+      };
+    }
+    const eur = r.costEur != null ? r.costEur : (toEur(r.cost, r.currency) || 0);
+    map[key].qty     += r.qty;
+    map[key].costEur += eur;
+    map[key].pxQtySum += (r.pxAchat || 0) * r.qty;   // pour prix achat moyen pondéré
+  });
+
+  let rows = Object.values(map).map(row => {
+    const info     = CURRENT_PRICES[row.ticker];
+    const pxCurr   = info?.price;                         // prix actuel (devise cotation)
+    const pxCur    = info?.currency || row.currency;
+    const pxAchat  = row.qty > 0 ? row.pxQtySum / row.qty : 0; // prix achat moyen (devise ligne)
+    const valEur   = pxCurr != null ? toEur(row.qty * pxCurr, pxCur) : null;
+    const pnl      = valEur != null ? valEur - row.costEur : null;
+    const pnlPct   = valEur != null && row.costEur > 0 ? pnl / row.costEur * 100 : null;
+    const vars     = CURRENT_VARIATIONS[row.ticker] || {};
+    return { ...row, pxCurr, pxCur, pxAchat, valEur, pnl, pnlPct, vars };
+  }).sort((a,b) => (b.valEur ?? b.costEur) - (a.valEur ?? a.costEur));
+
+  // ── Helpers de formatage ───────────────────────────────────────────────────
+  const fmt   = n => Math.round(n).toLocaleString('fr');
+  const fmtF  = (n,d=2) => n.toLocaleString('fr', {minimumFractionDigits:d, maximumFractionDigits:d});
+  const col   = n => n >= 0 ? '#4caf82' : '#e06c6c';
+  const eurTxt = n => n != null ? fmt(n) + ' €' : '<span style="color:var(--text2)">—</span>';
+  const pxTxt  = (p,c) => p != null ? fmtF(p) + ' ' + c : '<span style="color:var(--text2)">—</span>';
+  const pnlEurTxt = n => n != null
+    ? `<span style="color:${col(n)};font-weight:600">${n>=0?'+':''}${fmt(n)} €</span>`
+    : '<span style="color:var(--text2)">—</span>';
+  const pctTxt = n => n != null
+    ? `<span style="color:${col(n)};font-weight:600">${n>=0?'+':''}${n.toFixed(1)}%</span>`
+    : '<span style="color:var(--text2)">—</span>';
+  const varCell = v => (v == null || isNaN(v))
+    ? '<td style="text-align:right;color:var(--text2)">—</td>'
+    : `<td style="text-align:right;color:${col(v)};font-weight:600">${v>=0?'+':''}${v.toFixed(2)}%</td>`;
+
+  // ── Totaux ─────────────────────────────────────────────────────────────────
+  const hasPrices = rows.some(r => r.valEur != null);
+  const totCost = rows.reduce((s,r) => s + r.costEur, 0);
+  const totVal  = hasPrices ? rows.reduce((s,r) => s + (r.valEur ?? r.costEur), 0) : totCost;
+  const totPnl  = totVal - totCost;
+  const totPnlPct = totCost ? totPnl / totCost * 100 : 0;
+  const hasVars = rows.some(r => VAR_COLS.some(k => r.vars[k] != null));
+
+  // ── En-tête + note ─────────────────────────────────────────────────────────
+  const note = hasVars
+    ? `<span style="color:var(--text2)">Variations de cours chargées depuis Google Sheets (onglet Prices).</span>`
+    : `<span style="color:#f59e0b">⚠️ Variations non chargées — connectez Google puis relancez update_prix_gsheet.py (colonnes 1D…YTD).</span>`;
+
+  // ── Lignes du tableau ──────────────────────────────────────────────────────
+  const body = rows.map(r => {
+    const icon = r.isEtf ? '📦' : '🏛️';
+    const tag  = r.isEtf
+      ? '<span class="badge badge-gray" style="font-size:9px">ETF</span>'
+      : '<span class="badge badge-gray" style="font-size:9px">Action</span>';
+    return `<tr>
+      <td style="white-space:nowrap"><span style="margin-right:6px">${icon}</span><strong>${r.name}</strong> ${tag}</td>
+      <td class="mono" style="color:var(--text2);font-size:11px">${r.isin || '—'}</td>
+      <td style="text-align:right;font-family:'DM Mono',monospace">${r.qty.toLocaleString('fr',{maximumFractionDigits:4})}</td>
+      <td style="text-align:right;font-family:'DM Mono',monospace">${pxTxt(r.pxAchat, r.currency)}</td>
+      <td style="text-align:right;font-family:'DM Mono',monospace">${pxTxt(r.pxCurr, r.pxCur)}</td>
+      <td style="text-align:right;font-family:'DM Mono',monospace"><strong>${eurTxt(r.valEur)}</strong></td>
+      <td style="text-align:right;font-family:'DM Mono',monospace">${pnlEurTxt(r.pnl)}</td>
+      <td style="text-align:right;font-family:'DM Mono',monospace">${pctTxt(r.pnlPct)}</td>
+      ${VAR_COLS.map(k => varCell(r.vars[k])).join('')}
+    </tr>`;
+  }).join('');
+
+  const totRow = `<tr style="border-top:2px solid var(--border);font-weight:700;background:var(--bg2)">
+    <td colspan="5" style="text-align:right">TOTAL (${rows.length} lignes)</td>
+    <td style="text-align:right;font-family:'DM Mono',monospace">${eurTxt(totVal)}</td>
+    <td style="text-align:right;font-family:'DM Mono',monospace">${pnlEurTxt(totPnl)}</td>
+    <td style="text-align:right;font-family:'DM Mono',monospace">${pctTxt(totPnlPct)}</td>
+    <td colspan="7"></td>
+  </tr>`;
+
+  const thStyle = 'style="text-align:right;white-space:nowrap"';
+  sec.innerHTML = `
+    <div class="card" style="padding:22px 24px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px">
+        <h2 style="font-size:18px;font-weight:700;margin:0">📉 Actions &amp; ETFs — Performance &amp; variations</h2>
+        <div style="font-size:13px">Valeur ${eurTxt(totVal)} &nbsp;·&nbsp; P&amp;L ${pnlEurTxt(totPnl)} (${pctTxt(totPnlPct)})</div>
+      </div>
+      <div style="font-size:12px;margin-bottom:14px">${note}</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+          <thead>
+            <tr style="border-bottom:2px solid var(--border);color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.4px">
+              <th style="text-align:left">Nom</th>
+              <th style="text-align:left">ISIN</th>
+              <th ${thStyle}>Qté</th>
+              <th ${thStyle}>Prix achat</th>
+              <th ${thStyle}>Prix actuel</th>
+              <th ${thStyle}>Valeur €</th>
+              <th ${thStyle}>P&amp;L €</th>
+              <th ${thStyle}>P&amp;L %</th>
+              ${VAR_COLS.map(k => `<th ${thStyle}>${k}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>${body}${totRow}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
 
 function renderActions() {
   const kpiEl  = document.getElementById('actions_kpis');
