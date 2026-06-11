@@ -3690,6 +3690,43 @@ const GS_KEYS = [
   'evo_history'
 ];
 
+// ==============================================================================
+// SAUVEGARDE AUTOMATIQUE SYSTEMATIQUE - toute ecriture de donnees declenche un
+// push vers Google Sheets (si connecte), sinon marque des modifications en attente.
+// ==============================================================================
+const GS_AUTOSAVE_SET = new Set(GS_KEYS);
+const GS_USER_SET = new Set([
+  'book2_extra_rows','book2_all_rows','book2_overrides',
+  'sold_rows','closed_positions','cash_data','oblig_data',
+  'direct_sector_overrides'
+]);
+let _gsReady     = false;
+let _gsLoading   = false;
+let _gsAutoTimer = null;
+const _gsRawSetItem = localStorage.setItem.bind(localStorage);
+
+function gsAutoSave() {
+  if (!_gsToken) return;
+  if (_gsAutoTimer) clearTimeout(_gsAutoTimer);
+  _gsAutoTimer = setTimeout(() => {
+    gsSaveAll({ silent: true }).catch(() => {});
+  }, 2500);
+}
+
+function gsOnKeyWrite(key) {
+  if (_gsLoading || !_gsReady) return;
+  if (!GS_AUTOSAVE_SET.has(key)) return;
+  if (_gsToken) gsAutoSave();
+  else if (GS_USER_SET.has(key)) { try { _gsRawSetItem('_gs_pending_changes', '1'); } catch(_){} }
+}
+
+localStorage.setItem = function(k, v) {
+  _gsRawSetItem(k, v);
+  try { gsOnKeyWrite(k); } catch(_){}
+};
+
+setTimeout(() => { _gsReady = true; }, 2500);
+
 function gsSetStatus(msg, col) {
   const e = document.getElementById('syncStatus');
   if (e) { e.textContent = msg; e.style.color = col || 'var(--text2)'; }
@@ -3715,9 +3752,8 @@ function gsSignIn() {
       document.getElementById('syncLoginBtn').style.display = 'none';
       document.getElementById('syncSaveBtn').style.display  = '';
       document.getElementById('syncLoadBtn').style.display  = '';
-      gsSetMsg('Connecté ! Chargement des prix et compositions ETF...', '#4caf82');
-      gsLoadPrices();
-      gsLoadETFComp();
+      gsSetMsg('Connecté ! Synchronisation des données...', '#4caf82');
+      gsAutoLoadOnConnect();
     }
   }).requestAccessToken();
 }
@@ -3732,9 +3768,10 @@ async function gsRequest(method, path, body) {
   return res.json();
 }
 
-async function gsSaveAll() {
-  if (!_gsToken) { gsSetMsg('⚠️ Connectez-vous d\'abord', '#f59e0b'); return; }
-  gsSetMsg('💾 Sauvegarde...', '#60a5fa');
+async function gsSaveAll(opts) {
+  opts = opts || {};
+  if (!_gsToken) { if (!opts.silent) gsSetMsg('⚠️ Connectez-vous d\'abord', '#f59e0b'); return; }
+  if (!opts.silent) gsSetMsg('💾 Sauvegarde...', '#60a5fa');
   try {
     // Google Sheets limite chaque cellule à 50 000 caractères → on découpe les
     // grandes valeurs sur plusieurs colonnes (B, C, D, …) recollées au chargement.
@@ -3758,9 +3795,11 @@ async function gsSaveAll() {
     await gsRequest('PUT', '/values/Data!A1?valueInputOption=RAW', {
       range: 'Data!A1', majorDimension: 'ROWS', values
     });
-    gsSetMsg('✅ Sauvegardé — ' + new Date().toLocaleTimeString('fr'), '#4caf82');
+    try { localStorage.removeItem('_gs_pending_changes'); } catch(_){}
+    gsSetMsg((opts.silent ? '✅ Auto-sauvegardé — ' : '✅ Sauvegardé — ') + new Date().toLocaleTimeString('fr'), '#4caf82');
   } catch(e) {
-    gsSetMsg('❌ ' + String(e.message || e).slice(0,80), '#e06c6c');
+    if (!opts.silent) gsSetMsg('❌ ' + String(e.message || e).slice(0,80), '#e06c6c');
+    else { console.warn('Auto-save echouee', e); throw e; }
   }
 }
 
@@ -3775,6 +3814,7 @@ async function gsLoadAll() {
       gsSetMsg('⚠️ Sheet vide ou insuffisant — chargement annulé', '#f59e0b');
       return;
     }
+    _gsLoading = true;
     let loaded = 0;
     rows.forEach(row => {
       const key = row[0];
@@ -3784,7 +3824,10 @@ async function gsLoadAll() {
         loaded++;
       }
     });
+    _gsLoading = false;
     if (loaded === 0) { gsSetMsg('⚠️ Aucune donnée valide trouvée — annulé', '#f59e0b'); return; }
+    try { localStorage.removeItem('_gs_pending_changes'); } catch(_){}
+    try { sessionStorage.setItem('_gs_autoloaded', '1'); } catch(_){}
     gsSetMsg('✅ ' + loaded + ' clés chargées — rechargement...', '#4caf82');
     setTimeout(() => location.reload(), 1500);
   } catch(e) { gsSetMsg('❌ ' + e.message.slice(0,60), '#e06c6c'); }
@@ -3793,6 +3836,53 @@ async function gsLoadAll() {
 // ══════════════════════════════════════════════════════════════════════════════
 // CHARGEMENT AUTOMATIQUE DES PRIX DEPUIS GOOGLE SHEETS (onglet Prices)
 // ══════════════════════════════════════════════════════════════════════════════
+
+// -- Synchronisation descendante automatique a la connexion --------------------
+async function gsAutoLoadOnConnect() {
+  if (sessionStorage.getItem('_gs_autoloaded') === '1') {
+    gsLoadPrices(); gsLoadETFComp();
+    return;
+  }
+  if (localStorage.getItem('_gs_pending_changes') === '1') {
+    const ok = confirm(
+      'Des modifications locales n\'ont pas encore ete sauvegardees sur Google Sheets.\n\n' +
+      'OK = charger les donnees de Google Sheets (remplace les modifications locales)\n' +
+      'Annuler = garder les donnees locales (pensez ensuite a 💾 Sauvegarder)');
+    if (!ok) { try { sessionStorage.setItem('_gs_autoloaded', '1'); } catch(_){} gsLoadPrices(); gsLoadETFComp(); return; }
+  }
+  gsSetMsg('📥 Synchronisation des données depuis Google Sheets...', '#60a5fa');
+  try {
+    const res  = await gsRequest('GET', '/values/Data!A:Z');
+    const rows = res.values || [];
+    if (rows.length < 3) {
+      try { sessionStorage.setItem('_gs_autoloaded', '1'); } catch(_){}
+      gsLoadPrices(); gsLoadETFComp();
+      return;
+    }
+    _gsLoading = true;
+    let loaded = 0;
+    rows.forEach(row => {
+      const key = row[0];
+      const val = row.slice(1).join('');
+      if (key && key !== '_saved_at' && val && val.length > 2) {
+        localStorage.setItem(key, val); loaded++;
+      }
+    });
+    _gsLoading = false;
+    try { sessionStorage.setItem('_gs_autoloaded', '1'); } catch(_){}
+    if (loaded > 0) {
+      try { localStorage.removeItem('_gs_pending_changes'); } catch(_){}
+      gsSetMsg('✅ ' + loaded + ' données chargées depuis Google Sheets — actualisation...', '#4caf82');
+      setTimeout(() => location.reload(), 1200);
+      return;
+    }
+    gsLoadPrices(); gsLoadETFComp();
+  } catch(e) {
+    _gsLoading = false;
+    gsSetMsg('⚠️ Synchro auto échouée — chargement des prix seuls', '#f59e0b');
+    gsLoadPrices(); gsLoadETFComp();
+  }
+}
 
 async function gsLoadPrices() {
   const status = document.getElementById('fetchStatus');
