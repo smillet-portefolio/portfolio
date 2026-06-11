@@ -4396,7 +4396,7 @@ function renderEvolution() {
         <div style="position:relative;height:300px"><canvas id="evoChart"></canvas></div>
       </div>
       <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);padding:20px;margin-bottom:24px">
-        <div style="font-size:13px;font-weight:600;margin-bottom:12px">Delta quotidien (€)</div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:12px">Delta quotidien (€) — hors dépôts / retraits</div>
         <div style="position:relative;height:160px"><canvas id="evoDeltaChart"></canvas></div>
       </div>
       <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);padding:16px;overflow-x:auto">
@@ -4412,7 +4412,7 @@ function renderEvolution() {
               <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2)">Valeur investie totale</th>
               <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2)">P&L €</th>
               <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2)">P&L %</th>
-              <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2)">Delta jour</th>
+              <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2)">Delta jour<br><span style="font-weight:400;color:var(--text2);font-size:9px">hors dépôts</span></th>
               <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">KB<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
               <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">LUMO<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
               <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">LENDO.<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
@@ -4437,6 +4437,15 @@ function renderEvolution() {
 }
 
 function _renderEvoContent(rows, period) {
+  // Delta quotidien HORS dépôts/retraits : on retire la variation de l'investi
+  // (dépôt ou retrait = différence d'investi entre le jour et la veille).
+  const _allAsc = [...rows].sort((a, b) => a.date.localeCompare(b.date));
+  const adjDeltaByDate = {};
+  _allAsc.forEach((r, i) => {
+    if (i === 0) { adjDeltaByDate[r.date] = null; return; }
+    const p = _allAsc[i - 1];
+    adjDeltaByDate[r.date] = ((r.act_total || 0) - (p.act_total || 0)) - ((r.inv_total || 0) - (p.inv_total || 0));
+  });
   const fmtE = n => n == null ? '—' : Math.round(n).toLocaleString('fr') + ' €';
   const fmtP = p => p == null ? '—' : (p >= 0 ? '+' : '') + (p*100).toFixed(2) + '%';
   const fmtD = n => {
@@ -4513,11 +4522,11 @@ function _renderEvoContent(rows, period) {
   if (EVO_DELTA_CHART_INSTANCE) { EVO_DELTA_CHART_INSTANCE.destroy(); EVO_DELTA_CHART_INSTANCE = null; }
   const ctx2 = document.getElementById('evoDeltaChart');
   if (ctx2) {
-    const deltaData = sorted.map(r => r.act_delta);
+    const deltaData = sorted.map(r => adjDeltaByDate[r.date]);
     EVO_DELTA_CHART_INSTANCE = new Chart(ctx2, {
       type: 'bar',
       data: { labels: sorted.map(r => r.date),
-        datasets: [{ label: 'Delta (€)', data: deltaData, backgroundColor: deltaData.map(v => v == null ? 'transparent' : v >= 0 ? 'rgba(76,175,130,0.7)' : 'rgba(224,108,108,0.7)'), borderRadius: 2 }]
+        datasets: [{ label: 'Delta hors dépôts (€)', data: deltaData, backgroundColor: deltaData.map(v => v == null ? 'transparent' : v >= 0 ? 'rgba(76,175,130,0.7)' : 'rgba(224,108,108,0.7)'), borderRadius: 2 }]
       },
       options: { responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => (ctx.raw >= 0 ? '+' : '') + Math.round(ctx.raw).toLocaleString('fr') + ' €' } } },
@@ -4542,7 +4551,7 @@ function _renderEvoContent(rows, period) {
         <td style="padding:6px 8px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${fmtE(r.inv_total)}</td>
         <td style="padding:6px 8px;text-align:right;font-family:'DM Mono',monospace;color:${pnl>=0?'#4caf82':'#e06c6c'}">${fmtE(pnl)}</td>
         <td style="padding:6px 8px;text-align:right;color:${pnlPct>=0?'#4caf82':'#e06c6c'}">${fmtP(pnlPct)}</td>
-        <td style="padding:6px 8px;text-align:right">${fmtD(r.act_delta)}</td>
+        <td style="padding:6px 8px;text-align:right">${fmtD(adjDeltaByDate[r.date])}</td>
         <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_kb, r.act_kb)}</td>
         <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_lumo, r.act_lumo)}</td>
         <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_lendo, r.act_lendo)}</td>
