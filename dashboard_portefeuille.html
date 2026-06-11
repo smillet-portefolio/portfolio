@@ -319,7 +319,7 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
   <div id="dashboard" class="section active">
 
     <!-- KPIs globaux -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:24px">
       <div class="card" style="padding:18px 16px">
         <div class="kpi-label">Montant investi (net déposé)</div>
         <div id="db_invested" class="kpi-value" style="font-size:22px">—</div>
@@ -339,6 +339,16 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
         <div class="kpi-label">Performance</div>
         <div id="db_kpi_perf" class="kpi-value" style="font-size:22px">—</div>
         <div id="db_perf_sub" style="font-size:13px;color:var(--text2);margin-top:4px">Sur montant investi</div>
+      </div>
+      <div class="card" style="padding:18px 16px">
+        <div class="kpi-label">Performance YTD</div>
+        <div id="db_kpi_ytd" class="kpi-value" style="font-size:22px">—</div>
+        <div id="db_ytd_sub" style="font-size:13px;color:var(--text2);margin-top:4px">Depuis le 1er janvier</div>
+      </div>
+      <div class="card" style="padding:18px 16px">
+        <div class="kpi-label">Performance MTD</div>
+        <div id="db_kpi_mtd" class="kpi-value" style="font-size:22px">—</div>
+        <div id="db_mtd_sub" style="font-size:13px;color:var(--text2);margin-top:4px">Depuis le 1er du mois</div>
       </div>
     </div>
 
@@ -391,7 +401,7 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
       <!-- Par type d'actif -->
       <div class="card" style="padding:20px">
         <p style="font-size:14px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">Par type d'actif</p>
-        <table style="width:100%;font-size:14px;border-collapse:collapse">
+        <table style="width:100%;font-size:13px;border-collapse:collapse">
           <thead>
             <tr style="font-size:14px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);background:var(--bg3)">
               <th style="padding:7px 12px;text-align:left">Type</th>
@@ -399,6 +409,8 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
               <th style="padding:7px 12px;text-align:right">Valeur act. (€)</th>
               <th style="padding:7px 12px;text-align:right">+/− (€)</th>
               <th style="padding:7px 12px;text-align:right">Perf.</th>
+              <th style="padding:7px 10px;text-align:right">Perf. YTD</th>
+              <th style="padding:7px 10px;text-align:right">Perf. MTD</th>
             </tr>
           </thead>
           <tbody id="db_type_body"></tbody>
@@ -408,7 +420,7 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
       <!-- Par broker -->
       <div class="card" style="padding:20px">
         <p style="font-size:14px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">Par broker</p>
-        <table style="width:100%;font-size:14px;border-collapse:collapse">
+        <table style="width:100%;font-size:13px;border-collapse:collapse">
           <thead>
             <tr style="font-size:14px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);background:var(--bg3)">
               <th style="padding:7px 12px;text-align:left">Broker</th>
@@ -416,6 +428,8 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
               <th style="padding:7px 12px;text-align:right">Valeur act. (€)</th>
               <th style="padding:7px 12px;text-align:right">+/− (€)</th>
               <th style="padding:7px 12px;text-align:right">Perf.</th>
+              <th style="padding:7px 10px;text-align:right">Perf. YTD</th>
+              <th style="padding:7px 10px;text-align:right">Perf. MTD</th>
             </tr>
           </thead>
           <tbody id="db_broker_body"></tbody>
@@ -1544,6 +1558,32 @@ function renderDashboard() {
   set('db_kpi_perf',     fmtP(totalPerf), colPnl(totalPerf));
   set('db_value_sub', `Portefeuille ${fmtE(pfValTot)} + Oblig. ${fmtE(obligCapRest)} + Cash ${fmtE(cashTot)}`);
 
+  // ── Performance YTD / MTD (calculées depuis l'historique de l'onglet Évolution) ──
+  (function() {
+    const src = (typeof getEvoRows === 'function') ? getEvoRows()
+              : (typeof EVO_HISTORY !== 'undefined' ? EVO_HISTORY : []);
+    const evo = (src || [])
+      .filter(r => r && r.date && r.date <= today && r.inv_total)
+      .slice().sort((a, b) => a.date.localeCompare(b.date));
+    const pnlNow = totalPnl;   // = valeur actuelle − investi (cohérent avec la carte +/− Value)
+    const baseBefore = (cut) => {
+      let base = null;
+      for (const r of evo) { if (r.date < cut) base = r; else break; }
+      return base || evo[0] || null;   // si rien avant la coupure, prendre la 1re ligne dispo
+    };
+    const calc = (cut, elV, elS, label) => {
+      const b = baseBefore(cut);
+      if (!b) { set(elV, '—'); set(elS, label); return; }
+      const pnlBase = (b.act_total || 0) - (b.inv_total || 0);
+      const gain    = pnlNow - pnlBase;                          // gain hors dépôts sur la période
+      const pct     = b.act_total > 0 ? (gain / b.act_total * 100) : null;
+      set(elV, fmtP(pct), colPnl(pct));
+      set(elS, `${label} · ${gain >= 0 ? '+' : ''}${fmtE(gain)}`);
+    };
+    calc(today.slice(0,4) + '-01-01', 'db_kpi_ytd', 'db_ytd_sub', 'Depuis 01/01');
+    calc(today.slice(0,7) + '-01',    'db_kpi_mtd', 'db_mtd_sub', 'Depuis 01/' + today.slice(5,7));
+  })();
+
   // ── Donuts ──────────────────────────────────────────────────────────────────
   if (!window._dbCharts) window._dbCharts = {};
   var CAT_COLORS = {
@@ -1730,6 +1770,32 @@ function renderDashboard() {
   }
 
   // ── Tableau par type d'actif ────────────────────────────────────────────────
+  // ── Helper Performance YTD / MTD par ligne (basé sur l'historique de l'onglet Évolution) ──
+  const EVO_SRC = (((typeof getEvoRows === 'function') ? getEvoRows()
+                   : (typeof EVO_HISTORY !== 'undefined' ? EVO_HISTORY : [])) || [])
+                   .filter(r => r && r.date && r.date <= today && r.inv_total)
+                   .slice().sort((a, b) => a.date.localeCompare(b.date));
+  const BROKER_EVO = { 'KB':'kb','SAXO':'saxo','IBKR':'ibkr','TRADING 212':'t212','XTB':'xtb',
+                       'Ledger':'ledger','Binance':'binance','ENERFIP':'enerfip','LENDOSPHERE':'lendo','LUMO':'lumo','LINXEA':'linxea' };
+  const YTD_CUT = today.slice(0,4) + '-01-01';
+  const MTD_CUT = today.slice(0,7) + '-01';
+  const evoBaseRow = (cut) => { let base = null; for (const r of EVO_SRC) { if (r.date < cut) base = r; else break; } return base || EVO_SRC[0] || null; };
+  const evoBaseSum = (suffixes, cut) => {
+    const b = evoBaseRow(cut); if (!b) return null;
+    let act = 0, inv = 0, ok = false;
+    suffixes.forEach(s => { if (typeof b['act_'+s] === 'number') { act += b['act_'+s]; ok = true; } if (typeof b['inv_'+s] === 'number') { inv += b['inv_'+s]; } });
+    return ok ? { act, inv } : null;
+  };
+  const periodCell = (valNow, invNow, suffixes, cut) => {
+    const base = evoBaseSum(suffixes, cut);
+    if (!base || base.act <= 0) return `<td style="padding:7px 10px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">—</td>`;
+    const pct = ((valNow - invNow) - (base.act - base.inv)) / base.act * 100;
+    return `<td style="padding:7px 10px;text-align:right;font-family:'DM Mono',monospace;white-space:nowrap;color:${colPnl(pct)}">${fmtP(pct)}</td>`;
+  };
+  const catSuffixes = (cat) => Object.keys(BROKER_EVO).filter(k => BROKER_TO_CAT[k] === cat).map(k => BROKER_EVO[k]);
+  const catCell = (cat, val, inv, cut) => periodCell(val, inv, catSuffixes(cat), cut);
+  const brkCell = (b,   val, inv, cut) => periodCell(val, inv, BROKER_EVO[b] ? [BROKER_EVO[b]] : [], cut);
+
   const typeBody = document.getElementById('db_type_body');
   if (typeBody) {
     let totInv = 0, totVal = 0;
@@ -1747,6 +1813,7 @@ function renderDashboard() {
         <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${fmtE(val)}</td>
         <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:${colPnl(pnl)}">${fmtE(pnl)}</td>
         <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:${colPnl(perf)}">${fmtP(perf)}</td>
+        ${catCell(cat, val, inv, YTD_CUT)}${catCell(cat, val, inv, MTD_CUT)}
       </tr>`;
     }).join('') + `<tr class="tfoot">
       <td style="padding:7px 12px;font-weight:700">Total</td>
@@ -1754,6 +1821,7 @@ function renderDashboard() {
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:700">${fmtE(totVal)}</td>
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:${colPnl(totVal-totInv)}">${fmtE(totVal-totInv)}</td>
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:${colPnl(totInv>0?(totVal-totInv)/totInv*100:null)}">${fmtP(totInv>0?(totVal-totInv)/totInv*100:null)}</td>
+      ${periodCell(totVal, totInv, ['total'], YTD_CUT)}${periodCell(totVal, totInv, ['total'], MTD_CUT)}
     </tr>`;
   }
 
@@ -1779,6 +1847,7 @@ function renderDashboard() {
         <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${fmtE(val)}</td>
         <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:${colPnl(pnl)}">${fmtE(pnl)}</td>
         <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:${colPnl(perf)}">${fmtP(perf)}</td>
+        ${brkCell(b, val, inv, YTD_CUT)}${brkCell(b, val, inv, MTD_CUT)}
       </tr>`;
     });
     brokerBody.innerHTML = rows.join('') + `<tr class="tfoot">
@@ -1787,6 +1856,7 @@ function renderDashboard() {
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:700">${fmtE(totVal)}</td>
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:${colPnl(totVal-totInv)}">${fmtE(totVal-totInv)}</td>
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:${colPnl(totInv>0?(totVal-totInv)/totInv*100:null)}">${fmtP(totInv>0?(totVal-totInv)/totInv*100:null)}</td>
+      ${periodCell(totVal, totInv, ['total'], YTD_CUT)}${periodCell(totVal, totInv, ['total'], MTD_CUT)}
     </tr>`;
   }
 }
