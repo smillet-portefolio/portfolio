@@ -331,11 +331,6 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
         <div id="db_value_sub" style="font-size:13px;color:var(--text2);margin-top:4px">Portefeuille + obligations + cash</div>
       </div>
       <div class="card" style="padding:18px 16px">
-        <div class="kpi-label">+/− Value</div>
-        <div id="db_pnl" class="kpi-value" style="font-size:22px">—</div>
-        <div id="db_pnl_sub" style="font-size:13px;color:var(--text2);margin-top:4px">Valeur actuelle − investi</div>
-      </div>
-      <div class="card" style="padding:18px 16px">
         <div class="kpi-label">Performance</div>
         <div id="db_kpi_perf" class="kpi-value" style="font-size:22px">—</div>
         <div id="db_perf_sub" style="font-size:13px;color:var(--text2);margin-top:4px">Sur montant investi</div>
@@ -404,13 +399,13 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
         <table style="width:100%;font-size:13px;border-collapse:collapse">
           <thead>
             <tr style="font-size:14px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);background:var(--bg3)">
-              <th style="padding:7px 12px;text-align:left">Type</th>
-              <th style="padding:7px 12px;text-align:right">Investi (€)</th>
-              <th style="padding:7px 12px;text-align:right">Valeur act. (€)</th>
-              <th style="padding:7px 12px;text-align:right">+/− (€)</th>
-              <th style="padding:7px 12px;text-align:right">Perf.</th>
-              <th style="padding:7px 10px;text-align:right">Perf. YTD</th>
-              <th style="padding:7px 10px;text-align:right">Perf. MTD</th>
+              <th onclick="dbSort('type','label')" data-tbl="type" data-col="label" style="padding:7px 12px;text-align:left;cursor:pointer;user-select:none">Type<span class="dbarr" style="font-size:10px"></span></th>
+              <th onclick="dbSort('type','inv')" data-tbl="type" data-col="inv" style="padding:7px 12px;text-align:right;cursor:pointer;user-select:none">Investi (€)<span class="dbarr" style="font-size:10px"></span></th>
+              <th onclick="dbSort('type','val')" data-tbl="type" data-col="val" style="padding:7px 12px;text-align:right;cursor:pointer;user-select:none">Valeur act. (€)<span class="dbarr" style="font-size:10px"></span></th>
+              <th onclick="dbSort('type','pnl')" data-tbl="type" data-col="pnl" style="padding:7px 12px;text-align:right;cursor:pointer;user-select:none">+/− (€)<span class="dbarr" style="font-size:10px"></span></th>
+              <th onclick="dbSort('type','perf')" data-tbl="type" data-col="perf" style="padding:7px 12px;text-align:right;cursor:pointer;user-select:none">Perf.<span class="dbarr" style="font-size:10px"></span></th>
+              <th onclick="dbSort('type','ytd')" data-tbl="type" data-col="ytd" style="padding:7px 10px;text-align:right;cursor:pointer;user-select:none">Perf. YTD<span class="dbarr" style="font-size:10px"></span></th>
+              <th onclick="dbSort('type','mtd')" data-tbl="type" data-col="mtd" style="padding:7px 10px;text-align:right;cursor:pointer;user-select:none">Perf. MTD<span class="dbarr" style="font-size:10px"></span></th>
             </tr>
           </thead>
           <tbody id="db_type_body"></tbody>
@@ -423,13 +418,13 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
         <table style="width:100%;font-size:13px;border-collapse:collapse">
           <thead>
             <tr style="font-size:14px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);background:var(--bg3)">
-              <th style="padding:7px 12px;text-align:left">Broker</th>
-              <th style="padding:7px 12px;text-align:right">Investi (€)</th>
-              <th style="padding:7px 12px;text-align:right">Valeur act. (€)</th>
-              <th style="padding:7px 12px;text-align:right">+/− (€)</th>
-              <th style="padding:7px 12px;text-align:right">Perf.</th>
-              <th style="padding:7px 10px;text-align:right">Perf. YTD</th>
-              <th style="padding:7px 10px;text-align:right">Perf. MTD</th>
+              <th onclick="dbSort('broker','label')" data-tbl="broker" data-col="label" style="padding:7px 12px;text-align:left;cursor:pointer;user-select:none">Broker<span class="dbarr" style="font-size:10px"></span></th>
+              <th onclick="dbSort('broker','inv')" data-tbl="broker" data-col="inv" style="padding:7px 12px;text-align:right;cursor:pointer;user-select:none">Investi (€)<span class="dbarr" style="font-size:10px"></span></th>
+              <th onclick="dbSort('broker','val')" data-tbl="broker" data-col="val" style="padding:7px 12px;text-align:right;cursor:pointer;user-select:none">Valeur act. (€)<span class="dbarr" style="font-size:10px"></span></th>
+              <th onclick="dbSort('broker','pnl')" data-tbl="broker" data-col="pnl" style="padding:7px 12px;text-align:right;cursor:pointer;user-select:none">+/− (€)<span class="dbarr" style="font-size:10px"></span></th>
+              <th onclick="dbSort('broker','perf')" data-tbl="broker" data-col="perf" style="padding:7px 12px;text-align:right;cursor:pointer;user-select:none">Perf.<span class="dbarr" style="font-size:10px"></span></th>
+              <th onclick="dbSort('broker','ytd')" data-tbl="broker" data-col="ytd" style="padding:7px 10px;text-align:right;cursor:pointer;user-select:none">Perf. YTD<span class="dbarr" style="font-size:10px"></span></th>
+              <th onclick="dbSort('broker','mtd')" data-tbl="broker" data-col="mtd" style="padding:7px 10px;text-align:right;cursor:pointer;user-select:none">Perf. MTD<span class="dbarr" style="font-size:10px"></span></th>
             </tr>
           </thead>
           <tbody id="db_broker_body"></tbody>
@@ -1556,6 +1551,7 @@ function renderDashboard() {
   set('db_value',    fmtE(totalValue));
   set('db_pnl',      fmtE(totalPnl),  colPnl(totalPnl));
   set('db_kpi_perf',     fmtP(totalPerf), colPnl(totalPerf));
+  set('db_perf_sub', `Plus-value · ${totalPnl >= 0 ? '+' : ''}${fmtE(totalPnl)}`);
   set('db_value_sub', `Portefeuille ${fmtE(pfValTot)} + Oblig. ${fmtE(obligCapRest)} + Cash ${fmtE(cashTot)}`);
 
   // ── Performance YTD / MTD (calculées depuis l'historique de l'onglet Évolution) ──
@@ -1796,69 +1792,76 @@ function renderDashboard() {
   const catCell = (cat, val, inv, cut) => periodCell(val, inv, catSuffixes(cat), cut);
   const brkCell = (b,   val, inv, cut) => periodCell(val, inv, BROKER_EVO[b] ? [BROKER_EVO[b]] : [], cut);
 
-  const typeBody = document.getElementById('db_type_body');
-  if (typeBody) {
+  const periodPct = (valNow, invNow, suffixes, cut) => {
+    const base = evoBaseSum(suffixes, cut);
+    if (!base || base.act <= 0) return null;
+    return ((valNow - invNow) - (base.act - base.inv)) / base.act * 100;
+  };
+
+  const typeData = CATS.map(cat => {
+    const inv = investedByCat[cat] || 0, val = valueByCat[cat] || 0;
+    return { label: cat, inv, val, pnl: val - inv, perf: inv > 0 ? (val - inv) / inv * 100 : null,
+             ytd: periodPct(val, inv, catSuffixes(cat), YTD_CUT), mtd: periodPct(val, inv, catSuffixes(cat), MTD_CUT) };
+  });
+  const allBrokers = [...new Set([...Object.keys(investedByBroker), ...Object.keys(pfByBroker)])];
+  const brokerData = allBrokers.map(b => {
+    const inv = investedByBroker[b] || 0, val = pfByBroker[b] || 0;
+    const sfx = BROKER_EVO[b] ? [BROKER_EVO[b]] : [];
+    return { label: b, inv, val, pnl: val - inv, perf: inv > 0 ? (val - inv) / inv * 100 : null,
+             ytd: periodPct(val, inv, sfx, YTD_CUT), mtd: periodPct(val, inv, sfx, MTD_CUT) };
+  });
+
+  window._dbSort = window._dbSort || { type: { col: 'val', dir: -1 }, broker: { col: 'val', dir: -1 } };
+
+  const renderDbTbl = (which, data, bodyId) => {
+    const body = document.getElementById(bodyId);
+    if (!body) return;
+    const st = window._dbSort[which];
+    const sorted = data.slice().sort((a, b) => {
+      let x = a[st.col], y = b[st.col];
+      if (typeof x === 'string') return st.dir * x.localeCompare(y);
+      if (x == null) x = -Infinity;
+      if (y == null) y = -Infinity;
+      return st.dir * (x - y);
+    });
     let totInv = 0, totVal = 0;
-    const sortedCats = CATS.slice().sort(function(a,b) { return (valueByCat[b]||0)-(valueByCat[a]||0); });
-    typeBody.innerHTML = sortedCats.map((cat, i) => {
-      const inv  = investedByCat[cat] || 0;
-      const val  = valueByCat[cat]    || 0;
-      const pnl  = val - inv;
-      const perf = inv > 0 ? (pnl / inv * 100) : null;
-      totInv += inv; totVal += val;
+    data.forEach(r => { totInv += r.inv; totVal += r.val; });
+    const totPerf = totInv > 0 ? (totVal - totInv) / totInv * 100 : null;
+    const totYtd  = periodPct(totVal, totInv, ['total'], YTD_CUT);
+    const totMtd  = periodPct(totVal, totInv, ['total'], MTD_CUT);
+    const c  = (v, col, w) => `<td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;${w ? 'font-weight:700;' : ''}color:${col}">${v}</td>`;
+    const pc = (v, col, w) => `<td style="padding:7px 10px;text-align:right;font-family:'DM Mono',monospace;white-space:nowrap;${w ? 'font-weight:700;' : ''}color:${col}">${v}</td>`;
+    body.innerHTML = sorted.map((r, i) => {
       const bg = i % 2 === 0 ? 'var(--bg)' : 'var(--bg2)';
       return `<tr style="background:${bg};border-bottom:1px solid var(--border)">
-        <td style="padding:7px 12px;font-weight:600">${cat}</td>
-        <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${fmtE(inv)}</td>
-        <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${fmtE(val)}</td>
-        <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:${colPnl(pnl)}">${fmtE(pnl)}</td>
-        <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:${colPnl(perf)}">${fmtP(perf)}</td>
-        ${catCell(cat, val, inv, YTD_CUT)}${catCell(cat, val, inv, MTD_CUT)}
+        <td style="padding:7px 12px;font-weight:600">${r.label}</td>
+        ${c(fmtE(r.inv), 'var(--text)')}${c(fmtE(r.val), 'var(--text)')}${c(fmtE(r.pnl), colPnl(r.pnl))}${c(fmtP(r.perf), colPnl(r.perf))}${pc(fmtP(r.ytd), colPnl(r.ytd))}${pc(fmtP(r.mtd), colPnl(r.mtd))}
       </tr>`;
     }).join('') + `<tr class="tfoot">
       <td style="padding:7px 12px;font-weight:700">Total</td>
-      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:700">${fmtE(totInv)}</td>
-      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:700">${fmtE(totVal)}</td>
-      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:${colPnl(totVal-totInv)}">${fmtE(totVal-totInv)}</td>
-      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:${colPnl(totInv>0?(totVal-totInv)/totInv*100:null)}">${fmtP(totInv>0?(totVal-totInv)/totInv*100:null)}</td>
-      ${periodCell(totVal, totInv, ['total'], YTD_CUT)}${periodCell(totVal, totInv, ['total'], MTD_CUT)}
+      ${c(fmtE(totInv), 'var(--text)', 1)}${c(fmtE(totVal), 'var(--text)', 1)}${c(fmtE(totVal - totInv), colPnl(totVal - totInv), 1)}${c(fmtP(totPerf), colPnl(totPerf), 1)}${pc(fmtP(totYtd), colPnl(totYtd), 1)}${pc(fmtP(totMtd), colPnl(totMtd), 1)}
     </tr>`;
-  }
+    document.querySelectorAll('th[data-tbl="' + which + '"]').forEach(th => {
+      const s = th.querySelector('.dbarr');
+      if (s) s.textContent = (th.dataset.col === st.col) ? (st.dir < 0 ? ' ▼' : ' ▲') : '';
+    });
+  };
+
+  window._dbRender = {
+    type:   () => renderDbTbl('type',   typeData,   'db_type_body'),
+    broker: () => renderDbTbl('broker', brokerData, 'db_broker_body')
+  };
+  window._dbRender.type();
+  window._dbRender.broker();
 
   // ── Tableau par broker ──────────────────────────────────────────────────────
-  const brokerBody = document.getElementById('db_broker_body');
-  if (brokerBody) {
-    const allBrokers = [...new Set([
-      ...Object.keys(investedByBroker),
-      ...Object.keys(pfByBroker)
-    ])].sort(function(a,b) { return (pfByBroker[b]||0)-(pfByBroker[a]||0); });
-
-    let totInv = 0, totVal = 0;
-    const rows = allBrokers.map((b, i) => {
-      const inv = investedByBroker[b] || 0;
-      const val = pfByBroker[b]       || 0;
-      const pnl = val - inv;
-      const perf = inv > 0 ? (pnl / inv * 100) : null;
-      totInv += inv; totVal += val;
-      const bg = i % 2 === 0 ? 'var(--bg)' : 'var(--bg2)';
-      return `<tr style="background:${bg};border-bottom:1px solid var(--border)">
-        <td style="padding:7px 12px;font-weight:600">${b}</td>
-        <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${fmtE(inv)}</td>
-        <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${fmtE(val)}</td>
-        <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:${colPnl(pnl)}">${fmtE(pnl)}</td>
-        <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:${colPnl(perf)}">${fmtP(perf)}</td>
-        ${brkCell(b, val, inv, YTD_CUT)}${brkCell(b, val, inv, MTD_CUT)}
-      </tr>`;
-    });
-    brokerBody.innerHTML = rows.join('') + `<tr class="tfoot">
-      <td style="padding:7px 12px;font-weight:700">Total</td>
-      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:700">${fmtE(totInv)}</td>
-      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:700">${fmtE(totVal)}</td>
-      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:${colPnl(totVal-totInv)}">${fmtE(totVal-totInv)}</td>
-      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:${colPnl(totInv>0?(totVal-totInv)/totInv*100:null)}">${fmtP(totInv>0?(totVal-totInv)/totInv*100:null)}</td>
-      ${periodCell(totVal, totInv, ['total'], YTD_CUT)}${periodCell(totVal, totInv, ['total'], MTD_CUT)}
-    </tr>`;
-  }
+// (tableaux rendus via window._dbRender ci-dessus)
+}
+function dbSort(which, col) {
+  window._dbSort = window._dbSort || { type: { col: 'val', dir: -1 }, broker: { col: 'val', dir: -1 } };
+  const st = window._dbSort[which];
+  if (st.col === col) st.dir *= -1; else { st.col = col; st.dir = -1; }
+  if (window._dbRender && window._dbRender[which]) window._dbRender[which]();
 }
 function isActiveInv(r) {
   return !r.typeInv || r.typeInv === 'ETF' || r.typeInv === 'Action';
