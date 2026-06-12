@@ -331,19 +331,36 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
         <div id="db_value_sub" style="font-size:13px;color:var(--text2);margin-top:4px">Portefeuille + obligations + cash</div>
       </div>
       <div class="card" style="padding:18px 16px">
+        <div class="kpi-label">Performance journalière</div>
+        <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-top:2px">
+          <span id="db_kpi_journ" class="kpi-value" style="font-size:20px">—</span>
+          <span id="db_journ_val" class="kpi-value" style="font-size:20px">—</span>
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-top:3px">Aujourd'hui (hors dépôts)</div>
+      </div>
+      <div class="card" style="padding:18px 16px">
         <div class="kpi-label">Performance</div>
-        <div id="db_kpi_perf" class="kpi-value" style="font-size:22px">—</div>
-        <div id="db_perf_sub" style="font-size:13px;color:var(--text2);margin-top:4px">Sur montant investi</div>
+        <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-top:2px">
+          <span id="db_kpi_perf" class="kpi-value" style="font-size:20px">—</span>
+          <span id="db_perf_val" class="kpi-value" style="font-size:20px">—</span>
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-top:3px">Sur montant investi</div>
       </div>
       <div class="card" style="padding:18px 16px">
         <div class="kpi-label">Performance YTD</div>
-        <div id="db_kpi_ytd" class="kpi-value" style="font-size:22px">—</div>
-        <div id="db_ytd_sub" style="font-size:13px;color:var(--text2);margin-top:4px">Depuis le 1er janvier</div>
+        <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-top:2px">
+          <span id="db_kpi_ytd" class="kpi-value" style="font-size:20px">—</span>
+          <span id="db_ytd_val" class="kpi-value" style="font-size:20px">—</span>
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-top:3px">Depuis le 1er janvier</div>
       </div>
       <div class="card" style="padding:18px 16px">
         <div class="kpi-label">Performance MTD</div>
-        <div id="db_kpi_mtd" class="kpi-value" style="font-size:22px">—</div>
-        <div id="db_mtd_sub" style="font-size:13px;color:var(--text2);margin-top:4px">Depuis le 1er du mois</div>
+        <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-top:2px">
+          <span id="db_kpi_mtd" class="kpi-value" style="font-size:20px">—</span>
+          <span id="db_mtd_val" class="kpi-value" style="font-size:20px">—</span>
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-top:3px">Depuis le 1er du mois</div>
       </div>
     </div>
 
@@ -1562,8 +1579,8 @@ function renderDashboard() {
   set('db_invested', fmtE(totalInvested));
   set('db_value',    fmtE(totalValue));
   set('db_pnl',      fmtE(totalPnl),  colPnl(totalPnl));
-  set('db_kpi_perf',     fmtP(totalPerf), colPnl(totalPerf));
-  set('db_perf_sub', `Plus-value · ${totalPnl >= 0 ? '+' : ''}${fmtE(totalPnl)}`);
+  set('db_kpi_perf', fmtP(totalPerf), colPnl(totalPerf));
+  set('db_perf_val', `${totalPnl >= 0 ? '+' : ''}${fmtE(totalPnl)}`, colPnl(totalPnl));
   set('db_value_sub', `Portefeuille ${fmtE(pfValTot)} + Oblig. ${fmtE(obligCapRest)} + Cash ${fmtE(cashTot)}`);
 
   // ── Performance YTD / MTD (calculées depuis l'historique de l'onglet Évolution) ──
@@ -1579,17 +1596,18 @@ function renderDashboard() {
       for (const r of evo) { if (r.date < cut) base = r; else break; }
       return base || evo[0] || null;   // si rien avant la coupure, prendre la 1re ligne dispo
     };
-    const calc = (cut, elV, elS, label) => {
+    const calc = (cut, elV, elE) => {
       const b = baseBefore(cut);
-      if (!b) { set(elV, '—'); set(elS, label); return; }
+      if (!b) { set(elV, '—'); set(elE, '—'); return; }
       const pnlBase = (b.act_total || 0) - (b.inv_total || 0);
       const gain    = pnlNow - pnlBase;                          // gain hors dépôts sur la période
       const pct     = b.act_total > 0 ? (gain / b.act_total * 100) : null;
       set(elV, fmtP(pct), colPnl(pct));
-      set(elS, `${label} · ${gain >= 0 ? '+' : ''}${fmtE(gain)}`);
+      set(elE, `${gain >= 0 ? '+' : ''}${fmtE(gain)}`, colPnl(gain));
     };
-    calc(today.slice(0,4) + '-01-01', 'db_kpi_ytd', 'db_ytd_sub', 'Depuis 01/01');
-    calc(today.slice(0,7) + '-01',    'db_kpi_mtd', 'db_mtd_sub', 'Depuis 01/' + today.slice(5,7));
+    calc(today,                       'db_kpi_journ', 'db_journ_val');
+    calc(today.slice(0,4) + '-01-01', 'db_kpi_ytd',   'db_ytd_val');
+    calc(today.slice(0,7) + '-01',    'db_kpi_mtd',   'db_mtd_val');
   })();
 
   // ── Donuts ──────────────────────────────────────────────────────────────────
@@ -3596,15 +3614,44 @@ function submitSellLine() {
 // ──────────────────────────────────────────────────────────────────────────────
 // RENDER CLOSED POSITIONS
 // ──────────────────────────────────────────────────────────────────────────────
+window._closedSort = window._closedSort || { col: 'dateSell', dir: -1 };
+window._closedFilter = window._closedFilter || { nom: '', ticker: '' };
+function closedSort(col) {
+  const st = window._closedSort;
+  if (st.col === col) st.dir *= -1; else { st.col = col; st.dir = 1; }
+  renderClosedPositions();
+}
+function closedFilter(key, val) {
+  window._closedFilter[key] = (val || '').toLowerCase();
+  renderClosedPositions();
+}
 function renderClosedPositions() {
   const tbody = document.getElementById('closedBody'); if (!tbody) return;
-  let rows = [];
-  try { rows = JSON.parse(localStorage.getItem('closed_positions')||'[]'); } catch(e){}
+  let all = [];
+  try { all = JSON.parse(localStorage.getItem('closed_positions')||'[]'); } catch(e){}
   tbody.innerHTML = '';
   const emptyEl = document.getElementById('closed_empty');
   const tableEl = document.getElementById('closedTable');
-  if (emptyEl) emptyEl.style.display = rows.length ? 'none' : 'block';
-  if (tableEl) tableEl.style.display = rows.length ? '' : 'none';
+  if (emptyEl) emptyEl.style.display = all.length ? 'none' : 'block';
+  if (tableEl) tableEl.style.display = all.length ? '' : 'none';
+  // Filtre + tri
+  const cf = window._closedFilter || { nom:'', ticker:'' };
+  let rows = all.filter(p =>
+    (!cf.nom || (p.name||'').toLowerCase().includes(cf.nom)) &&
+    (!cf.ticker || (p.ticker||'').toLowerCase().includes(cf.ticker)));
+  const cs = window._closedSort || { col:'dateSell', dir:-1 };
+  rows = rows.slice().sort((a,b) => {
+    let x = a[cs.col], y = b[cs.col];
+    if (typeof x === 'string' || typeof y === 'string')
+      return cs.dir * String(x==null?'':x).localeCompare(String(y==null?'':y));
+    if (x == null) x = -Infinity;
+    if (y == null) y = -Infinity;
+    return cs.dir * (x - y);
+  });
+  document.querySelectorAll('th[data-csort]').forEach(th => {
+    const s = th.querySelector('.cs-arr');
+    if (s) s.textContent = (th.dataset.csort === cs.col) ? (cs.dir < 0 ? ' \u25bc' : ' \u25b2') : '';
+  });
   let totCost=0, totVal=0, totPnl=0;
 
   rows.forEach(p => {
@@ -4523,6 +4570,18 @@ function _renderEvoContent(rows, period) {
     sorted.forEach(r => { byKey[keyOf(r.date)] = r; });   // derniere ligne de chaque periode
     points = Object.values(byKey).sort((a,b) => a.date.localeCompare(b.date));
   }
+  // Libellés de l'axe selon la granularité : mois -> "juin 2026", semaine -> "S24 2026"
+  const _moisFr = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+  const evoLabel = (ds) => {
+    if (gran === 'month') { const a = ds.split('-'); return _moisFr[(+a[1]) - 1] + ' ' + a[0]; }
+    if (gran === 'week') {
+      const dt = new Date(ds), oj = new Date(dt.getFullYear(), 0, 1);
+      const wk = Math.ceil((((dt - oj) / 86400000) + oj.getDay() + 1) / 7);
+      return 'S' + wk + ' ' + dt.getFullYear();
+    }
+    return ds;
+  };
+  const evoLabels = points.map(r => evoLabel(r.date));
 
   // Graphique principal
   if (EVO_CHART_INSTANCE) { EVO_CHART_INSTANCE.destroy(); EVO_CHART_INSTANCE = null; }
@@ -4531,7 +4590,7 @@ function _renderEvoContent(rows, period) {
     EVO_CHART_INSTANCE = new Chart(ctx, {
       type: 'line',
       data: {
-        labels: points.map(r => r.date),
+        labels: evoLabels,
         datasets: [
           { label: 'Valeur actuelle', data: points.map(r => r.act_total), borderColor: '#5a8dee', backgroundColor: 'rgba(90,141,238,0.1)', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.3 },
           { label: 'Investi', data: points.map(r => r.inv_total), borderColor: '#f97316', backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 0, borderDash: [4,4], tension: 0.3 }
@@ -4553,7 +4612,7 @@ function _renderEvoContent(rows, period) {
       : points.map((r, i) => i === 0 ? null : ((r.act_total - points[i-1].act_total) - (r.inv_total - points[i-1].inv_total)));
     EVO_DELTA_CHART_INSTANCE = new Chart(ctx2, {
       type: 'bar',
-      data: { labels: points.map(r => r.date),
+      data: { labels: evoLabels,
         datasets: [{ label: 'Delta hors dépôts (€)', data: deltaData, backgroundColor: deltaData.map(v => v == null ? 'transparent' : v >= 0 ? 'rgba(76,175,130,0.7)' : 'rgba(224,108,108,0.7)'), borderRadius: 2 }]
       },
       options: { responsive: true, maintainAspectRatio: false,
@@ -5152,17 +5211,22 @@ function renderObligCharts(data) {
       <table id="closedTable" style="font-size:12px;width:100%;border-collapse:collapse;display:none">
         <thead>
           <tr style="background:var(--bg2);text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2)">
-            <th style="padding:8px 12px;text-align:left">Nom</th>
-            <th style="padding:8px 12px;text-align:left">Ticker</th>
-            <th style="padding:8px 12px;text-align:left">Date achat</th>
-            <th style="padding:8px 12px;text-align:left">Date vente</th>
-            <th style="padding:8px 12px;text-align:right">Qté</th>
-            <th style="padding:8px 12px;text-align:right">Px achat</th>
-            <th style="padding:8px 12px;text-align:right">Px vente</th>
-            <th style="padding:8px 12px;text-align:right">Coût €</th>
-            <th style="padding:8px 12px;text-align:right">Vente €</th>
-            <th style="padding:8px 12px;text-align:right;font-weight:700">P&amp;L €</th>
-            <th style="padding:8px 12px;text-align:right">P&amp;L %</th>
+            <th onclick="closedSort('name',this)" data-csort="name" style="padding:8px 12px;text-align:left;cursor:pointer;user-select:none">Nom<span class="cs-arr" style="font-size:9px"></span></th>
+            <th onclick="closedSort('ticker',this)" data-csort="ticker" style="padding:8px 12px;text-align:left;cursor:pointer;user-select:none">Ticker<span class="cs-arr" style="font-size:9px"></span></th>
+            <th onclick="closedSort('dateAchat',this)" data-csort="dateAchat" style="padding:8px 12px;text-align:left;cursor:pointer;user-select:none">Date achat<span class="cs-arr" style="font-size:9px"></span></th>
+            <th onclick="closedSort('dateSell',this)" data-csort="dateSell" style="padding:8px 12px;text-align:left;cursor:pointer;user-select:none">Date vente<span class="cs-arr" style="font-size:9px"></span></th>
+            <th onclick="closedSort('qty',this)" data-csort="qty" style="padding:8px 12px;text-align:right;cursor:pointer;user-select:none">Qté<span class="cs-arr" style="font-size:9px"></span></th>
+            <th onclick="closedSort('pxAchat',this)" data-csort="pxAchat" style="padding:8px 12px;text-align:right;cursor:pointer;user-select:none">Px achat<span class="cs-arr" style="font-size:9px"></span></th>
+            <th onclick="closedSort('pxVente',this)" data-csort="pxVente" style="padding:8px 12px;text-align:right;cursor:pointer;user-select:none">Px vente<span class="cs-arr" style="font-size:9px"></span></th>
+            <th onclick="closedSort('costEur',this)" data-csort="costEur" style="padding:8px 12px;text-align:right;cursor:pointer;user-select:none">Coût €<span class="cs-arr" style="font-size:9px"></span></th>
+            <th onclick="closedSort('saleEur',this)" data-csort="saleEur" style="padding:8px 12px;text-align:right;cursor:pointer;user-select:none">Vente €<span class="cs-arr" style="font-size:9px"></span></th>
+            <th onclick="closedSort('pnl',this)" data-csort="pnl" style="padding:8px 12px;text-align:right;cursor:pointer;user-select:none;font-weight:700">P&amp;L €<span class="cs-arr" style="font-size:9px"></span></th>
+            <th onclick="closedSort('pnlPct',this)" data-csort="pnlPct" style="padding:8px 12px;text-align:right;cursor:pointer;user-select:none">P&amp;L %<span class="cs-arr" style="font-size:9px"></span></th>
+          </tr>
+          <tr style="background:var(--bg2)">
+            <td style="padding:3px 8px"><input type="text" placeholder="Filtrer nom..." oninput="closedFilter('nom',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>
+            <td style="padding:3px 8px"><input type="text" placeholder="Ticker..." oninput="closedFilter('ticker',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>
+            <td colspan="9"></td>
           </tr>
         </thead>
         <tbody id="closedBody"></tbody>
