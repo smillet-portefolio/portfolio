@@ -4378,11 +4378,18 @@ function renderEvolution() {
       <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);padding:20px;margin-bottom:24px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
           <span style="font-size:13px;font-weight:600">Valeur actuelle vs Investi</span>
-          <div style="display:flex;gap:6px">
-            <button class="filter-btn active" id="evo_all" onclick="filterEvoChart('all',this)">Tout</button>
-            <button class="filter-btn" id="evo_3m"  onclick="filterEvoChart('3m',this)">3M</button>
-            <button class="filter-btn" id="evo_1m"  onclick="filterEvoChart('1m',this)">1M</button>
-            <button class="filter-btn" id="evo_1w"  onclick="filterEvoChart('1w',this)">1S</button>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <div style="display:flex;gap:6px">
+              <button class="filter-btn evo-gran-btn active" onclick="setEvoGran('day',this)">Jour</button>
+              <button class="filter-btn evo-gran-btn" onclick="setEvoGran('week',this)">Semaine</button>
+              <button class="filter-btn evo-gran-btn" onclick="setEvoGran('month',this)">Mois</button>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button class="filter-btn evo-period-btn active" onclick="filterEvoChart('all',this)">Tout</button>
+              <button class="filter-btn evo-period-btn" onclick="filterEvoChart('ytd',this)">YTD</button>
+              <button class="filter-btn evo-period-btn" onclick="filterEvoChart('1m',this)">1M</button>
+              <button class="filter-btn evo-period-btn" onclick="filterEvoChart('1w',this)">1S</button>
+            </div>
           </div>
         </div>
         <div style="position:relative;height:300px"><canvas id="evoChart"></canvas></div>
@@ -4478,17 +4485,32 @@ function _renderEvoContent(rows, period) {
     <div style="font-size:15px;font-weight:700;color:${k.col}">${k.val}</div>
   </div>`).join('');
 
-  // Filtrer par période
-  const now = new Date();
-  const cutoff = {'all': null, '3m': 90, '1m': 30, '1w': 7};
-  const days = cutoff[period];
+  // Filtrer par période (all / ytd / 1m / 1w)
   let filtered = rows;
-  if (days) {
-    const d = new Date(); d.setDate(d.getDate() - days);
+  if (period === 'ytd') {
+    const ys = new Date().getFullYear() + '-01-01';
+    filtered = rows.filter(r => r.date >= ys);
+  } else if (period === '1m' || period === '1w') {
+    const d = new Date(); d.setDate(d.getDate() - (period === '1m' ? 30 : 7));
     const ds = d.toISOString().slice(0,10);
     filtered = rows.filter(r => r.date >= ds);
   }
   const sorted = [...filtered].sort((a,b) => a.date.localeCompare(b.date));
+
+  // Granularité jour / semaine / mois : 1 point par jour, semaine ou mois
+  const gran = window._evoGran || 'day';
+  let points = sorted;
+  if (gran === 'week' || gran === 'month') {
+    const keyOf = (ds) => {
+      if (gran === 'month') return ds.slice(0,7);
+      const dt = new Date(ds); const oj = new Date(dt.getFullYear(), 0, 1);
+      const wk = Math.ceil((((dt - oj) / 86400000) + oj.getDay() + 1) / 7);
+      return dt.getFullYear() + '-W' + String(wk).padStart(2, '0');
+    };
+    const byKey = {};
+    sorted.forEach(r => { byKey[keyOf(r.date)] = r; });   // derniere ligne de chaque periode
+    points = Object.values(byKey).sort((a,b) => a.date.localeCompare(b.date));
+  }
 
   // Graphique principal
   if (EVO_CHART_INSTANCE) { EVO_CHART_INSTANCE.destroy(); EVO_CHART_INSTANCE = null; }
@@ -4497,10 +4519,10 @@ function _renderEvoContent(rows, period) {
     EVO_CHART_INSTANCE = new Chart(ctx, {
       type: 'line',
       data: {
-        labels: sorted.map(r => r.date),
+        labels: points.map(r => r.date),
         datasets: [
-          { label: 'Valeur actuelle', data: sorted.map(r => r.act_total), borderColor: '#5a8dee', backgroundColor: 'rgba(90,141,238,0.1)', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.3 },
-          { label: 'Investi', data: sorted.map(r => r.inv_total), borderColor: '#f97316', backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 0, borderDash: [4,4], tension: 0.3 }
+          { label: 'Valeur actuelle', data: points.map(r => r.act_total), borderColor: '#5a8dee', backgroundColor: 'rgba(90,141,238,0.1)', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.3 },
+          { label: 'Investi', data: points.map(r => r.inv_total), borderColor: '#f97316', backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 0, borderDash: [4,4], tension: 0.3 }
         ]
       },
       options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
@@ -4514,10 +4536,12 @@ function _renderEvoContent(rows, period) {
   if (EVO_DELTA_CHART_INSTANCE) { EVO_DELTA_CHART_INSTANCE.destroy(); EVO_DELTA_CHART_INSTANCE = null; }
   const ctx2 = document.getElementById('evoDeltaChart');
   if (ctx2) {
-    const deltaData = sorted.map(r => adjDeltaByDate[r.date]);
+    const deltaData = (gran === 'day')
+      ? points.map(r => adjDeltaByDate[r.date])
+      : points.map((r, i) => i === 0 ? null : ((r.act_total - points[i-1].act_total) - (r.inv_total - points[i-1].inv_total)));
     EVO_DELTA_CHART_INSTANCE = new Chart(ctx2, {
       type: 'bar',
-      data: { labels: sorted.map(r => r.date),
+      data: { labels: points.map(r => r.date),
         datasets: [{ label: 'Delta hors dépôts (€)', data: deltaData, backgroundColor: deltaData.map(v => v == null ? 'transparent' : v >= 0 ? 'rgba(76,175,130,0.7)' : 'rgba(224,108,108,0.7)'), borderRadius: 2 }]
       },
       options: { responsive: true, maintainAspectRatio: false,
@@ -4565,11 +4589,19 @@ function _renderEvoContent(rows, period) {
   if (status) status.textContent = `${rows.length} jours — ${rows.filter(r=>r.frozen).length} gelés · mis à jour le ${new Date().toLocaleTimeString('fr')}`;
 }
 
+window._evoPeriod = window._evoPeriod || 'all';
+window._evoGran   = window._evoGran   || 'day';
 function filterEvoChart(period, btn) {
-  document.querySelectorAll('[id^="evo_"]').forEach(b => b.classList && b.classList.remove('active'));
+  window._evoPeriod = period;
+  document.querySelectorAll('.evo-period-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  const rows = mergeEvoRows();
-  _renderEvoContent(rows, period);
+  _renderEvoContent(mergeEvoRows(), period);
+}
+function setEvoGran(gran, btn) {
+  window._evoGran = gran;
+  document.querySelectorAll('.evo-gran-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  _renderEvoContent(mergeEvoRows(), window._evoPeriod || 'all');
 }
 
 // Ajouter evo_history dans les clés GSheets sauvegardées
