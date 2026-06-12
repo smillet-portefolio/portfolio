@@ -5050,6 +5050,7 @@ function renderObligSection() {
     var montantInvesti = (p.montant||0) - recuInt - recuCap;  // capital encore engagé net (EUR)
     var intByYear = {}, dateByYear = {};
     (p.echeancier||[]).forEach(function(e) {
+      if (e.date <= today) return;   // échéance passée : déjà dans "Reçu int", pas dans les intérêts futurs
       var yr = e.date.slice(0,4);
       var ie = echIntEur(p, e);
       intByYear[yr]  = (intByYear[yr]||0) + ie;
