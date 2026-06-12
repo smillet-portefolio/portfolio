@@ -4774,7 +4774,7 @@ let _obligEditId = null;
     + '<button onclick="obligAddEcheance()" style="padding:4px 12px;font-size:11px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;color:var(--text);cursor:pointer">+ Ajouter &#233;ch&#233;ance</button>'
     + '</div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:6px;padding:0 0 6px;font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">'
-    + '<span>Date</span><span>Int&#233;r&#234;ts (&#8364;)</span><span>Remb. capital (&#8364;)</span><span></span></div>'
+    + '<span>Date</span><span id="ob_ec_int_hdr">Int&#233;r&#234;ts (&#8364;)</span><span id="ob_ec_cap_hdr">Remb. capital (&#8364;)</span><span></span></div>'
     + '<div id="ob_echeancier" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto"></div>'
     + '</div>'
     + '<div id="ob_msg" style="font-size:12px;color:#e06c6c;min-height:18px;margin-bottom:10px"></div>'
@@ -4881,6 +4881,11 @@ function obligCloseModal() {
 
 function obligCurrencyChange() {
   const cur     = document.getElementById('ob_currency') ? document.getElementById('ob_currency').value : 'EUR';
+  const _cl = (cur === 'EUR') ? '\u20ac' : cur;
+  const _ih = document.getElementById('ob_ec_int_hdr');
+  const _ch = document.getElementById('ob_ec_cap_hdr');
+  if (_ih) _ih.textContent = 'Int\u00e9r\u00eats (' + _cl + ')';
+  if (_ch) _ch.textContent = 'Remb. capital (' + _cl + ')';
   const fxEl    = document.getElementById('ob_fx');
   const lbl     = document.getElementById('ob_fx_label');
   const hint    = document.getElementById('ob_eur_hint');
