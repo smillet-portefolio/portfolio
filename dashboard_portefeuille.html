@@ -307,6 +307,7 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
     <button class="tab" onclick="sw('editeur',this)">✏️ Éditer</button>
     <button class="tab" onclick="sw('cash',this)">💰 Dépôts & Cash</button>
     <button class="tab" onclick="sw('dividend',this)">💸 Dividendes</button>
+    <button class="tab" onclick="sw('conseq',this)">🏦 Conseq Retraite</button>
     <button class="tab" onclick="sw('oblig',this)">📋 Obligations non cotées</button>
     <button class="tab" onclick="sw('clotures',this)">📤 Clôturées</button>
     <button class="tab" onclick="sw('actions',this)">Actions directes</button>
@@ -1051,6 +1052,7 @@ function sw(id, btn) {
   if (id === 'dashboard') setTimeout(renderDashboard, 50);
   if (id === 'cash')         setTimeout(renderCashSection, 50);
   if (id === 'dividend')     setTimeout(renderDividendSection, 50);
+  if (id === 'conseq')       setTimeout(renderConseqSection, 50);
   if (id === 'oblig') {
     setTimeout(function() {
       renderObligSection();
@@ -4005,7 +4007,7 @@ const GS_KEYS = [
   'book2_extra_rows','book2_all_rows','book2_overrides',
   'sold_rows','closed_positions',
   'portfolio_prices','portfolio_variations','portfolio_fx',
-  'cash_data','oblig_data','dividend_data',
+  'cash_data','oblig_data','dividend_data','conseq_data',
   'etf_comp_override','etf_comp_date',
   'direct_sector_overrides',
   'evo_history'
@@ -4018,7 +4020,7 @@ const GS_KEYS = [
 const GS_AUTOSAVE_SET = new Set(GS_KEYS);
 const GS_USER_SET = new Set([
   'book2_extra_rows','book2_all_rows','book2_overrides',
-  'sold_rows','closed_positions','cash_data','oblig_data','dividend_data',
+  'sold_rows','closed_positions','cash_data','oblig_data','dividend_data','conseq_data',
   'direct_sector_overrides'
 ]);
 let _gsReady     = false;
@@ -5167,6 +5169,194 @@ function divTickerSelected(){
   var m=window._divTickerMap&&window._divTickerMap[t];
   if(m){ var nm=document.getElementById('divf_name'), is=document.getElementById('divf_isin');
     if(nm&&!nm.value&&m.name) nm.value=m.name; if(is&&m.isin) is.value=m.isin; }
+}
+
+// ==============================================================================
+// ONGLET CONSEQ RETRAITE (épargne retraite DPS, CZK)
+// ==============================================================================
+const _csqInp='style="width:100%;padding:7px 9px;border:1px solid var(--border2);border-radius:7px;background:var(--bg2);color:var(--text);font-size:13px;box-sizing:border-box"';
+const CSQ_LABELS={employer:"Cotisation de l'employeur",participant:"Contribution du participant",state:"Allocation de l'État",transfer:"Transfert initial",other:"Autre"};
+const CSQ_CATCOL={employer:'#5a8dee',participant:'#4caf82',state:'#f0956e',transfer:'#9b87d4',other:'#9ca3af'};
+const CSQ_FUNDCOL=['#5a8dee','#f0956e','#4caf82','#9b87d4'];
+var CONSEQ_DATA=null;
+let _csqSort={col:'date',dir:-1};
+let _csqFilter='all';
+const CONSEQ_SEED={"tx": [{"date": "2019-07-24", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 38659.0}, {"date": "2019-08-12", "cat": "participant", "label": "Contribution des participants", "amount": 2100.0}, {"date": "2019-08-26", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 40226.0}, {"date": "2019-09-02", "cat": "employer", "label": "Transfert de la contribution patronale", "amount": 1125526.0}, {"date": "2019-09-02", "cat": "state", "label": "Transfert de l'allocation de l'État", "amount": 18240.0}, {"date": "2019-09-02", "cat": "transfer", "label": "Transfert de la contribution du participant", "amount": 196000.0}, {"date": "2019-09-02", "cat": "transfer", "label": "Transfert d'évaluation du contrat DPS", "amount": 20434.44}, {"date": "2019-09-02", "cat": "transfer", "label": "Transfert des revenus de la contribution du participant", "amount": 23227.12}, {"date": "2019-09-02", "cat": "state", "label": "Transfert des revenus de l'allocation de l'État", "amount": 406.18}, {"date": "2019-09-02", "cat": "transfer", "label": "Transfert de la cotisation de l'adhérent-BO", "amount": 95107.49}, {"date": "2019-09-11", "cat": "participant", "label": "contribution extraordinaire d'un participant", "amount": 2100.0}, {"date": "2019-09-26", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 37125.0}, {"date": "2019-10-10", "cat": "participant", "label": "contribution extraordinaire d'un participant", "amount": 2100.0}, {"date": "2019-10-24", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 37125.0}, {"date": "2019-11-12", "cat": "participant", "label": "contribution extraordinaire d'un participant", "amount": 2100.0}, {"date": "2019-11-19", "cat": "state", "label": "Transfert de l'allocation de l'État", "amount": 230.0}, {"date": "2019-11-25", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 37125.0}, {"date": "2019-11-29", "cat": "state", "label": "Allocation de l'État", "amount": 460.0}, {"date": "2019-12-11", "cat": "participant", "label": "contribution extraordinaire d'un participant", "amount": 2100.0}, {"date": "2019-12-20", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 39362.0}, {"date": "2020-01-10", "cat": "participant", "label": "contribution extraordinaire d'un participant", "amount": 2100.0}, {"date": "2020-01-24", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 38373.0}, {"date": "2020-02-12", "cat": "participant", "label": "contribution extraordinaire d'un participant", "amount": 2100.0}, {"date": "2020-02-24", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 37125.0}, {"date": "2020-02-27", "cat": "state", "label": "Allocation de l'État", "amount": 690.0}, {"date": "2020-03-10", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 303315.0}, {"date": "2020-03-11", "cat": "participant", "label": "Contribution des participants", "amount": 2100.0}, {"date": "2020-03-25", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 40459.0}, {"date": "2020-04-14", "cat": "participant", "label": "Contribution des participants", "amount": 2100.0}, {"date": "2020-04-24", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 37125.0}, {"date": "2020-05-13", "cat": "participant", "label": "Contribution des participants", "amount": 2100.0}, {"date": "2020-05-21", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 38246.0}, {"date": "2020-05-28", "cat": "state", "label": "Allocation de l'État", "amount": 690.0}, {"date": "2020-06-10", "cat": "participant", "label": "Contribution des participants", "amount": 2100.0}, {"date": "2020-06-24", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 37125.0}, {"date": "2020-07-10", "cat": "participant", "label": "Contribution des participants", "amount": 2100.0}, {"date": "2020-07-21", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 39642.0}, {"date": "2020-08-12", "cat": "participant", "label": "Contribution des participants", "amount": 2100.0}, {"date": "2020-08-21", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 48275.0}, {"date": "2020-08-28", "cat": "state", "label": "Allocation de l'État", "amount": 690.0}, {"date": "2020-09-10", "cat": "participant", "label": "Contribution des participants", "amount": 2100.0}, {"date": "2020-09-24", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 37125.0}, {"date": "2020-10-12", "cat": "participant", "label": "Contribution des participants", "amount": 2100.0}, {"date": "2020-10-22", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 39400.0}, {"date": "2020-11-11", "cat": "participant", "label": "Contribution des participants", "amount": 2100.0}, {"date": "2020-11-20", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 37125.0}, {"date": "2020-11-27", "cat": "state", "label": "Allocation de l'État", "amount": 690.0}, {"date": "2020-12-07", "cat": "participant", "label": "contribution extraordinaire d'un participant", "amount": 12000.0}, {"date": "2020-12-10", "cat": "participant", "label": "Contribution des participants", "amount": 2100.0}, {"date": "2020-12-22", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 41949.0}, {"date": "2021-01-12", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2021-01-22", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 37125.0}, {"date": "2021-02-10", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2021-02-23", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 37125.0}, {"date": "2021-02-25", "cat": "state", "label": "Allocation de l'État", "amount": 690.0}, {"date": "2021-03-10", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2021-03-23", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 228774.0}, {"date": "2021-04-12", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2021-04-22", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 40790.0}, {"date": "2021-05-12", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2021-05-25", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 37847.0}, {"date": "2021-05-28", "cat": "state", "label": "Allocation de l'État", "amount": 690.0}, {"date": "2021-06-10", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2021-06-18", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 37125.0}, {"date": "2021-07-17", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2021-07-23", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 44775.0}, {"date": "2021-08-11", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2021-08-24", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 39895.0}, {"date": "2021-08-30", "cat": "state", "label": "Allocation de l'État", "amount": 690.0}, {"date": "2021-09-10", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2021-09-22", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 38510.0}, {"date": "2021-10-12", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2021-10-21", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 38510.0}, {"date": "2021-11-10", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2021-11-19", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 39169.0}, {"date": "2021-11-29", "cat": "state", "label": "Allocation de l'État", "amount": 690.0}, {"date": "2021-12-10", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2021-12-17", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 46593.0}, {"date": "2022-01-12", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2022-01-24", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 38510.0}, {"date": "2022-02-10", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2022-02-22", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 39657.0}, {"date": "2022-02-25", "cat": "state", "label": "Allocation de l'État", "amount": 690.0}, {"date": "2022-03-10", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2022-03-22", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 389116.0}, {"date": "2022-04-12", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2022-04-22", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 36010.0}, {"date": "2022-05-11", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2022-05-30", "cat": "state", "label": "Allocation de l'État", "amount": 690.0}, {"date": "2022-06-03", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 36010.0}, {"date": "2022-06-10", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2022-06-20", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 36010.0}, {"date": "2022-07-17", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2022-07-21", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 47192.0}, {"date": "2022-08-10", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2022-08-22", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 44314.0}, {"date": "2022-08-29", "cat": "state", "label": "Allocation de l'État", "amount": 690.0}, {"date": "2022-09-12", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2022-09-21", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 37450.0}, {"date": "2022-10-12", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2022-10-21", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 37450.0}, {"date": "2022-11-10", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2022-11-22", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 37450.0}, {"date": "2022-11-29", "cat": "state", "label": "Allocation de l'État", "amount": 690.0}, {"date": "2022-12-12", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2022-12-20", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 47959.0}, {"date": "2023-01-11", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2023-01-23", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 40133.0}, {"date": "2023-02-10", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2023-02-21", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 37450.0}, {"date": "2023-02-27", "cat": "state", "label": "Allocation de l'État", "amount": 690.0}, {"date": "2023-03-10", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2023-03-22", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 463349.0}, {"date": "2023-04-13", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2023-04-21", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 38919.0}, {"date": "2023-05-11", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2023-05-24", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 88843.0}, {"date": "2023-05-30", "cat": "state", "label": "Allocation de l'État", "amount": 690.0}, {"date": "2023-06-12", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2023-06-21", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 37450.0}, {"date": "2023-07-12", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2023-07-20", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 43158.0}, {"date": "2023-08-10", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2023-08-18", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 56103.0}, {"date": "2023-08-30", "cat": "state", "label": "Allocation de l'État", "amount": 690.0}, {"date": "2023-09-12", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2023-09-21", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 39884.0}, {"date": "2023-10-12", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2023-10-20", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 43591.0}, {"date": "2023-11-10", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2023-11-22", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 39884.0}, {"date": "2023-11-29", "cat": "state", "label": "Allocation de l'État", "amount": 690.0}, {"date": "2023-12-12", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2023-12-19", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 46953.0}, {"date": "2024-01-10", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2024-01-23", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 47539.0}, {"date": "2024-02-12", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2024-02-22", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 39884.0}, {"date": "2024-02-28", "cat": "state", "label": "Allocation de l'État", "amount": 690.0}, {"date": "2024-03-12", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2024-03-22", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 639359.0}, {"date": "2024-04-10", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2024-04-22", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 44884.0}, {"date": "2024-05-13", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2024-05-20", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 146938.0}, {"date": "2024-05-30", "cat": "state", "label": "Allocation de l'État", "amount": 690.0}, {"date": "2024-06-12", "cat": "participant", "label": "Contribution des participants", "amount": 3100.0}, {"date": "2024-06-21", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 39884.0}, {"date": "2024-07-10", "cat": "participant", "label": "Contribution des participants", "amount": 5985.0}, {"date": "2024-07-22", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 49597.0}, {"date": "2024-08-12", "cat": "participant", "label": "Contribution des participants", "amount": 5985.0}, {"date": "2024-08-21", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 59846.0}, {"date": "2024-08-29", "cat": "state", "label": "Allocation de l'État", "amount": 690.0}, {"date": "2024-09-11", "cat": "participant", "label": "Contribution des participants", "amount": 5985.0}, {"date": "2024-09-20", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 41480.0}, {"date": "2024-10-10", "cat": "participant", "label": "Contribution des participants", "amount": 5985.0}, {"date": "2024-10-22", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 41480.0}, {"date": "2024-11-10", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 41480.0}, {"date": "2024-11-12", "cat": "participant", "label": "Contribution des participants", "amount": 5985.0}, {"date": "2024-11-28", "cat": "state", "label": "Allocation de l'État", "amount": 1020.0}, {"date": "2024-12-04", "cat": "participant", "label": "contribution extraordinaire d'un participant", "amount": 12000.0}, {"date": "2024-12-11", "cat": "participant", "label": "Contribution des participants", "amount": 5985.0}, {"date": "2024-12-18", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 51992.0}, {"date": "2025-01-10", "cat": "participant", "label": "Contribution des participants", "amount": 5985.0}, {"date": "2025-02-10", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 46891.0}, {"date": "2025-02-12", "cat": "participant", "label": "Contribution des participants", "amount": 5985.0}, {"date": "2025-02-27", "cat": "state", "label": "Allocation de l'État", "amount": 1020.0}, {"date": "2025-03-07", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 46350.0}, {"date": "2025-03-12", "cat": "participant", "label": "Contribution des participants", "amount": 5985.0}, {"date": "2025-04-07", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 322770.0}, {"date": "2025-04-10", "cat": "participant", "label": "Contribution des participants", "amount": 5985.0}, {"date": "2025-05-07", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 47537.0}, {"date": "2025-05-13", "cat": "participant", "label": "Contribution des participants", "amount": 5985.0}, {"date": "2025-05-29", "cat": "state", "label": "Allocation de l'État", "amount": 1020.0}, {"date": "2025-06-05", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 173285.0}, {"date": "2025-06-11", "cat": "participant", "label": "Contribution des participants", "amount": 5985.0}, {"date": "2025-07-04", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 41480.0}, {"date": "2025-07-10", "cat": "participant", "label": "Contribution des participants", "amount": 5985.0}, {"date": "2025-08-06", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 49159.0}, {"date": "2025-08-12", "cat": "participant", "label": "Contribution des participants", "amount": 5985.0}, {"date": "2026-08-28", "cat": "state", "label": "Allocation de l'État", "amount": 1020.0}, {"date": "2025-09-04", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 51314.0}, {"date": "2025-09-09", "cat": "participant", "label": "Contribution des participants", "amount": 10500.0}, {"date": "2025-10-07", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 42724.0}, {"date": "2025-10-14", "cat": "participant", "label": "Contribution des participants", "amount": 25000.0}, {"date": "2025-11-06", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 42724.0}, {"date": "2025-11-12", "cat": "participant", "label": "Contribution des participants", "amount": 25000.0}, {"date": "2025-11-28", "cat": "state", "label": "Allocation de l'État", "amount": 1020.0}, {"date": "2025-12-05", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 42724.0}, {"date": "2025-12-12", "cat": "participant", "label": "Contribution des participants", "amount": 25000.0}, {"date": "2026-01-06", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 49152.0}, {"date": "2026-01-12", "cat": "participant", "label": "Contribution des participants", "amount": 25000.0}, {"date": "2026-02-06", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 42724.0}, {"date": "2026-02-12", "cat": "participant", "label": "Contribution des participants", "amount": 25000.0}, {"date": "2026-02-27", "cat": "state", "label": "Allocation de l'État", "amount": 1020.0}, {"date": "2026-03-06", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 48075.0}, {"date": "2026-03-12", "cat": "participant", "label": "Contribution des participants", "amount": 25000.0}, {"date": "2026-04-09", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 321983.0}, {"date": "2026-04-14", "cat": "participant", "label": "Contribution des participants", "amount": 50000.0}, {"date": "2026-05-07", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 42724.0}, {"date": "2026-05-13", "cat": "participant", "label": "Contribution des participants", "amount": 50000.0}, {"date": "2026-05-29", "cat": "state", "label": "Allocation de l'État", "amount": 1020.0}, {"date": "2026-05-06", "cat": "employer", "label": "Cotisation de l'employeur", "amount": 151964.0}], "years": [{"year": 2019, "invested": 1719753.23, "valueEnd": 1770111.88}, {"year": 2020, "invested": 815244.0, "valueEnd": 2442268.04}, {"year": 2021, "invested": 706198.0, "valueEnd": 3368995.69}, {"year": 2022, "invested": 867088.0, "valueEnd": 4083572.47}, {"year": 2023, "invested": 1015677.0, "valueEnd": 5888553.95}, {"year": 2024, "invested": 1313963.0, "valueEnd": 7565668.0}, {"year": 2025, "invested": 1044418.0, "valueEnd": 9686852.92}, {"year": 2026, "invested": 833662.0, "valueEnd": 11293866.74}], "funds": [{"name": "Conseq globální akciový účastnický fond", "value": 8627539.41, "share": 0.7639, "perfYtd": 0.0995}, {"name": "Conseq realitní účastnický fond", "value": 2129541.67, "share": 0.1886, "perfYtd": 0.0109}, {"name": "Conseq dluhopisový účastnický fond", "value": 536785.66, "share": 0.0475, "perfYtd": 0.003}], "currency": "CZK", "valueNow": 11293866.74};
+function csqSave(){ try{ localStorage.setItem('conseq_data', JSON.stringify(CONSEQ_DATA)); }catch(e){} }
+function csqEur(czk){ return (typeof toEur==='function')?toEur(czk,'CZK'):(czk/25.4); }
+function csqFmt(n){ return Math.round(n).toLocaleString('fr'); }
+function _csqTh(col,label,align){ return '<th onclick="csqSort(\''+col+'\')" data-csqcol="'+col+'" style="cursor:pointer;user-select:none;text-align:'+(align||'left')+'">'+label+'<span class="ov-arr" style="font-size:9px;opacity:.35"> ⇅</span></th>'; }
+
+(function initConseq(){
+  var raw=localStorage.getItem('conseq_data');
+  if(raw===null){ CONSEQ_DATA=JSON.parse(JSON.stringify(CONSEQ_SEED)); csqSave(); }
+  else { try{ CONSEQ_DATA=JSON.parse(raw); }catch(e){ CONSEQ_DATA=null; } }
+  if(!CONSEQ_DATA || !CONSEQ_DATA.tx) CONSEQ_DATA=JSON.parse(JSON.stringify(CONSEQ_SEED));
+
+  var wrapper=document.querySelector('.tabs').parentElement;
+  var sec=document.createElement('div'); sec.id='conseq'; sec.className='section';
+  var TP='font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:12px';
+  sec.innerHTML=
+    '<h2 style="font-size:18px;font-weight:700;margin:0 0 4px">🏦 Conseq Retraite</h2>'+
+    '<p class="section-desc" style="margin-bottom:16px">Épargne retraite Conseq (DPS) — montants en CZK. Cotisations employeur, participant et allocations de l\'État.</p>'+
+    '<div id="csq_kpis" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px"></div>'+
+    '<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:20px;margin-bottom:22px">'+
+      '<div class="card" style="padding:18px"><p style="'+TP+'">Évolution par année</p><div class="chart-wrap" style="height:300px"><canvas id="csq_evo"></canvas></div></div>'+
+      '<div class="card" style="padding:18px"><p style="'+TP+'">Répartition par fonds</p><div style="display:flex;flex-direction:column;align-items:center;gap:14px"><canvas id="csq_funds" width="200" height="200"></canvas><div id="csq_funds_leg" style="width:100%"></div></div></div>'+
+    '</div>'+
+    '<h3 style="font-size:14px;font-weight:700;margin:0 0 10px">Performance par année</h3>'+
+    '<div style="overflow-x:auto;margin-bottom:24px"><table id="csq_perf_tbl"><thead><tr>'+
+      '<th>Année</th><th style="text-align:right">Investi (année)</th><th style="text-align:right">Investi cumulé</th><th style="text-align:right">Valeur</th><th style="text-align:right">Plus-value</th><th style="text-align:right">Perf. cumulée</th><th style="text-align:right">Perf. annuelle</th>'+
+    '</tr></thead><tbody id="csq_perf_body"></tbody></table></div>'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px">'+
+      '<h3 style="font-size:14px;font-weight:700;margin:0">Historique des versements</h3>'+
+      '<button onclick="csqOpenAdd()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer">+ Nouveau versement</button>'+
+    '</div>'+
+    '<div id="csq_filters" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap"></div>'+
+    '<div style="max-height:430px;overflow:auto"><table id="csq_tx_tbl"><thead><tr>'+
+      _csqTh('date','Date','left')+_csqTh('cat','Type','left')+_csqTh('amount','Montant','right')+
+    '</tr></thead><tbody id="csq_tx_body"></tbody></table></div>';
+  wrapper.appendChild(sec);
+
+  var modal=document.createElement('div'); modal.id='csqModal';
+  modal.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center';
+  modal.innerHTML='<div style="background:var(--bg);border-radius:12px;padding:22px;width:420px;max-width:92vw;border:1px solid var(--border2)">'+
+    '<h3 style="margin:0 0 14px;font-size:16px">Nouveau versement</h3>'+
+    '<div style="margin-bottom:10px"><label style="display:block;font-size:11px;color:var(--text2);margin-bottom:3px">Type</label>'+
+      '<select id="csqf_type" '+_csqInp+'><option value="employer">Cotisation de l\'employeur</option><option value="participant">Contribution du participant</option><option value="state">Allocation de l\'État</option></select></div>'+
+    '<div style="margin-bottom:10px"><label style="display:block;font-size:11px;color:var(--text2);margin-bottom:3px">Date</label><input id="csqf_date" type="date" '+_csqInp+'></div>'+
+    '<div style="margin-bottom:14px"><label style="display:block;font-size:11px;color:var(--text2);margin-bottom:3px">Montant (CZK)</label><input id="csqf_amount" type="number" step="0.01" oninput="csqPreview()" '+_csqInp+'><div id="csqf_prev" style="font-size:11px;color:var(--text2);margin-top:5px"></div></div>'+
+    '<div style="display:flex;gap:8px;justify-content:flex-end"><button onclick="csqCloseModal()" style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:8px 14px;cursor:pointer">Annuler</button>'+
+    '<button onclick="csqSubmit()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-weight:600">Enregistrer</button></div></div>';
+  document.body.appendChild(modal);
+  renderConseqSection();
+})();
+
+function csqSetFilter(f){ _csqFilter=f; renderConseqSection(); }
+function csqSort(col){ if(_csqSort.col===col)_csqSort.dir*=-1; else {_csqSort.col=col;_csqSort.dir=(col==='cat')?1:-1;} renderConseqSection(); }
+function csqOpenAdd(){
+  document.getElementById('csqf_date').value=new Date().toISOString().slice(0,10);
+  document.getElementById('csqf_type').value='employer';
+  document.getElementById('csqf_amount').value='';
+  var p=document.getElementById('csqf_prev'); if(p)p.textContent='';
+  document.getElementById('csqModal').style.display='flex';
+}
+function csqCloseModal(){ var m=document.getElementById('csqModal'); if(m)m.style.display='none'; }
+function csqPreview(){ var a=parseFloat(document.getElementById('csqf_amount').value)||0; var p=document.getElementById('csqf_prev'); if(p)p.innerHTML='≈ <strong>'+csqFmt(csqEur(a))+' €</strong>'; }
+function csqSubmit(){
+  var date=document.getElementById('csqf_date').value;
+  var cat=document.getElementById('csqf_type').value;
+  var amt=parseFloat(document.getElementById('csqf_amount').value)||0;
+  if(!date||amt<=0){ alert('Date et montant requis'); return; }
+  amt=Math.round(amt*100)/100;
+  CONSEQ_DATA.tx.push({date:date,cat:cat,label:CSQ_LABELS[cat],amount:amt});
+  var y=parseInt(date.slice(0,4),10);
+  var yr=(CONSEQ_DATA.years||[]).find(function(o){return o.year===y;});
+  if(yr) yr.invested=(yr.invested||0)+amt; else { if(!CONSEQ_DATA.years)CONSEQ_DATA.years=[]; CONSEQ_DATA.years.push({year:y,invested:amt,valueEnd:null}); }
+  csqSave(); renderConseqSection(); csqCloseModal();
+}
+
+function csqFundsChart(){
+  var cv=document.getElementById('csq_funds'); if(!cv||typeof Chart==='undefined') return;
+  var funds=(CONSEQ_DATA.funds||[]).slice().sort(function(a,b){return b.value-a.value;});
+  var labels=funds.map(function(f){return f.name;});
+  var vals=funds.map(function(f){return f.value;});
+  var cols=funds.map(function(f,i){return CSQ_FUNDCOL[i%CSQ_FUNDCOL.length];});
+  var tot=vals.reduce(function(s,v){return s+v;},0);
+  if(window._csqFundsChart){try{window._csqFundsChart.destroy();}catch(e){}}
+  window._csqFundsChart=new Chart(cv.getContext('2d'),{type:'doughnut',data:{labels:labels,datasets:[{data:vals,backgroundColor:cols,borderWidth:2,borderColor:'rgba(255,255,255,0.5)'}]},options:{responsive:false,cutout:'58%',plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return ' '+csqFmt(c.parsed)+' CZK ('+(tot?(c.parsed/tot*100).toFixed(1):0)+'%)';}}}}}});
+  var leg=document.getElementById('csq_funds_leg');
+  if(leg) leg.innerHTML=funds.map(function(f,i){
+    var sn=f.name.replace('Conseq ','').replace(' účastnický fond','').replace(' fond','');
+    var pct=tot?(f.value/tot*100):0;
+    var pf=(f.perfYtd!=null)?(' <span style="color:'+(f.perfYtd>=0?'#4caf82':'#e06c6c')+';font-size:10px">'+(f.perfYtd>=0?'+':'')+(f.perfYtd*100).toFixed(1)+'% YTD</span>'):'';
+    return '<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border2)"><span style="width:10px;height:10px;border-radius:2px;background:'+cols[i]+';flex-shrink:0"></span><span style="flex:1;font-size:12px" title="'+f.name+'">'+sn+pf+'</span><span class="mono" style="font-size:11px;color:var(--text2)">'+csqFmt(f.value)+' · '+pct.toFixed(1)+'%</span></div>';
+  }).join('');
+}
+
+function csqEvoChart(){
+  var cv=document.getElementById('csq_evo'); if(!cv||typeof Chart==='undefined') return;
+  var years=(CONSEQ_DATA.years||[]).slice().sort(function(a,b){return a.year-b.year;});
+  var labels=years.map(function(y){return String(y.year);});
+  var cum=0; var cumInv=years.map(function(y){cum+=(y.invested||0);return Math.round(cum);});
+  var vals=years.map(function(y){return y.valueEnd!=null?Math.round(y.valueEnd):null;});
+  if(window._csqEvoChart){try{window._csqEvoChart.destroy();}catch(e){}}
+  window._csqEvoChart=new Chart(cv.getContext('2d'),{type:'line',data:{labels:labels,datasets:[
+    {label:'Valeur',data:vals,borderColor:'#4caf82',backgroundColor:'rgba(76,175,130,0.12)',fill:true,tension:0.25,borderWidth:2,pointRadius:3,spanGaps:true},
+    {label:'Investi cumulé',data:cumInv,borderColor:'#5a8dee',backgroundColor:'transparent',borderDash:[5,4],fill:false,tension:0.25,borderWidth:2,pointRadius:3}
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{color:'#8b95a8',font:{size:12},boxWidth:14,usePointStyle:true}},tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+csqFmt(c.parsed.y)+' CZK';}}}},scales:{y:{ticks:{callback:function(v){return (v/1e6).toFixed(1)+'M';},color:'#8b95a8'},grid:{color:'rgba(0,0,0,0.05)'}},x:{grid:{display:false},ticks:{color:'#8b95a8'}}}}});
+}
+
+function renderConseqSection(){
+  if(!CONSEQ_DATA) return;
+  var years=(CONSEQ_DATA.years||[]).slice().sort(function(a,b){return a.year-b.year;});
+  var totInv=years.reduce(function(s,y){return s+(y.invested||0);},0);
+  var valNow=(CONSEQ_DATA.valueNow!=null)?CONSEQ_DATA.valueNow:(years.length?years[years.length-1].valueEnd:0);
+  var gain=valNow-totInv;
+  var perf=totInv?gain/totInv*100:0;
+  var fmt=csqFmt;
+  var eurTxt=function(czk){return '≈ '+csqFmt(csqEur(czk))+' €';};
+  var kel=document.getElementById('csq_kpis');
+  if(kel){
+    var cards=[
+      {l:'Total investi',v:fmt(totInv)+' CZK',s:eurTxt(totInv),c:'var(--text)'},
+      {l:'Valeur actuelle',v:fmt(valNow)+' CZK',s:eurTxt(valNow),c:'var(--text)'},
+      {l:'Plus-value',v:(gain>=0?'+':'')+fmt(gain)+' CZK',s:eurTxt(gain),c:gain>=0?'#4caf82':'#e06c6c'},
+      {l:'Performance',v:(perf>=0?'+':'')+perf.toFixed(1).replace('.',',')+'%',s:"depuis l'origine",c:perf>=0?'#4caf82':'#e06c6c'}
+    ];
+    kel.innerHTML=cards.map(function(c){return '<div style="background:var(--bg2);border-radius:8px;padding:14px 16px;border:1px solid var(--border2)"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:6px">'+c.l+'</div><div style="font-size:19px;font-weight:700;color:'+c.c+'">'+c.v+'</div><div style="font-size:11px;color:var(--text2);margin-top:3px">'+c.s+'</div></div>';}).join('');
+  }
+  var pb=document.getElementById('csq_perf_body');
+  if(pb){
+    var cum=0,prevVal=0,html='';
+    var col=function(n){return n==null?'var(--text2)':(n>=0?'#4caf82':'#e06c6c');};
+    years.forEach(function(y,i){
+      cum+=(y.invested||0);
+      var v=y.valueEnd;
+      var gainC=v!=null?v-cum:null;
+      var perfC=(v!=null&&cum)?gainC/cum*100:null;
+      var annual=null;
+      if(v!=null&&i>0&&prevVal){ annual=(v-prevVal-(y.invested||0))/(prevVal+(y.invested||0))*100; }
+      else if(v!=null&&i===0&&(y.invested||0)){ annual=(v-(y.invested||0))/(y.invested||0)*100; }
+      var lbl=(i===years.length-1)?(y.year+' (actuel)'):String(y.year);
+      html+='<tr><td><strong>'+lbl+'</strong></td>'+
+        '<td class="mono" style="text-align:right">'+fmt(y.invested||0)+'</td>'+
+        '<td class="mono" style="text-align:right">'+fmt(cum)+'</td>'+
+        '<td class="mono" style="text-align:right">'+(v!=null?fmt(v):'—')+'</td>'+
+        '<td class="mono" style="text-align:right;color:'+col(gainC)+'">'+(gainC!=null?((gainC>=0?'+':'')+fmt(gainC)):'—')+'</td>'+
+        '<td class="mono" style="text-align:right;color:'+col(perfC)+'">'+(perfC!=null?((perfC>=0?'+':'')+perfC.toFixed(1).replace('.',',')+'%'):'—')+'</td>'+
+        '<td class="mono" style="text-align:right;color:'+col(annual)+'">'+(annual!=null?((annual>=0?'+':'')+annual.toFixed(1).replace('.',',')+'%'):'—')+'</td></tr>';
+      if(v!=null) prevVal=v;
+    });
+    pb.innerHTML=html;
+  }
+  csqFundsChart();
+  csqEvoChart();
+  var fel=document.getElementById('csq_filters');
+  if(fel){
+    var cats=[['all','Tous'],['employer','Employeur'],['participant','Participant'],['state','État'],['transfer','Transfert']];
+    fel.innerHTML=cats.map(function(c){var on=_csqFilter===c[0];return '<button onclick="csqSetFilter(\''+c[0]+'\')" style="border:1px solid '+(on?'var(--blue)':'var(--border2)')+';background:'+(on?'var(--blue)':'var(--bg2)')+';color:'+(on?'#fff':'var(--text)')+';border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">'+c[1]+'</button>';}).join('');
+  }
+  var tb=document.getElementById('csq_tx_body');
+  if(tb){
+    var list=(CONSEQ_DATA.tx||[]).slice();
+    if(_csqFilter!=='all') list=list.filter(function(t){return t.cat===_csqFilter;});
+    var st=_csqSort;
+    list.sort(function(a,b){
+      var key=function(t){return st.col==='amount'?(t.amount||0):st.col==='cat'?(t.cat||''):(t.date||'');};
+      var x=key(a),y=key(b);
+      if(typeof x==='string'||typeof y==='string') return st.dir*String(x).localeCompare(String(y));
+      return st.dir*(x-y);
+    });
+    var totShown=list.reduce(function(s,t){return s+(t.amount||0);},0);
+    tb.innerHTML=list.map(function(t){
+      return '<tr><td class="mono" style="white-space:nowrap">'+t.date+'</td>'+
+        '<td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+(CSQ_CATCOL[t.cat]||'#9ca3af')+';margin-right:7px;vertical-align:middle"></span>'+(t.label||CSQ_LABELS[t.cat]||'')+'</td>'+
+        '<td class="mono" style="text-align:right">'+fmt(t.amount)+' CZK</td></tr>';
+    }).join('')+'<tr style="border-top:2px solid var(--border2);font-weight:700;background:var(--bg3)"><td colspan="2">Total ('+list.length+')</td><td class="mono" style="text-align:right">'+fmt(totShown)+' CZK</td></tr>';
+    var tbl=document.getElementById('csq_tx_tbl');
+    if(tbl) tbl.querySelectorAll('th[data-csqcol]').forEach(function(th){var s=th.querySelector('.ov-arr');if(s){var on=th.dataset.csqcol===st.col;s.textContent=on?(st.dir<0?' ▼':' ▲'):' ⇅';s.style.opacity=on?'1':'0.35';}});
+  }
 }
 
 // ── Conversion EUR des échéances pour projets en devise étrangère ──────────────
