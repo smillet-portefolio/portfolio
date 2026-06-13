@@ -301,19 +301,19 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
   <!-- TABS -->
   <div class="tabs">
     <button class="tab active" onclick="sw('dashboard',this)">📊 Dashboard</button>
+    <button class="tab" onclick="sw('evolution',this)">📈 Évolution</button>
+    <button class="tab" onclick="sw('actetf',this)">📉 Actions ETFs +/−</button>
+    <button class="tab" onclick="sw('portefeuille',this)">💼 Portefeuille</button>
+    <button class="tab" onclick="sw('editeur',this)">✏️ Éditer</button>
+    <button class="tab" onclick="sw('cash',this)">💰 Dépôts & Cash</button>
+    <button class="tab" onclick="sw('dividend',this)">💸 Dividendes</button>
+    <button class="tab" onclick="sw('oblig',this)">📋 Obligations non cotées</button>
+    <button class="tab" onclick="sw('clotures',this)">📤 Clôturées</button>
+    <button class="tab" onclick="sw('actions',this)">Actions directes</button>
+    <button class="tab" onclick="sw('etfs',this)">ETFs</button>
+    <button class="tab" onclick="sw('positions',this)">Positions</button>
     <button class="tab" onclick="sw('geo',this)">Géographie</button>
     <button class="tab" onclick="sw('sect',this)">Secteurs</button>
-    <button class="tab" onclick="sw('positions',this)">Positions</button>
-    <button class="tab" onclick="sw('etfs',this)">ETFs</button>
-    <button class="tab" onclick="sw('actions',this)">Actions directes</button>
-    <button class="tab" onclick="sw('actetf',this)">📉 Actions ETFs +/−</button>
-    <button class="tab" onclick="sw('editeur',this)">✏️ Éditer</button>
-    <button class="tab" onclick="sw('portefeuille',this)">💼 Portefeuille</button>
-    <button class="tab" onclick="sw('clotures',this)">📤 Clôturées</button>
-    <button class="tab" onclick="sw('cash',this)">💰 Dépôts & Cash</button>
-    <button class="tab" onclick="sw('oblig',this)">📋 Obligations non cotées</button>
-    <button class="tab" onclick="sw('dividend',this)">💸 Dividendes</button>
-      <button class="tab" onclick="sw('evolution',this)">📈 Évolution</button>
   </div>
 
   <!-- ======== DASHBOARD ======== -->
@@ -370,29 +370,29 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
       <div class="card" style="padding:16px">
         <p style="font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:10px;text-align:center">Par type d'actif</p>
         <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
-          <canvas id="db_donut_type" width="150" height="150"></canvas>
-          <div id="db_donut_type_leg" style="font-size:12px;display:flex;flex-direction:column;gap:4px;width:100%"></div>
+          <canvas id="db_donut_type" width="180" height="180"></canvas>
+          <div id="db_donut_type_leg" style="font-size:11px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px 12px;width:100%"></div>
         </div>
       </div>
       <div class="card" style="padding:16px">
         <p style="font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:10px;text-align:center">Par broker</p>
         <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
-          <canvas id="db_donut_broker" width="150" height="150"></canvas>
-          <div id="db_donut_broker_leg" style="font-size:12px;display:flex;flex-direction:column;gap:4px;width:100%"></div>
+          <canvas id="db_donut_broker" width="180" height="180"></canvas>
+          <div id="db_donut_broker_leg" style="font-size:11px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px 12px;width:100%"></div>
         </div>
       </div>
       <div class="card" style="padding:16px">
         <p style="font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:10px;text-align:center">Grandes régions</p>
         <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
-          <canvas id="db_donut_geo" width="150" height="150"></canvas>
-          <div id="db_donut_geo_leg" style="font-size:12px;display:flex;flex-direction:column;gap:4px;width:100%"></div>
+          <canvas id="db_donut_geo" width="180" height="180"></canvas>
+          <div id="db_donut_geo_leg" style="font-size:11px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px 12px;width:100%"></div>
         </div>
       </div>
       <div class="card" style="padding:16px">
         <p style="font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:10px;text-align:center">Par secteur</p>
         <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
-          <canvas id="db_donut_sec" width="150" height="150"></canvas>
-          <div id="db_donut_sec_leg" style="font-size:12px;display:flex;flex-direction:column;gap:4px;width:100%"></div>
+          <canvas id="db_donut_sec" width="180" height="180"></canvas>
+          <div id="db_donut_sec_leg" style="font-size:11px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px 12px;width:100%"></div>
         </div>
       </div>
     </div>
@@ -1670,10 +1670,10 @@ function renderDashboard() {
     });
     if (legEl) legEl.innerHTML = sorted.map(function(e, i) {
       var pct = total ? (Math.max(0,e[1])/total*100).toFixed(1) : '0.0';
-      return '<div style="display:flex;align-items:center;gap:6px;padding:2px 0">'
-        + '<div style="width:11px;height:11px;border-radius:2px;background:' + colors[i] + ';flex-shrink:0"></div>'
-        + '<span style="color:var(--text);font-size:14px">' + e[0] + '</span>'
-        + '<span style="color:var(--text2);font-family:\'DM Mono\',monospace;font-size:13px;min-width:38px;text-align:right">' + pct + '%</span>'
+      return '<div style="display:flex;align-items:center;gap:5px;padding:1px 0;min-width:0">'
+        + '<div style="width:10px;height:10px;border-radius:2px;background:' + colors[i] + ';flex-shrink:0"></div>'
+        + '<span style="color:var(--text);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0" title="' + e[0] + '">' + e[0] + '</span>'
+        + '<span style="color:var(--text2);font-family:\'DM Mono\',monospace;font-size:11px;flex-shrink:0">' + pct + '%</span>'
         + '</div>';
     }).join('');
   }
