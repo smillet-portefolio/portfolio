@@ -454,6 +454,7 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
   <!-- ======== GÉOGRAPHIE ======== -->
   <div id="geo" class="section">
     <p class="section-desc" style="margin-bottom:20px">Exposition géographique réelle — ETFs décomposés via look-through × valeur actuelle + actions directes.</p>
+    <div id="geo_kpis" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;align-items:start">
 
       <!-- Grandes régions -->
@@ -462,7 +463,7 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
         <p class="section-desc" style="margin-bottom:12px">Amérique du Nord · Europe · Émergents · Autres</p>
         <div class="chart-wrap" style="height:260px"><canvas id="geoR"></canvas></div>
         <div id="geoRL" class="legend" style="margin-top:8px"></div>
-        <table style="margin-top:12px"><thead><tr><th>Région</th><th>€</th><th>%</th></tr></thead><tbody id="geoRT"></tbody></table>
+        <table style="margin-top:12px"><thead><tr><th onclick="_compSort('geoRT','lab','geo')" data-ovcol="lab" style="cursor:pointer;user-select:none">Région<span class="ov-arr" style="font-size:9px;opacity:.35"> ⇅</span></th><th onclick="_compSort('geoRT','val','geo')" data-ovcol="val" style="cursor:pointer;user-select:none">€<span class="ov-arr" style="font-size:9px;opacity:.35"> ⇅</span></th><th onclick="_compSort('geoRT','pct','geo')" data-ovcol="pct" style="cursor:pointer;user-select:none">%<span class="ov-arr" style="font-size:9px;opacity:.35"> ⇅</span></th></tr></thead><tbody id="geoRT"></tbody></table>
       </div>
 
       <!-- Sous-régions -->
@@ -471,7 +472,7 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
         <p class="section-desc" style="margin-bottom:12px">USA · Europe de l'Ouest · Asie du Nord · Asie du Sud…</p>
         <div class="chart-wrap" style="height:260px"><canvas id="geoS"></canvas></div>
         <div id="geoSL" class="legend" style="margin-top:8px"></div>
-        <table style="margin-top:12px"><thead><tr><th>Sous-région</th><th>€</th><th>%</th></tr></thead><tbody id="geoST"></tbody></table>
+        <table style="margin-top:12px"><thead><tr><th onclick="_compSort('geoST','lab','geo')" data-ovcol="lab" style="cursor:pointer;user-select:none">Sous-région<span class="ov-arr" style="font-size:9px;opacity:.35"> ⇅</span></th><th onclick="_compSort('geoST','val','geo')" data-ovcol="val" style="cursor:pointer;user-select:none">€<span class="ov-arr" style="font-size:9px;opacity:.35"> ⇅</span></th><th onclick="_compSort('geoST','pct','geo')" data-ovcol="pct" style="cursor:pointer;user-select:none">%<span class="ov-arr" style="font-size:9px;opacity:.35"> ⇅</span></th></tr></thead><tbody id="geoST"></tbody></table>
       </div>
 
       <!-- Pays -->
@@ -480,7 +481,7 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
         <p class="section-desc" style="margin-bottom:12px">Top pays par exposition en valeur actuelle</p>
         <div class="chart-wrap" style="height:260px"><canvas id="geoP"></canvas></div>
         <div id="geoPL" class="legend" style="margin-top:8px"></div>
-        <table style="margin-top:12px"><thead><tr><th>Pays</th><th>€</th><th>%</th></tr></thead><tbody id="geoPT"></tbody></table>
+        <table style="margin-top:12px"><thead><tr><th onclick="_compSort('geoPT','lab','geo')" data-ovcol="lab" style="cursor:pointer;user-select:none">Pays<span class="ov-arr" style="font-size:9px;opacity:.35"> ⇅</span></th><th onclick="_compSort('geoPT','val','geo')" data-ovcol="val" style="cursor:pointer;user-select:none">€<span class="ov-arr" style="font-size:9px;opacity:.35"> ⇅</span></th><th onclick="_compSort('geoPT','pct','geo')" data-ovcol="pct" style="cursor:pointer;user-select:none">%<span class="ov-arr" style="font-size:9px;opacity:.35"> ⇅</span></th></tr></thead><tbody id="geoPT"></tbody></table>
       </div>
 
     </div>
@@ -490,6 +491,7 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
   <!-- ======== SECTEURS ======== -->
   <div id="sect" class="section">
     <p class="section-desc" style="margin-bottom:20px">Exposition sectorielle réelle — ETFs décomposés via look-through × valeur actuelle + actions directes.</p>
+    <div id="sect_kpis" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;align-items:start">
 
       <!-- ETFs look-through -->
@@ -498,7 +500,7 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
         <p class="section-desc" style="margin-bottom:12px">Secteurs réels dans les sous-jacents ETFs</p>
         <div class="chart-wrap" style="height:280px"><canvas id="secETF"></canvas></div>
         <div id="secETFL" class="legend" style="margin-top:8px"></div>
-        <table style="margin-top:12px"><thead><tr><th>Secteur</th><th>€</th><th>%</th></tr></thead><tbody id="secETFT"></tbody></table>
+        <table style="margin-top:12px"><thead><tr><th onclick="_compSort('secETFT','lab','sect')" data-ovcol="lab" style="cursor:pointer;user-select:none">Secteur<span class="ov-arr" style="font-size:9px;opacity:.35"> ⇅</span></th><th onclick="_compSort('secETFT','val','sect')" data-ovcol="val" style="cursor:pointer;user-select:none">€<span class="ov-arr" style="font-size:9px;opacity:.35"> ⇅</span></th><th onclick="_compSort('secETFT','pct','sect')" data-ovcol="pct" style="cursor:pointer;user-select:none">%<span class="ov-arr" style="font-size:9px;opacity:.35"> ⇅</span></th></tr></thead><tbody id="secETFT"></tbody></table>
       </div>
 
       <!-- Actions directes -->
@@ -507,7 +509,7 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
         <p class="section-desc" style="margin-bottom:12px">Secteurs des actions en portefeuille</p>
         <div class="chart-wrap" style="height:280px"><canvas id="secACT"></canvas></div>
         <div id="secACTL" class="legend" style="margin-top:8px"></div>
-        <table style="margin-top:12px"><thead><tr><th>Secteur</th><th>€</th><th>%</th></tr></thead><tbody id="secACTT"></tbody></table>
+        <table style="margin-top:12px"><thead><tr><th onclick="_compSort('secACTT','lab','sect')" data-ovcol="lab" style="cursor:pointer;user-select:none">Secteur<span class="ov-arr" style="font-size:9px;opacity:.35"> ⇅</span></th><th onclick="_compSort('secACTT','val','sect')" data-ovcol="val" style="cursor:pointer;user-select:none">€<span class="ov-arr" style="font-size:9px;opacity:.35"> ⇅</span></th><th onclick="_compSort('secACTT','pct','sect')" data-ovcol="pct" style="cursor:pointer;user-select:none">%<span class="ov-arr" style="font-size:9px;opacity:.35"> ⇅</span></th></tr></thead><tbody id="secACTT"></tbody></table>
       </div>
 
       <!-- Exposition totale -->
@@ -516,7 +518,7 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
         <p class="section-desc" style="margin-bottom:12px">ETFs look-through + actions directes consolidés</p>
         <div class="chart-wrap" style="height:280px"><canvas id="secTOT"></canvas></div>
         <div id="secTOTL" class="legend" style="margin-top:8px"></div>
-        <table style="margin-top:12px"><thead><tr><th>Secteur</th><th>€</th><th>%</th></tr></thead><tbody id="secTOTT"></tbody></table>
+        <table style="margin-top:12px"><thead><tr><th onclick="_compSort('secTOTT','lab','sect')" data-ovcol="lab" style="cursor:pointer;user-select:none">Secteur<span class="ov-arr" style="font-size:9px;opacity:.35"> ⇅</span></th><th onclick="_compSort('secTOTT','val','sect')" data-ovcol="val" style="cursor:pointer;user-select:none">€<span class="ov-arr" style="font-size:9px;opacity:.35"> ⇅</span></th><th onclick="_compSort('secTOTT','pct','sect')" data-ovcol="pct" style="cursor:pointer;user-select:none">%<span class="ov-arr" style="font-size:9px;opacity:.35"> ⇅</span></th></tr></thead><tbody id="secTOTT"></tbody></table>
       </div>
 
     </div>
@@ -2003,8 +2005,62 @@ function buildSectExposure() {
   return { etfMap, actMap, totMap };
 }
 
+window._compTableSort = window._compTableSort || {};
+function _compSort(tableId, col, fn) {
+  const st = window._compTableSort[tableId] || { col:'val', dir:-1 };
+  if (st.col === col) st.dir *= -1; else { st.col = col; st.dir = -1; }
+  window._compTableSort[tableId] = st;
+  (fn === 'geo' ? renderGeoCharts : renderSectCharts)();
+}
+function _equityKpis() {
+  const map = {};
+  BOOK2_ROWS.forEach(r => {
+    const isETF = ETF_TICKERS.has(r.ticker) && (!r.typeInv || r.typeInv === 'ETF');
+    const isAct = !ETF_TICKERS.has(r.ticker) && (!r.typeInv || r.typeInv === 'Action');
+    if (!isETF && !isAct) return;
+    const t = r.ticker;
+    if (!map[t]) map[t] = { ticker:t, qty:0, costEur:0, currency:r.currency };
+    const eur = r.costEur != null ? r.costEur : (toEur(r.cost, r.currency)||0);
+    map[t].qty += r.qty; map[t].costEur += Math.round(eur);
+  });
+  let totCost=0, totVal=0, nGain=0, nLoss=0, nLines=0, hasPrices=false;
+  Object.values(map).forEach(row => {
+    nLines++; totCost += row.costEur;
+    const info = CURRENT_PRICES[row.ticker];
+    const px = info && info.price;
+    if (px != null) {
+      const v = Math.round(toEur(row.qty * px, (info && info.currency) || row.currency));
+      totVal += v; hasPrices = true;
+      const pnl = v - row.costEur;
+      if (pnl > 0) nGain++; else if (pnl < 0) nLoss++;
+    } else { totVal += row.costEur; }
+  });
+  const totPnl = hasPrices ? totVal - totCost : 0;
+  const totPnlPct = totCost ? totPnl / totCost * 100 : 0;
+  return { totCost, totVal, totPnl, totPnlPct, nGain, nLoss, nLines, hasPrices };
+}
+function _renderEquityBanner(elId) {
+  const el = document.getElementById(elId); if (!el) return;
+  const k = _equityKpis();
+  const fmt = n => Math.round(n).toLocaleString('fr');
+  const fmtP = n => (n >= 0 ? '+' : '') + n.toFixed(1) + '%';
+  const colC = n => n >= 0 ? '#4caf82' : '#e06c6c';
+  const cards = [
+    { label:'Valeur achat',       val: fmt(k.totCost)+' €',                  sub: k.nLines+' lignes (ETFs + actions)', c:'var(--text)' },
+    { label:'Valeur actuelle',    val: k.hasPrices ? fmt(k.totVal)+' €' : '—', sub: k.hasPrices?'après import des prix':'avant import prix', c:'var(--text)' },
+    { label:'P&L total',          val: k.hasPrices ? fmtP(k.totPnlPct) : '—', sub: k.hasPrices ? fmt(k.totPnl)+' €' : '—', c: k.hasPrices ? colC(k.totPnlPct) : 'var(--text2)' },
+    { label:'En gain / En perte', val: k.hasPrices ? (k.nGain+' / '+k.nLoss) : '—', sub:'positions sur '+k.nLines, c: k.hasPrices ? (k.nGain>=k.nLoss?'#4caf82':'#e06c6c') : 'var(--text2)' },
+  ];
+  el.innerHTML = cards.map(c => `
+    <div style="background:var(--bg2);border-radius:8px;padding:14px 16px;border:1px solid var(--border2)">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:6px">${c.label}</div>
+      <div style="font-size:20px;font-weight:700;color:${c.c}">${c.val}</div>
+      <div style="font-size:11px;color:var(--text2);margin-top:3px">${c.sub}</div>
+    </div>`).join('');
+}
 function renderSectCharts() {
   const msg = document.getElementById('secMsg');
+  _renderEquityBanner('sect_kpis');
 
   const hasComp = Object.keys(ETF_META).some(t => (ETF_COMP_OVERRIDE[t]?.sectorsAll || ETF_META[t]?.sectors || []).length > 0);
   const hasVal  = Object.keys(_compValMap).some(t => _compValMap[t] > 0);
@@ -2027,7 +2083,9 @@ function renderSectCharts() {
   if (!grandTot) return;
 
   function drawDonut(canvasId, legendId, tableId, dataMap, tot) {
-    const entries = Object.entries(dataMap).sort((a, b) => b[1] - a[1]);
+    if (!window._compTableSort[tableId]) window._compTableSort[tableId] = { col:'val', dir:-1 };
+    const _st = window._compTableSort[tableId];
+    const entries = Object.entries(dataMap).sort((a, b) => _st.col==='lab' ? _st.dir*String(a[0]).localeCompare(String(b[0])) : _st.dir*(a[1]-b[1]));
     const labels  = entries.map(([l]) => l);
     const values  = entries.map(([, v]) => v);
     const colors  = labels.map(l => SECTOR_UNIFIED_COLORS[l] || '#9ca3af');
@@ -2061,10 +2119,16 @@ function renderSectCharts() {
     }).join('');
 
     const tb = document.getElementById(tableId);
-    if (tb) tb.innerHTML = entries.map(([l, v]) => {
-      const icon = SECTOR_ICONS[l] ? `${SECTOR_ICONS[l]} ` : '';
-      return `<tr><td>${icon}${l}</td><td class="mono">${Math.round(v).toLocaleString('fr')} €</td><td class="mono">${((v / grandTot) * 100).toFixed(1).replace('.', ',')}%</td></tr>`;
-    }).join('');
+    if (tb) {
+      const _sumV = entries.reduce((s, e) => s + e[1], 0);
+      tb.innerHTML = entries.map(([l, v]) => {
+        const icon = SECTOR_ICONS[l] ? `${SECTOR_ICONS[l]} ` : '';
+        return `<tr><td>${icon}${l}</td><td class="mono">${Math.round(v).toLocaleString('fr')} €</td><td class="mono">${((v / grandTot) * 100).toFixed(1).replace('.', ',')}%</td></tr>`;
+      }).join('') +
+        `<tr style="border-top:2px solid var(--border2);font-weight:700;background:var(--bg3)"><td>Total</td><td class="mono">${Math.round(_sumV).toLocaleString('fr')} €</td><td class="mono">${((_sumV / grandTot) * 100).toFixed(1).replace('.', ',')}%</td></tr>`;
+      const _tbl = tb.closest('table');
+      if (_tbl) _tbl.querySelectorAll('th[data-ovcol]').forEach(th => { const s = th.querySelector('.ov-arr'); if (s) { const on = th.dataset.ovcol === _st.col; s.textContent = on ? (_st.dir<0?' ▼':' ▲') : ' ⇅'; s.style.opacity = on ? '1' : '0.35'; } });
+    }
   }
 
   drawDonut('secETF', 'secETFL', 'secETFT', etfMap, grandTot);
@@ -2074,6 +2138,7 @@ function renderSectCharts() {
 
 function renderGeoCharts() {
   const msg = document.getElementById('geoMsg');
+  _renderEquityBanner('geo_kpis');
 
   const hasComp = Object.keys(ETF_META).some(t => (ETF_COMP_OVERRIDE[t]?.geoAll || ETF_META[t]?.geo || []).length > 0);
   const hasVal  = Object.keys(_compValMap).some(t => _compValMap[t] > 0);
@@ -2103,7 +2168,9 @@ function renderGeoCharts() {
   });
 
   function drawDonut(canvasId, legendId, tableId, rawMap, colorFn) {
-    const entries = Object.entries(rawMap).sort((a, b) => b[1] - a[1]);
+    if (!window._compTableSort[tableId]) window._compTableSort[tableId] = { col:'val', dir:-1 };
+    const _st = window._compTableSort[tableId];
+    const entries = Object.entries(rawMap).sort((a, b) => _st.col==='lab' ? _st.dir*String(a[0]).localeCompare(String(b[0])) : _st.dir*(a[1]-b[1]));
     const labels  = entries.map(([l]) => l);
     const values  = entries.map(([, v]) => v);
     const colors  = labels.map((l, i) => colorFn(l, i));
@@ -2133,9 +2200,15 @@ function renderGeoCharts() {
       </div>`
     ).join('');
     const tb = document.getElementById(tableId);
-    if (tb) tb.innerHTML = entries.map(([l, v]) =>
-      `<tr><td>${l}</td><td class="mono">${Math.round(v).toLocaleString('fr')} €</td><td class="mono">${((v/tot)*100).toFixed(1).replace('.',',')}%</td></tr>`
-    ).join('');
+    if (tb) {
+      const _sumV = entries.reduce((s, e) => s + e[1], 0);
+      tb.innerHTML = entries.map(([l, v]) =>
+        `<tr><td>${l}</td><td class="mono">${Math.round(v).toLocaleString('fr')} €</td><td class="mono">${((v/tot)*100).toFixed(1).replace('.',',')}%</td></tr>`
+      ).join('') +
+        `<tr style="border-top:2px solid var(--border2);font-weight:700;background:var(--bg3)"><td>Total</td><td class="mono">${Math.round(_sumV).toLocaleString('fr')} €</td><td class="mono">${((_sumV/tot)*100).toFixed(1).replace('.',',')}%</td></tr>`;
+      const _tbl = tb.closest('table');
+      if (_tbl) _tbl.querySelectorAll('th[data-ovcol]').forEach(th => { const s = th.querySelector('.ov-arr'); if (s) { const on = th.dataset.ovcol === _st.col; s.textContent = on ? (_st.dir<0?' ▼':' ▲') : ' ⇅'; s.style.opacity = on ? '1' : '0.35'; } });
+    }
   }
 
   // 1. Grandes régions
