@@ -5205,7 +5205,7 @@ const CSQ_FUND_REF={
   'Conseq realitní účastnický fond':{qty:2056931.97,nav:1.0353},
   'Conseq dluhopisový účastnický fond':{qty:369890.89,nav:1.4512}
 };
-const CSQ_NAME2CODE={'Conseq globální akciový účastnický fond':'GLAK','Conseq realitní účastnický fond':'RAF','Conseq dluhopisový účastnický fond':'DL'};
+const CSQ_NAME2CODE={'Conseq globální akciový účastnický fond':'GLAK','Conseq realitní účastnický fond':'RAF','Conseq dluhopisový účastnický fond':'DL','Conseq Target Bond 2035 účastnický fond':'BOND35'};
 function csqDetailSums(){
   var u={},a={},d={};
   (typeof CSQ_DETAIL!=='undefined'?CSQ_DETAIL:[]).forEach(function(r){ u[r.fund]=(u[r.fund]||0)+(r.units||0); a[r.fund]=(a[r.fund]||0)+(r.amount||0); if(!d[r.fund]||r.date>d[r.fund]) d[r.fund]=r.date; });
@@ -5244,6 +5244,9 @@ function _csqTh(col,label,align){ return '<th onclick="csqSort(\''+col+'\')" dat
   else { try{ CONSEQ_DATA=JSON.parse(raw); }catch(e){ CONSEQ_DATA=null; } }
   if(!CONSEQ_DATA || !CONSEQ_DATA.tx) CONSEQ_DATA=JSON.parse(JSON.stringify(CONSEQ_SEED));
   (CONSEQ_DATA.tx||[]).forEach(function(t){ if(t.date==='2026-08-28') t.date='2025-08-28'; });
+  if(CONSEQ_DATA.funds && !CONSEQ_DATA.funds.some(function(f){return (f.name||'').indexOf('Target Bond')>=0;})){
+    CONSEQ_DATA.funds.push({name:'Conseq Target Bond 2035 účastnický fond',nav:1.1685,nonInvest:0});
+  }
   (CONSEQ_DATA.funds||[]).forEach(function(f){
     if(f.qty==null||f.nav==null){ var r=CSQ_FUND_REF[f.name]; if(r){ if(f.qty==null)f.qty=r.qty; if(f.nav==null)f.nav=r.nav; } }
     if(f.nonInvest==null) f.nonInvest=0;
@@ -5478,16 +5481,16 @@ function csqFundDetail(){
   tb.innerHTML=funds.map(function(f,i){
     var val=(f.qty!=null&&f.nav!=null)?(f.qty*f.nav):(f.value||0);
     var inv=f.invested||0;
-    var avg=(f.qty)?inv/f.qty:0;
+    var avg=(Math.abs(f.qty)>1e-4)?inv/f.qty:null;
     var pnl=val-inv;
-    var pnlPct=inv?pnl/inv*100:null;
+    var pnlPct=(Math.abs(f.qty)>1e-4 && inv>0)?pnl/inv*100:null;
     var tot=val+(f.nonInvest||0);
     tA+=val; tI+=inv; tn+=(f.nonInvest||0); tt+=tot;
     var sn=f.name.replace('Conseq ','').replace(' účastnický fond','').replace(' fond','');
     return '<tr><td title="'+f.name+'"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:'+(CSQ_FUNDCOL[i%CSQ_FUNDCOL.length])+';margin-right:7px;vertical-align:middle"></span>'+sn+'</td>'+
       '<td class="mono" style="text-align:right">'+(f.qty!=null?f.qty.toLocaleString('fr',{maximumFractionDigits:2}):'—')+'</td>'+
       '<td style="text-align:right"><input type="number" step="0.0001" value="'+(f.nav!=null?f.nav:'')+'" onchange="csqSetNav('+i+',this.value)" style="'+inpS+'"><div style="font-size:9px;color:var(--text2);margin-top:2px">maj '+(f.navDate||'—')+'</div></td>'+
-      '<td class="mono" style="text-align:right">'+nf4(avg)+'</td>'+
+      '<td class="mono" style="text-align:right">'+(avg!=null?nf4(avg):'—')+'</td>'+
       '<td class="mono" style="text-align:right">'+csqFmt(inv)+' CZK</td>'+
       '<td class="mono" style="text-align:right">'+csqFmt(val)+' CZK</td>'+
       '<td class="mono" style="text-align:right;color:'+(pnlPct==null?'var(--text2)':pc(pnlPct))+'">'+(pnlPct!=null?((pnlPct>=0?'+':'')+pnlPct.toFixed(1).replace('.',',')+'%'):'—')+'</td>'+
