@@ -2531,38 +2531,53 @@ const BOOK2_ROWS = [
 
 // ── Restore extra rows from localStorage immediately at page load ─────────────
 (function restoreExtraRows() {
+  // ── 1. book2_all_rows = SOURCE DE VÉRITÉ : si un snapshot complet existe
+  //       (sauvegarde locale ou GSheet), on reconstruit BOOK2_ROWS à partir de lui.
+  //       Cela évite les pertes de lignes (ex. broker IBKR) dues au matching
+  //       par ticker+date+qty qui échouait quand une qty avait été éditée. ──────
+  let usedSnapshot = false;
+  try {
+    const saved = JSON.parse(localStorage.getItem('book2_all_rows') || '[]');
+    // Garde-fou : on ne remplace que si le snapshot est crédible (≥ 50% du socle statique)
+    if (Array.isArray(saved) && saved.length >= Math.floor(BOOK2_ROWS.length * 0.5)) {
+      BOOK2_ROWS.length = 0;
+      saved.forEach(r => BOOK2_ROWS.push(Object.assign({}, r)));
+      usedSnapshot = true;
+    }
+  } catch(e) {}
+
+  // ── 2. Lignes ajoutées localement (book2_extra_rows) non encore dans le snapshot ──
   try {
     const extra = JSON.parse(localStorage.getItem('book2_extra_rows') || '[]');
     extra.forEach(r => {
-      if (r.ticker && !BOOK2_ROWS.some(e => e.ticker===r.ticker && e.date===r.date && e.qty===r.qty)) {
+      if (r.ticker && !BOOK2_ROWS.some(e => e.ticker===r.ticker && e.date===r.date && Math.abs((+e.qty||0)-(+r.qty||0))<1e-4)) {
         BOOK2_ROWS.push(r);
       }
     });
   } catch(e) {}
 
-  // ── Restaurer toutes les modifications depuis le snapshot complet ───────────
-  try {
-    const saved = JSON.parse(localStorage.getItem('book2_all_rows') || '[]');
-    saved.forEach(sv => {
-      // Chercher la ligne correspondante par ticker + date + qty original (avant modif)
-      // On cherche d'abord par isin+date si disponible, sinon par ticker+date+qty
-      const idx = BOOK2_ROWS.findIndex(r => {
-        if (sv.isin && r.isin) return r.isin === sv.isin && r.date === sv.date && Math.abs(r.qty - sv.qty) < 0.001;
-        return r.ticker === sv.ticker && r.date === sv.date && Math.abs(r.qty - sv.qty) < 0.001;
+  // ── 3. Pas de snapshot crédible → ancien comportement : patch champ-à-champ ──
+  if (!usedSnapshot) {
+    try {
+      const saved = JSON.parse(localStorage.getItem('book2_all_rows') || '[]');
+      saved.forEach(sv => {
+        const idx = BOOK2_ROWS.findIndex(r => {
+          if (sv.isin && r.isin) return r.isin === sv.isin && r.date === sv.date && Math.abs(r.qty - sv.qty) < 0.001;
+          return r.ticker === sv.ticker && r.date === sv.date && Math.abs(r.qty - sv.qty) < 0.001;
+        });
+        if (idx !== -1) {
+          const fields = ['name','broker','typeInv','currency','qty','pxAchat','cost','costEur','fxRate','_modified'];
+          fields.forEach(f => { if (sv[f] !== undefined) BOOK2_ROWS[idx][f] = sv[f]; });
+        }
       });
-      if (idx !== -1) {
-        // Appliquer les champs modifiables sans écraser l'identité de la ligne
-        const fields = ['name','broker','typeInv','currency','qty','pxAchat','cost','costEur','fxRate','_modified'];
-        fields.forEach(f => { if (sv[f] !== undefined) BOOK2_ROWS[idx][f] = sv[f]; });
-      }
-    });
-  } catch(e) {}
+    } catch(e) {}
+  }
 
-  // ── Supprimer les lignes vendues (blacklist persistée) ──────────────────────
+  // ── 4. Supprimer les lignes vendues (blacklist persistée, sensible au broker) ──
   try {
     const sold = JSON.parse(localStorage.getItem('sold_rows') || '[]');
     sold.forEach(s => {
-      const idx = BOOK2_ROWS.findIndex(r => r.ticker === s.ticker && r.date === s.date && r.qty === s.qty);
+      const idx = BOOK2_ROWS.findIndex(r => r.ticker === s.ticker && r.date === s.date && Math.abs((+r.qty||0)-(+s.qty||0))<1e-4 && (s.broker ? r.broker === s.broker : true));
       if (idx !== -1) BOOK2_ROWS.splice(idx, 1);
     });
   } catch(e){}
@@ -3612,7 +3627,7 @@ function submitSellLine() {
   // ── Blacklist this row so it never comes back after reload ────────────────
   try {
     const sold = JSON.parse(localStorage.getItem('sold_rows')||'[]');
-    sold.push({ ticker: r.ticker, date: r.date, qty: r.qty });
+    sold.push({ ticker: r.ticker, date: r.date, qty: r.qty, broker: r.broker });
     localStorage.setItem('sold_rows', JSON.stringify(sold));
   } catch(e){}
 
