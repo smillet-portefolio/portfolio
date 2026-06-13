@@ -312,6 +312,7 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
     <button class="tab" onclick="sw('clotures',this)">📤 Clôturées</button>
     <button class="tab" onclick="sw('cash',this)">💰 Dépôts & Cash</button>
     <button class="tab" onclick="sw('oblig',this)">📋 Obligations non cotées</button>
+    <button class="tab" onclick="sw('dividend',this)">💸 Dividendes</button>
       <button class="tab" onclick="sw('evolution',this)">📈 Évolution</button>
   </div>
 
@@ -380,6 +381,20 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
           <div id="db_donut_broker_leg" style="font-size:13px;display:flex;flex-direction:column;gap:5px"></div>
         </div>
       </div>
+      <div class="card" style="padding:20px">
+        <p style="font-size:14px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Répartition par grandes régions</p>
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center">
+          <canvas id="db_donut_geo" width="180" height="180"></canvas>
+          <div id="db_donut_geo_leg" style="font-size:13px;display:flex;flex-direction:column;gap:5px"></div>
+        </div>
+      </div>
+      <div class="card" style="padding:20px">
+        <p style="font-size:14px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Répartition par secteur</p>
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center">
+          <canvas id="db_donut_sec" width="180" height="180"></canvas>
+          <div id="db_donut_sec_leg" style="font-size:13px;display:flex;flex-direction:column;gap:5px"></div>
+        </div>
+      </div>
     </div>
 
     <!-- Analyse & Risques inline -->
@@ -398,11 +413,10 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
         <div id="db_perf"></div>
       </div>
 
-      <!-- Signaux + Exposition devises -->
+      <!-- Dividendes nets par année -->
       <div class="card" style="padding:20px">
-        <p style="font-size:14px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">⚡ Signaux & Devises</p>
-        <div id="db_signals"></div>
-        <div id="db_currency" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)"></div>
+        <p style="font-size:14px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">💸 Dividendes nets</p>
+        <div class="chart-wrap" style="height:210px"><canvas id="db_div_chart"></canvas></div>
       </div>
 
     </div>
@@ -1035,6 +1049,7 @@ function sw(id, btn) {
   if (id === 'clotures')     setTimeout(renderClosedPositions, 50);
   if (id === 'dashboard') setTimeout(renderDashboard, 50);
   if (id === 'cash')         setTimeout(renderCashSection, 50);
+  if (id === 'dividend')     setTimeout(renderDividendSection, 50);
   if (id === 'oblig') {
     setTimeout(function() {
       renderObligSection();
@@ -1673,6 +1688,34 @@ function renderDashboard() {
     .filter(function(e) { return e[1] > 0; })
     .sort(function(a, b) { return b[1] - a[1]; });
   makeDonut('db_donut_broker', 'db_donut_broker_leg', brokerEntries, BROKER_PALETTE);
+
+  // Donut par grandes régions (données onglet Géographie)
+  try {
+    var _payMap = (typeof buildGeoExposure === 'function') ? buildGeoExposure() : {};
+    var _regionMap = {};
+    Object.entries(_payMap).forEach(function(e){ var m=(typeof GEO_MAP!=='undefined'&&GEO_MAP[e[0]])?GEO_MAP[e[0]]:{r:'Autres'}; _regionMap[m.r]=(_regionMap[m.r]||0)+e[1]; });
+    var _regSorted = Object.entries(_regionMap).filter(function(e){return e[1]>0;}).sort(function(a,b){return b[1]-a[1];});
+    makeDonut('db_donut_geo','db_donut_geo_leg', _regSorted, _regSorted.map(function(e){return (typeof GEO_R_COLORS!=='undefined'&&GEO_R_COLORS[e[0]])?GEO_R_COLORS[e[0]]:'#6b7280';}));
+  } catch(e){}
+
+  // Donut par secteur (exposition totale, onglet Secteurs)
+  try {
+    var _secTot = (typeof buildSectExposure === 'function') ? (buildSectExposure().totMap||{}) : {};
+    var _secSorted = Object.entries(_secTot).filter(function(e){return e[1]>0;}).sort(function(a,b){return b[1]-a[1];});
+    makeDonut('db_donut_sec','db_donut_sec_leg', _secSorted, _secSorted.map(function(e){return (typeof SECTOR_UNIFIED_COLORS!=='undefined'&&SECTOR_UNIFIED_COLORS[e[0]])?SECTOR_UNIFIED_COLORS[e[0]]:'#9ca3af';}));
+  } catch(e){}
+
+  // Graph dividendes nets par année (remplace l'ancien bloc Signaux & Devises)
+  try {
+    if(!window._dbCharts) window._dbCharts={};
+    var _dcv = document.getElementById('db_div_chart');
+    if (_dcv && typeof Chart !== 'undefined' && typeof DIVIDEND_DATA !== 'undefined') {
+      var _by={}; DIVIDEND_DATA.forEach(function(d){ var y=(d.date||'').slice(0,4); if(y) _by[y]=(_by[y]||0)+(d.netEur||0); });
+      var _ys=Object.keys(_by).sort(); var _vs=_ys.map(function(y){return Math.round(_by[y]);});
+      if (window._dbCharts['db_div_chart']) { try{ window._dbCharts['db_div_chart'].destroy(); }catch(e){} }
+      window._dbCharts['db_div_chart']=new Chart(_dcv.getContext('2d'),{type:'bar',data:{labels:_ys,datasets:[{data:_vs,backgroundColor:'#4caf82',borderRadius:6,maxBarThickness:64}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return Math.round(c.parsed.y).toLocaleString('fr')+' € net';}}}},scales:{y:{ticks:{callback:function(v){return (v/1000).toFixed(0)+'k€';},color:'#8b95a8'},grid:{color:'rgba(0,0,0,0.05)'}},x:{grid:{display:false},ticks:{color:'#8b95a8'}}}}});
+    }
+  } catch(e){}
 
   // ── Analyse & risques inline ────────────────────────────────────────────────
   // Agréger par ticker pour les calculs risques
@@ -3952,7 +3995,7 @@ const GS_KEYS = [
   'book2_extra_rows','book2_all_rows','book2_overrides',
   'sold_rows','closed_positions',
   'portfolio_prices','portfolio_variations','portfolio_fx',
-  'cash_data','oblig_data',
+  'cash_data','oblig_data','dividend_data',
   'etf_comp_override','etf_comp_date',
   'direct_sector_overrides',
   'evo_history'
@@ -3965,7 +4008,7 @@ const GS_KEYS = [
 const GS_AUTOSAVE_SET = new Set(GS_KEYS);
 const GS_USER_SET = new Set([
   'book2_extra_rows','book2_all_rows','book2_overrides',
-  'sold_rows','closed_positions','cash_data','oblig_data',
+  'sold_rows','closed_positions','cash_data','oblig_data','dividend_data',
   'direct_sector_overrides'
 ]);
 let _gsReady     = false;
@@ -4910,6 +4953,175 @@ let _obligEditId = null;
 function obligSave() {
   try { localStorage.setItem('oblig_data', JSON.stringify(OBLIG_DATA)); } catch(e) {}
 }
+
+// ==============================================================================
+// ONGLET DIVIDENDES
+// ==============================================================================
+const _divInp = 'style="width:100%;padding:7px 9px;border:1px solid var(--border2);border-radius:7px;background:var(--bg2);color:var(--text);font-size:13px;box-sizing:border-box"';
+function _divField(label, inner){ return '<div style="margin-bottom:10px"><label style="display:block;font-size:11px;color:var(--text2);margin-bottom:3px">'+label+'</label>'+inner+'</div>'; }
+function _divTh(col,label){ return '<th onclick="divSort(\''+col+'\')" data-divcol="'+col+'" style="cursor:pointer;user-select:none;white-space:nowrap">'+label+'<span class="ov-arr" style="font-size:9px;opacity:.35"> ⇅</span></th>'; }
+function _divEurPerUnit(cur){
+  if(cur==='EUR') return 1;
+  if(cur==='USD') return (FX_RATES.USD || 0.893);
+  if(cur==='GBP') return (FX_RATES.GBP || 1.172);
+  if(cur==='CZK') return (FX_RATES.CZK || (1/25.0));
+  return 1;
+}
+var DIVIDEND_DATA = [];
+let _divSort = { col:'date', dir:-1 };
+const DIVIDEND_SEED = [{"id": "d0", "broker": "SAXO", "name": "Microsoft", "ticker": "MSFT", "isin": "US5949181045", "date": "2026-06-11", "currency": "EUR", "fx": 1, "brut": 11.82, "taxe": 1.78, "net": 10.04, "brutEur": 11.82, "taxeEur": 1.78, "netEur": 10.04}, {"id": "d1", "broker": "SAXO", "name": "Saint-Gobain", "ticker": "SGO", "isin": "FR0000125007", "date": "2026-06-10", "currency": "EUR", "fx": 1, "brut": 108.68, "taxe": 36.23, "net": 72.45, "brutEur": 108.68, "taxeEur": 36.23, "netEur": 72.45}, {"id": "d2", "broker": "XTB", "name": "Essilor-Luxottica", "ticker": "EL", "isin": "FR0000121667", "date": "2026-06-03", "currency": "EUR", "fx": 1, "brut": 44.22, "taxe": 10.56, "net": 33.66, "brutEur": 44.22, "taxeEur": 10.56, "netEur": 33.66}, {"id": "d3", "broker": "IBKR", "name": "Essilor-Luxottica", "ticker": "EL", "isin": "FR0000121667", "date": "2026-06-03", "currency": "EUR", "fx": 1, "brut": 96.0, "taxe": 24.0, "net": 72.0, "brutEur": 96.0, "taxeEur": 24.0, "netEur": 72.0}, {"id": "d4", "broker": "SAXO", "name": "Spie", "ticker": "SPIE", "isin": "FR0012757854", "date": "2026-05-13", "currency": "EUR", "fx": 1, "brut": 81.9, "taxe": 20.48, "net": 61.42, "brutEur": 81.9, "taxeEur": 20.48, "netEur": 61.42}, {"id": "d5", "broker": "SAXO", "name": "Schneider Electric", "ticker": "SU", "isin": "FR0000121972", "date": "2026-05-13", "currency": "EUR", "fx": 1, "brut": 75.6, "taxe": 18.9, "net": 56.7, "brutEur": 75.6, "taxeEur": 18.9, "netEur": 56.7}, {"id": "d6", "broker": "IBKR", "name": "Ferrari", "ticker": "RACE", "isin": "NL0011585146", "date": "2026-05-05", "currency": "EUR", "fx": 1, "brut": 28.92, "taxe": 7.52, "net": 21.4, "brutEur": 28.92, "taxeEur": 7.52, "netEur": 21.4}, {"id": "d7", "broker": "XTB", "name": "Ferrari", "ticker": "RACE", "isin": "NL0011585146", "date": "2026-05-05", "currency": "EUR", "fx": 1, "brut": 18.08, "taxe": 4.7, "net": 13.38, "brutEur": 18.08, "taxeEur": 4.7, "netEur": 13.38}, {"id": "d8", "broker": "IBKR", "name": "Samsung Electronics", "ticker": "SMSN", "isin": "US7960508882", "date": "2026-04-24", "currency": "EUR", "fx": 1, "brut": 8.14, "taxe": 1.79, "net": 6.35, "brutEur": 8.14, "taxeEur": 1.79, "netEur": 6.35}, {"id": "d9", "broker": "IBKR", "name": "Deutsche Telekom", "ticker": "DTE", "isin": "DE0005557508", "date": "2026-04-08", "currency": "EUR", "fx": 1, "brut": 100.0, "taxe": 0.0, "net": 100.0, "brutEur": 100.0, "taxeEur": 0.0, "netEur": 100.0}, {"id": "d10", "broker": "SAXO", "name": "Vistra Corp", "ticker": "VST", "isin": "US92840M1027", "date": "2026-03-31", "currency": "EUR", "fx": 1, "brut": 3.18, "taxe": 0.48, "net": 2.7, "brutEur": 3.18, "taxeEur": 0.48, "netEur": 2.7}, {"id": "d11", "broker": "XTB", "name": "Siemens Energy", "ticker": "ENR", "isin": "DE000ENER6Y0", "date": "2026-03-03", "currency": "EUR", "fx": 1, "brut": 8.05, "taxe": 2.12, "net": 5.93, "brutEur": 8.05, "taxeEur": 2.12, "netEur": 5.93}, {"id": "d12", "broker": "Trading212", "name": "Siemens Energy", "ticker": "ENR", "isin": "DE000ENER6Y0", "date": "2026-03-03", "currency": "EUR", "fx": 1, "brut": 11.85, "taxe": 3.12, "net": 8.72, "brutEur": 11.85, "taxeEur": 3.12, "netEur": 8.72}, {"id": "d13", "broker": "XTB", "name": "Infineon", "ticker": "IFX", "isin": "DE0006231004", "date": "2026-02-24", "currency": "EUR", "fx": 1, "brut": 13.12, "taxe": 3.45, "net": 9.67, "brutEur": 13.12, "taxeEur": 3.45, "netEur": 9.67}, {"id": "d14", "broker": "XTB", "name": "Hermès International", "ticker": "RMS", "isin": "FR0000052292", "date": "2026-02-18", "currency": "EUR", "fx": 1, "brut": 5.0, "taxe": 1.26, "net": 3.74, "brutEur": 5.0, "taxeEur": 1.26, "netEur": 3.74}, {"id": "d15", "broker": "IBKR", "name": "VanEck Morningstar Developed Markets Dividend Leaders UCITS ETF", "ticker": "TDIV", "isin": "NL0011683594", "date": "2025-12-10", "currency": "EUR", "fx": 1, "brut": 7.78, "taxe": 1.13, "net": 6.65, "brutEur": 7.78, "taxeEur": 1.13, "netEur": 6.65}, {"id": "d16", "broker": "SAXO", "name": "iShares Global Clean Energy", "ticker": "IQQH", "isin": "IE00B1XNHC34", "date": "2025-11-26", "currency": "EUR", "fx": 1, "brut": 17.96, "taxe": 0.0, "net": 17.96, "brutEur": 17.96, "taxeEur": 0.0, "netEur": 17.96}, {"id": "d17", "broker": "Trading212", "name": "iShares $ High Yield Corp Bond UCITS ETF", "ticker": "IS0R", "isin": "IE00B4PY7Y77", "date": "2025-11-26", "currency": "EUR", "fx": 1, "brut": 110.7, "taxe": 0.0, "net": 110.7, "brutEur": 110.7, "taxeEur": 0.0, "netEur": 110.7}, {"id": "d18", "broker": "XTB", "name": "Apple", "ticker": "AAPL.US", "isin": "US0378331005", "date": "2025-11-13", "currency": "EUR", "fx": 1, "brut": 0.02, "taxe": 0.0, "net": 0.02, "brutEur": 0.02, "taxeEur": 0.0, "netEur": 0.02}, {"id": "d19", "broker": "IBKR", "name": "iShares EURO STOXX Select Dividend 30 UCITS ETF (DE)", "ticker": "EXSGd", "isin": "DE0002635281", "date": "2025-10-15", "currency": "EUR", "fx": 1, "brut": 32.02, "taxe": 0.0, "net": 32.02, "brutEur": 32.02, "taxeEur": 0.0, "netEur": 32.02}, {"id": "d20", "broker": "IBKR", "name": "iShares Euro Dividend UCITS ETF", "ticker": "IDVY", "isin": "IE00B0M62S72", "date": "2025-09-24", "currency": "EUR", "fx": 1, "brut": 29.61, "taxe": 0.0, "net": 29.61, "brutEur": 29.61, "taxeEur": 0.0, "netEur": 29.61}, {"id": "d21", "broker": "Trading212", "name": "iShares iBonds Dec 2028 Term EUR Corp UCITS ETF", "ticker": "IB28", "isin": "IE000264WWY0", "date": "2025-09-24", "currency": "EUR", "fx": 1, "brut": 37.01, "taxe": 0.0, "net": 37.01, "brutEur": 37.01, "taxeEur": 0.0, "netEur": 37.01}, {"id": "d22", "broker": "XTB", "name": "Spie", "ticker": "SPIE.FR", "isin": "FR0012757854", "date": "2025-09-18", "currency": "EUR", "fx": 1, "brut": 6.6, "taxe": 1.65, "net": 4.95, "brutEur": 6.6, "taxeEur": 1.65, "netEur": 4.95}, {"id": "d23", "broker": "IBKR", "name": "VanEck Morningstar Developed Markets Dividend Leaders UCITS ETF", "ticker": "TDIV", "isin": "NL0011683594", "date": "2025-09-10", "currency": "EUR", "fx": 1, "brut": 7.2, "taxe": 0.0, "net": 7.2, "brutEur": 7.2, "taxeEur": 0.0, "netEur": 7.2}, {"id": "d24", "broker": "Trading212", "name": "Xtrackers II EUR High Yield Corp Bond Sept 2027 UCITS ETF", "ticker": "XHY1", "isin": "LU1109939865", "date": "2025-09-04", "currency": "EUR", "fx": 1, "brut": 104.18, "taxe": 0.0, "net": 104.18, "brutEur": 104.18, "taxeEur": 0.0, "netEur": 104.18}, {"id": "d25", "broker": "XTB", "name": "Apple", "ticker": "AAPL.US", "isin": "US0378331005", "date": "2025-08-14", "currency": "EUR", "fx": 1, "brut": 0.02, "taxe": 0.0, "net": 0.02, "brutEur": 0.02, "taxeEur": 0.0, "netEur": 0.02}, {"id": "d26", "broker": "Trading212", "name": "iShares Core Global Aggregate Bond UCITS ETF", "ticker": "EUNU", "isin": "IE00B3F81409", "date": "2025-07-30", "currency": "EUR", "fx": 1, "brut": 73.95, "taxe": 0.0, "net": 73.95, "brutEur": 73.95, "taxeEur": 0.0, "netEur": 73.95}, {"id": "d27", "broker": "Trading212", "name": "iShares Core EUR Corp Bond UCITS ETF", "ticker": "IEAC", "isin": "IE00B3F81R35", "date": "2025-07-30", "currency": "EUR", "fx": 1, "brut": 74.04, "taxe": 0.0, "net": 74.04, "brutEur": 74.04, "taxeEur": 0.0, "netEur": 74.04}, {"id": "d28", "broker": "IBKR", "name": "iShares STOXX Europe 600 Construction & Materials UCITS ETF (DE)", "ticker": "EXV8d", "isin": "DE000A0H08F7", "date": "2025-07-15", "currency": "EUR", "fx": 1, "brut": 13.7, "taxe": 0.0, "net": 13.7, "brutEur": 13.7, "taxeEur": 0.0, "netEur": 13.7}, {"id": "d29", "broker": "XTB", "name": "Vusion Group", "ticker": "VU.FR", "isin": "FR0010282822", "date": "2025-06-26", "currency": "EUR", "fx": 1, "brut": 3.0, "taxe": 0.75, "net": 2.25, "brutEur": 3.0, "taxeEur": 0.75, "netEur": 2.25}, {"id": "d30", "broker": "XTB", "name": "Vusion Group", "ticker": "VU.FR", "isin": "FR0010282822", "date": "2025-06-26", "currency": "EUR", "fx": 1, "brut": 1.8, "taxe": 0.45, "net": 1.35, "brutEur": 1.8, "taxeEur": 0.45, "netEur": 1.35}, {"id": "d31", "broker": "Trading212", "name": "iShares iBonds Dec 2028 Term EUR Corp UCITS ETF", "ticker": "IB28", "isin": "IE000264WWY0", "date": "2025-06-25", "currency": "EUR", "fx": 1, "brut": 78.87, "taxe": 0.0, "net": 78.87, "brutEur": 78.87, "taxeEur": 0.0, "netEur": 78.87}, {"id": "d32", "broker": "XTB", "name": "Vonovia SE", "ticker": "VNA.DE", "isin": "DE000A1ML7J1", "date": "2025-06-25", "currency": "EUR", "fx": 1, "brut": 41.48, "taxe": 0.0, "net": 41.48, "brutEur": 41.48, "taxeEur": 0.0, "netEur": 41.48}, {"id": "d33", "broker": "XTB", "name": "Leonardo S.p.A.", "ticker": "LDO.IT", "isin": "IT0003856405", "date": "2025-06-25", "currency": "EUR", "fx": 1, "brut": 8.84, "taxe": 2.3, "net": 6.54, "brutEur": 8.84, "taxeEur": 2.3, "netEur": 6.54}, {"id": "d34", "broker": "XTB", "name": "Leonardo S.p.A.", "ticker": "LDO.IT", "isin": "IT0003856405", "date": "2025-06-25", "currency": "EUR", "fx": 1, "brut": 0.37, "taxe": 0.1, "net": 0.27, "brutEur": 0.37, "taxeEur": 0.1, "netEur": 0.27}, {"id": "d35", "broker": "XTB", "name": "Leonardo S.p.A.", "ticker": "LDO.IT", "isin": "IT0003856405", "date": "2025-06-25", "currency": "EUR", "fx": 1, "brut": 0.23, "taxe": 0.06, "net": 0.17, "brutEur": 0.23, "taxeEur": 0.06, "netEur": 0.17}, {"id": "d36", "broker": "XTB", "name": "Vonovia SE", "ticker": "VNA.DE", "isin": "DE000A1ML7J1", "date": "2025-06-25", "currency": "EUR", "fx": 1, "brut": 0.06, "taxe": 0.0, "net": 0.06, "brutEur": 0.06, "taxeEur": 0.0, "netEur": 0.06}, {"id": "d37", "broker": "XTB", "name": "Gérard Perrier Industrie S.A.", "ticker": "PERR.FR", "isin": "FR0000061459", "date": "2025-06-16", "currency": "EUR", "fx": 1, "brut": 25.3, "taxe": 6.33, "net": 18.97, "brutEur": 25.3, "taxeEur": 6.33, "netEur": 18.97}];
+function divSave(){ try{ localStorage.setItem('dividend_data', JSON.stringify(DIVIDEND_DATA)); }catch(e){} }
+
+(function initDividendSection(){
+  const raw = localStorage.getItem('dividend_data');
+  if(raw===null){ DIVIDEND_DATA = DIVIDEND_SEED.map(x=>Object.assign({},x)); divSave(); }
+  else { try{ DIVIDEND_DATA = JSON.parse(raw)||[]; }catch(e){ DIVIDEND_DATA=[]; } }
+  DIVIDEND_DATA.forEach((d,i)=>{ if(!d.id) d.id='d'+i+'_'+Math.random().toString(36).slice(2,6); });
+
+  const wrapper = document.querySelector('.tabs').parentElement;
+  const sec = document.createElement('div');
+  sec.id='dividend'; sec.className='section';
+  sec.innerHTML =
+    '<h2 style="font-size:18px;font-weight:700;margin:0 0 4px">💸 Dividendes</h2>'+
+    '<p class="section-desc" style="margin-bottom:16px">Dividendes encaissés — bruts, taxes et nets, convertis en euros.</p>'+
+    '<div id="div_kpis" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px"></div>'+
+    '<div style="margin-bottom:12px"><button onclick="divOpenAdd()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer">+ Ajouter un dividende</button></div>'+
+    '<div style="overflow-x:auto"><table id="divTable"><thead><tr>'+
+      _divTh('date','Date')+_divTh('broker','Broker')+_divTh('name','Description')+_divTh('ticker','Ticker')+_divTh('isin','ISIN')+_divTh('brutEur','Brut €')+_divTh('taxeEur','Taxe €')+_divTh('netEur','Net €')+'<th></th>'+
+    '</tr></thead><tbody id="divTableBody"></tbody></table></div>'+
+    '<h3 style="font-size:14px;font-weight:700;margin:26px 0 10px">Dividende net par année</h3>'+
+    '<div class="chart-wrap" style="height:300px"><canvas id="divYearChart"></canvas></div>';
+  wrapper.appendChild(sec);
+
+  const modal=document.createElement('div'); modal.id='divModal';
+  modal.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center';
+  modal.innerHTML='<div style="background:var(--bg);border-radius:12px;padding:22px;width:460px;max-width:92vw;max-height:90vh;overflow:auto;border:1px solid var(--border2)">'+
+    '<h3 id="divModalTitle" style="margin:0 0 14px;font-size:16px">Ajouter un dividende</h3>'+
+    _divField('Date','<input id="divf_date" type="date" '+_divInp+'>')+
+    _divField('Broker','<input id="divf_broker" type="text" placeholder="SAXO, IBKR, XTB..." '+_divInp+'>')+
+    _divField('Description','<input id="divf_name" type="text" '+_divInp+'>')+
+    _divField('Ticker','<input id="divf_ticker" type="text" '+_divInp+'>')+
+    _divField('ISIN','<input id="divf_isin" type="text" '+_divInp+'>')+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+      _divField('Devise','<select id="divf_cur" onchange="divFxPrefill()" '+_divInp+'><option>EUR</option><option>CZK</option><option>USD</option><option>GBP</option></select>')+
+      _divField('Taux FX (€ pour 1 unité)','<input id="divf_fx" type="number" step="0.0001" oninput="divPreview()" '+_divInp+'>')+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+      _divField('Dividende brut','<input id="divf_brut" type="number" step="0.01" oninput="divPreview()" '+_divInp+'>')+
+      _divField('Taxe','<input id="divf_taxe" type="number" step="0.01" oninput="divPreview()" '+_divInp+'>')+
+    '</div>'+
+    '<div id="divf_preview" style="font-size:12px;color:var(--text2);margin:4px 0 14px"></div>'+
+    '<div style="display:flex;gap:8px;justify-content:flex-end">'+
+      '<button onclick="divCloseModal()" style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:8px 14px;cursor:pointer">Annuler</button>'+
+      '<button onclick="divSubmit()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-weight:600">Enregistrer</button>'+
+    '</div></div>';
+  document.body.appendChild(modal);
+  renderDividendSection();
+})();
+
+function divSort(col){ if(_divSort.col===col)_divSort.dir*=-1; else{_divSort.col=col;_divSort.dir=['brutEur','taxeEur','netEur','date'].includes(col)?-1:1;} renderDividendSection(); }
+
+function renderDividendSection(){
+  const tb=document.getElementById('divTableBody'); if(!tb) return;
+  DIVIDEND_DATA.forEach(d=>{
+    const fx=(d.fx!=null?d.fx:_divEurPerUnit(d.currency||'EUR'));
+    if(d.brutEur==null) d.brutEur=+(((d.brut||0)*fx)).toFixed(2);
+    if(d.taxeEur==null) d.taxeEur=+(((d.taxe||0)*fx)).toFixed(2);
+    if(d.netEur==null)  d.netEur =+((((d.net!=null?d.net:(d.brut||0)-(d.taxe||0)))*fx)).toFixed(2);
+  });
+  const fmt=n=>Math.round(n).toLocaleString('fr');
+  const fmt2=n=>(+n||0).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const totNet=DIVIDEND_DATA.reduce((s,d)=>s+(d.netEur||0),0);
+  const totBrut=DIVIDEND_DATA.reduce((s,d)=>s+(d.brutEur||0),0);
+  const totTax=DIVIDEND_DATA.reduce((s,d)=>s+(d.taxeEur||0),0);
+  const nSoc=new Set(DIVIDEND_DATA.map(d=>d.isin||d.ticker)).size;
+  const cards=[
+    {label:'Dividende net total',  val:fmt(totNet)+' €',  sub:DIVIDEND_DATA.length+' versements · '+nSoc+' sociétés', c:'#4caf82'},
+    {label:'Dividende brut total', val:fmt(totBrut)+' €', sub:'avant taxes', c:'var(--text)'},
+    {label:'Taxes totales',        val:fmt(totTax)+' €',  sub:totBrut?('soit '+(totTax/totBrut*100).toFixed(1).replace('.',',')+'% du brut'):'', c:'#e06c6c'},
+    {label:'Taux net moyen',       val:totBrut?((totNet/totBrut*100).toFixed(1).replace('.',',')+'%'):'—', sub:'net / brut', c:'var(--text)'},
+  ];
+  const kpiEl=document.getElementById('div_kpis');
+  if(kpiEl) kpiEl.innerHTML=cards.map(c=>'<div style="background:var(--bg2);border-radius:8px;padding:14px 16px;border:1px solid var(--border2)"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:6px">'+c.label+'</div><div style="font-size:20px;font-weight:700;color:'+c.c+'">'+c.val+'</div><div style="font-size:11px;color:var(--text2);margin-top:3px">'+c.sub+'</div></div>').join('');
+
+  const st=_divSort;
+  const rows=DIVIDEND_DATA.slice().sort((a,b)=>{
+    const key=d=> ['brutEur','taxeEur','netEur'].includes(st.col)?(d[st.col]||0):(st.col==='date'?(d.date||''):String(d[st.col]||'').toLowerCase());
+    let x=key(a),y=key(b);
+    if(typeof x==='string'||typeof y==='string') return st.dir*String(x).localeCompare(String(y));
+    return st.dir*(x-y);
+  });
+  tb.innerHTML=rows.map(d=>{
+    const cur=(d.currency&&d.currency!=='EUR')?' <span style="font-size:9px;color:var(--text2)">('+d.currency+')</span>':'';
+    return '<tr>'+
+      '<td class="mono" style="white-space:nowrap">'+(d.date||'')+'</td>'+
+      '<td>'+(d.broker||'')+'</td>'+
+      '<td><strong>'+(d.name||'')+'</strong>'+cur+'</td>'+
+      '<td class="mono" style="color:var(--text2)">'+(d.ticker||'')+'</td>'+
+      '<td class="mono" style="font-size:11px;color:var(--text2)">'+(d.isin||'')+'</td>'+
+      '<td class="mono">'+fmt2(d.brutEur)+'</td>'+
+      '<td class="mono" style="color:#e06c6c">'+fmt2(d.taxeEur)+'</td>'+
+      '<td class="mono" style="color:#4caf82;font-weight:600">'+fmt2(d.netEur)+'</td>'+
+      '<td><span onclick="divDelete(\''+d.id+'\')" title="Supprimer" style="cursor:pointer;color:var(--text2);font-size:13px">✕</span></td>'+
+    '</tr>';
+  }).join('')+
+  '<tr style="border-top:2px solid var(--border2);font-weight:700;background:var(--bg3)"><td colspan="5">Total ('+rows.length+')</td><td class="mono">'+fmt2(totBrut)+'</td><td class="mono" style="color:#e06c6c">'+fmt2(totTax)+'</td><td class="mono" style="color:#4caf82">'+fmt2(totNet)+'</td><td></td></tr>';
+
+  const tbl=document.getElementById('divTable');
+  if(tbl) tbl.querySelectorAll('th[data-divcol]').forEach(th=>{const s=th.querySelector('.ov-arr');if(s){const on=th.dataset.divcol===st.col;s.textContent=on?(st.dir<0?' ▼':' ▲'):' ⇅';s.style.opacity=on?'1':'0.35';}});
+  divRenderYearChart();
+}
+
+function divRenderYearChart(){
+  const cv=document.getElementById('divYearChart'); if(!cv||typeof Chart==='undefined') return;
+  const byYear={};
+  DIVIDEND_DATA.forEach(d=>{ const y=(d.date||'').slice(0,4); if(!y) return; byYear[y]=(byYear[y]||0)+(d.netEur||0); });
+  const years=Object.keys(byYear).sort();
+  const vals=years.map(y=>Math.round(byYear[y]));
+  if(window._divYearChart){ window._divYearChart.destroy(); window._divYearChart=null; }
+  window._divYearChart=new Chart(cv.getContext('2d'),{
+    type:'bar',
+    data:{labels:years,datasets:[{data:vals,backgroundColor:'#4caf82',borderRadius:6,maxBarThickness:90}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>Math.round(c.parsed.y).toLocaleString('fr')+' € net'}}},scales:{y:{ticks:{callback:v=>(v/1000).toFixed(0)+'k€',color:'#8b95a8'},grid:{color:'rgba(0,0,0,0.05)'}},x:{grid:{display:false},ticks:{color:'#8b95a8',font:{size:13}}}}}
+  });
+}
+
+function divOpenAdd(){
+  const t=document.getElementById('divModalTitle'); if(t)t.textContent='Ajouter un dividende';
+  const td=new Date().toISOString().slice(0,10);
+  document.getElementById('divf_date').value=td;
+  ['broker','name','ticker','isin','brut','taxe'].forEach(f=>{const e=document.getElementById('divf_'+f);if(e)e.value='';});
+  document.getElementById('divf_cur').value='EUR';
+  divFxPrefill();
+  document.getElementById('divModal').style.display='flex';
+}
+function divCloseModal(){ const m=document.getElementById('divModal'); if(m)m.style.display='none'; }
+function divFxPrefill(){ const cur=document.getElementById('divf_cur').value; const fx=_divEurPerUnit(cur); const e=document.getElementById('divf_fx'); if(e)e.value=(cur==='EUR'?1:(+fx).toFixed(4)); divPreview(); }
+function divPreview(){
+  const cur=document.getElementById('divf_cur').value;
+  const fx=parseFloat(document.getElementById('divf_fx').value)||(cur==='EUR'?1:0);
+  const brut=parseFloat(document.getElementById('divf_brut').value)||0;
+  const taxe=parseFloat(document.getElementById('divf_taxe').value)||0;
+  const net=brut-taxe;
+  const el=document.getElementById('divf_preview');
+  if(el) el.innerHTML='Net : <strong>'+net.toLocaleString('fr',{maximumFractionDigits:2})+' '+cur+'</strong> → <strong style="color:#4caf82">'+(net*fx).toLocaleString('fr',{maximumFractionDigits:2})+' €</strong>';
+}
+function divSubmit(){
+  const cur=document.getElementById('divf_cur').value;
+  const fx=cur==='EUR'?1:(parseFloat(document.getElementById('divf_fx').value)||_divEurPerUnit(cur));
+  const brut=parseFloat(document.getElementById('divf_brut').value)||0;
+  const taxe=parseFloat(document.getElementById('divf_taxe').value)||0;
+  const net=+(brut-taxe).toFixed(4);
+  const date=document.getElementById('divf_date').value;
+  if(!date){ alert('Date requise'); return; }
+  DIVIDEND_DATA.push({ id:'d'+Date.now(), broker:document.getElementById('divf_broker').value.trim(),
+    name:document.getElementById('divf_name').value.trim(), ticker:document.getElementById('divf_ticker').value.trim(),
+    isin:document.getElementById('divf_isin').value.trim(), date:date, currency:cur, fx:fx,
+    brut:+brut.toFixed(2), taxe:+taxe.toFixed(2), net:net,
+    brutEur:+(brut*fx).toFixed(2), taxeEur:+(taxe*fx).toFixed(2), netEur:+(net*fx).toFixed(2) });
+  divSave(); renderDividendSection(); divCloseModal();
+}
+function divDelete(id){ DIVIDEND_DATA=DIVIDEND_DATA.filter(d=>d.id!==id); divSave(); renderDividendSection(); }
 
 // ── Conversion EUR des échéances pour projets en devise étrangère ──────────────
 // Intérêts/capital FUTURS : réévalués au dernier FX (FX_RATES). Une fois l'échéance
