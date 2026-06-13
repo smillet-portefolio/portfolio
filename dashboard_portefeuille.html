@@ -366,33 +366,33 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
     </div>
 
     <!-- Graphiques donuts -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
-      <div class="card" style="padding:20px">
-        <p style="font-size:14px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Valeur actuelle par type d'actif</p>
-        <div style="display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center">
-          <canvas id="db_donut_type" width="180" height="180"></canvas>
-          <div id="db_donut_type_leg" style="font-size:13px;display:flex;flex-direction:column;gap:5px"></div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px">
+      <div class="card" style="padding:16px">
+        <p style="font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:10px;text-align:center">Par type d'actif</p>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+          <canvas id="db_donut_type" width="150" height="150"></canvas>
+          <div id="db_donut_type_leg" style="font-size:12px;display:flex;flex-direction:column;gap:4px;width:100%"></div>
         </div>
       </div>
-      <div class="card" style="padding:20px">
-        <p style="font-size:14px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Valeur actuelle par broker</p>
-        <div style="display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center">
-          <canvas id="db_donut_broker" width="180" height="180"></canvas>
-          <div id="db_donut_broker_leg" style="font-size:13px;display:flex;flex-direction:column;gap:5px"></div>
+      <div class="card" style="padding:16px">
+        <p style="font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:10px;text-align:center">Par broker</p>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+          <canvas id="db_donut_broker" width="150" height="150"></canvas>
+          <div id="db_donut_broker_leg" style="font-size:12px;display:flex;flex-direction:column;gap:4px;width:100%"></div>
         </div>
       </div>
-      <div class="card" style="padding:20px">
-        <p style="font-size:14px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Répartition par grandes régions</p>
-        <div style="display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center">
-          <canvas id="db_donut_geo" width="180" height="180"></canvas>
-          <div id="db_donut_geo_leg" style="font-size:13px;display:flex;flex-direction:column;gap:5px"></div>
+      <div class="card" style="padding:16px">
+        <p style="font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:10px;text-align:center">Grandes régions</p>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+          <canvas id="db_donut_geo" width="150" height="150"></canvas>
+          <div id="db_donut_geo_leg" style="font-size:12px;display:flex;flex-direction:column;gap:4px;width:100%"></div>
         </div>
       </div>
-      <div class="card" style="padding:20px">
-        <p style="font-size:14px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Répartition par secteur</p>
-        <div style="display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center">
-          <canvas id="db_donut_sec" width="180" height="180"></canvas>
-          <div id="db_donut_sec_leg" style="font-size:13px;display:flex;flex-direction:column;gap:5px"></div>
+      <div class="card" style="padding:16px">
+        <p style="font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:10px;text-align:center">Par secteur</p>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+          <canvas id="db_donut_sec" width="150" height="150"></canvas>
+          <div id="db_donut_sec_leg" style="font-size:12px;display:flex;flex-direction:column;gap:4px;width:100%"></div>
         </div>
       </div>
     </div>
@@ -415,8 +415,9 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
 
       <!-- Dividendes nets par année -->
       <div class="card" style="padding:20px">
-        <p style="font-size:14px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">💸 Dividendes nets</p>
-        <div class="chart-wrap" style="height:210px"><canvas id="db_div_chart"></canvas></div>
+        <p style="font-size:14px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">💸 Dividendes nets</p>
+        <div id="db_div_totals" style="display:flex;gap:22px;margin-bottom:12px"></div>
+        <div class="chart-wrap" style="height:170px"><canvas id="db_div_chart"></canvas></div>
       </div>
 
     </div>
@@ -1708,6 +1709,12 @@ function renderDashboard() {
   // Graph dividendes nets par année (remplace l'ancien bloc Signaux & Devises)
   try {
     if(!window._dbCharts) window._dbCharts={};
+    if (typeof DIVIDEND_DATA !== 'undefined') {
+      var _totNet=0,_ytdNet=0,_yr=String(new Date().getFullYear());
+      DIVIDEND_DATA.forEach(function(d){ _totNet+=(d.netEur||0); if((d.date||'').slice(0,4)===_yr) _ytdNet+=(d.netEur||0); });
+      var _tEl=document.getElementById('db_div_totals');
+      if(_tEl) _tEl.innerHTML='<div><div style="font-size:10px;text-transform:uppercase;color:var(--text2);letter-spacing:.5px">Total</div><div style="font-size:18px;font-weight:700;color:#4caf82">'+Math.round(_totNet).toLocaleString('fr')+' €</div></div>'+'<div><div style="font-size:10px;text-transform:uppercase;color:var(--text2);letter-spacing:.5px">YTD '+_yr+'</div><div style="font-size:18px;font-weight:700;color:#4caf82">'+Math.round(_ytdNet).toLocaleString('fr')+' €</div></div>';
+    }
     var _dcv = document.getElementById('db_div_chart');
     if (_dcv && typeof Chart !== 'undefined' && typeof DIVIDEND_DATA !== 'undefined') {
       var _by={}; DIVIDEND_DATA.forEach(function(d){ var y=(d.date||'').slice(0,4); if(y) _by[y]=(_by[y]||0)+(d.netEur||0); });
@@ -4998,10 +5005,11 @@ function divSave(){ try{ localStorage.setItem('dividend_data', JSON.stringify(DI
   modal.innerHTML='<div style="background:var(--bg);border-radius:12px;padding:22px;width:460px;max-width:92vw;max-height:90vh;overflow:auto;border:1px solid var(--border2)">'+
     '<h3 id="divModalTitle" style="margin:0 0 14px;font-size:16px">Ajouter un dividende</h3>'+
     _divField('Date','<input id="divf_date" type="date" '+_divInp+'>')+
-    _divField('Broker','<input id="divf_broker" type="text" placeholder="SAXO, IBKR, XTB..." '+_divInp+'>')+
-    _divField('Description','<input id="divf_name" type="text" '+_divInp+'>')+
-    _divField('Ticker','<input id="divf_ticker" type="text" '+_divInp+'>')+
+    _divField('Broker','<input id="divf_broker" type="text" list="divf_brokers" placeholder="SAXO, IBKR, XTB..." '+_divInp+'>')+
+    _divField('Description','<input id="divf_name" type="text" list="divf_names" onchange="divNameSelected()" placeholder="Tapez ou choisissez..." '+_divInp+'>')+
+    _divField('Ticker','<input id="divf_ticker" type="text" list="divf_tickers" onchange="divTickerSelected()" '+_divInp+'>')+
     _divField('ISIN','<input id="divf_isin" type="text" '+_divInp+'>')+
+    '<datalist id="divf_names"></datalist><datalist id="divf_brokers"></datalist><datalist id="divf_tickers"></datalist>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
       _divField('Devise','<select id="divf_cur" onchange="divFxPrefill()" '+_divInp+'><option>EUR</option><option>CZK</option><option>USD</option><option>GBP</option></select>')+
       _divField('Taux FX (€ pour 1 unité)','<input id="divf_fx" type="number" step="0.0001" oninput="divPreview()" '+_divInp+'>')+
@@ -5093,6 +5101,7 @@ function divOpenAdd(){
   ['broker','name','ticker','isin','brut','taxe'].forEach(f=>{const e=document.getElementById('divf_'+f);if(e)e.value='';});
   document.getElementById('divf_cur').value='EUR';
   divFxPrefill();
+  divBuildLists();
   document.getElementById('divModal').style.display='flex';
 }
 function divCloseModal(){ const m=document.getElementById('divModal'); if(m)m.style.display='none'; }
@@ -5122,6 +5131,40 @@ function divSubmit(){
   divSave(); renderDividendSection(); divCloseModal();
 }
 function divDelete(id){ DIVIDEND_DATA=DIVIDEND_DATA.filter(d=>d.id!==id); divSave(); renderDividendSection(); }
+function divBuildLists(){
+  var nameMap={}, brokers={};
+  (typeof BOOK2_ROWS!=='undefined'?BOOK2_ROWS:[]).forEach(function(r){
+    if(r.name && !nameMap[r.name]) nameMap[r.name]={ticker:r.ticker||'',isin:r.isin||''};
+    if(r.broker) brokers[r.broker]=1;
+  });
+  DIVIDEND_DATA.forEach(function(d){
+    if(d.name && !nameMap[d.name]) nameMap[d.name]={ticker:d.ticker||'',isin:d.isin||''};
+    if(d.broker) brokers[d.broker]=1;
+  });
+  window._divNameMap=nameMap; window._divTickerMap={};
+  Object.keys(nameMap).forEach(function(n){ var v=nameMap[n]; if(v.ticker && !window._divTickerMap[v.ticker]) window._divTickerMap[v.ticker]={name:n,isin:v.isin}; });
+  var esc=function(s){return String(s).replace(/"/g,'&quot;');};
+  var dlN=document.getElementById('divf_names');
+  if(dlN) dlN.innerHTML=Object.keys(nameMap).sort().map(function(n){return '<option value="'+esc(n)+'">';}).join('');
+  var brkList=Object.keys(brokers);
+  ['SAXO','IBKR','LINXEA','XTB','TRADING 212','Trading212','Ledger','BINANCE','KB'].forEach(function(b){ if(brkList.indexOf(b)<0) brkList.push(b); });
+  var dlB=document.getElementById('divf_brokers');
+  if(dlB) dlB.innerHTML=brkList.sort().map(function(b){return '<option value="'+esc(b)+'">';}).join('');
+  var dlT=document.getElementById('divf_tickers');
+  if(dlT) dlT.innerHTML=Object.keys(window._divTickerMap).sort().map(function(t){return '<option value="'+esc(t)+'">';}).join('');
+}
+function divNameSelected(){
+  var n=document.getElementById('divf_name').value;
+  var m=window._divNameMap&&window._divNameMap[n];
+  if(m){ var tk=document.getElementById('divf_ticker'), is=document.getElementById('divf_isin');
+    if(tk&&m.ticker) tk.value=m.ticker; if(is&&m.isin) is.value=m.isin; }
+}
+function divTickerSelected(){
+  var t=document.getElementById('divf_ticker').value;
+  var m=window._divTickerMap&&window._divTickerMap[t];
+  if(m){ var nm=document.getElementById('divf_name'), is=document.getElementById('divf_isin');
+    if(nm&&!nm.value&&m.name) nm.value=m.name; if(is&&m.isin) is.value=m.isin; }
+}
 
 // ── Conversion EUR des échéances pour projets en devise étrangère ──────────────
 // Intérêts/capital FUTURS : réévalués au dernier FX (FX_RATES). Une fois l'échéance
