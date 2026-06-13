@@ -1668,14 +1668,17 @@ function renderDashboard() {
         }
       }
     });
-    if (legEl) legEl.innerHTML = sorted.map(function(e, i) {
+    if (legEl) {
+    legEl.style.gridAutoFlow = 'column';
+    legEl.style.gridTemplateRows = 'repeat(' + Math.ceil(sorted.length/2) + ',auto)';
+    legEl.innerHTML = sorted.map(function(e, i) {
       var pct = total ? (Math.max(0,e[1])/total*100).toFixed(1) : '0.0';
       return '<div style="display:flex;align-items:center;gap:5px;padding:1px 0;min-width:0">'
         + '<div style="width:10px;height:10px;border-radius:2px;background:' + colors[i] + ';flex-shrink:0"></div>'
         + '<span style="color:var(--text);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0" title="' + e[0] + '">' + e[0] + '</span>'
         + '<span style="color:var(--text2);font-family:\'DM Mono\',monospace;font-size:11px;flex-shrink:0">' + pct + '%</span>'
         + '</div>';
-    }).join('');
+    }).join(''); }
   }
 
   // Donut par type
