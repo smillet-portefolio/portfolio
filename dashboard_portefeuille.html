@@ -5265,9 +5265,9 @@ function _csqTh(col,label,align){ return '<th onclick="csqSort(\''+col+'\')" dat
     '</div>'+
     '<div class="card" style="padding:18px;margin-bottom:22px"><p style="'+TP+'">Détail des fonds — modifiable</p>'+
       '<div style="overflow-x:auto"><table id="csq_fund_tbl"><thead><tr>'+
-        '<th>Fonds</th><th style="text-align:right">Nb de parts</th><th style="text-align:right">Valeur part</th><th style="text-align:right">Part moyenne</th><th style="text-align:right">Valeur actuelle fonds</th><th style="text-align:right">Valeur investie</th><th style="text-align:right">P&L %</th><th style="text-align:right">Valeur non investie</th><th style="text-align:right">Valeur totale</th>'+
+        '<th>Fonds</th><th style="text-align:right">Nb de parts</th><th style="text-align:right">Valeur part</th><th style="text-align:right">Valeur part moyenne</th><th style="text-align:right">Valeur investie</th><th style="text-align:right">Valeur actuelle fonds</th><th style="text-align:right">P&L %</th><th style="text-align:right">Valeur non investie</th><th style="text-align:right">Valeur totale</th>'+
       '</tr></thead><tbody id="csq_fund_body"></tbody></table></div>'+
-      '<p style="font-size:11px;color:var(--text2);margin-top:8px">Part moyenne = montant investi / nb de parts (prix de revient). Valeur actuelle = parts × valeur de part. Valeur totale = actuelle + non investie. Le nb de parts et la valeur investie viennent du détail par fond ; les champs jaunes sont modifiables.</p></div>'+
+      '<p style="font-size:11px;color:var(--text2);margin-top:8px">Valeur part moyenne = montant investi / nb de parts (prix de revient). Valeur actuelle = parts × valeur de part. Valeur totale = actuelle + non investie. Le nb de parts et la valeur investie viennent du détail par fond ; les champs jaunes sont modifiables.</p></div>'+
     '<h3 style="font-size:14px;font-weight:700;margin:0 0 10px">Performance par année</h3>'+
     '<div style="overflow-x:auto;margin-bottom:24px"><table id="csq_perf_tbl"><thead><tr>'+
       '<th>Année</th><th style="text-align:right">Investi (année)</th><th style="text-align:right">Investi cumulé</th><th style="text-align:right">Valeur</th><th style="text-align:right">Plus-value annuelle</th><th style="text-align:right">Plus-value cumulée</th><th style="text-align:right">Perf. cumulée</th><th style="text-align:right">Perf. annuelle</th>'+
@@ -5363,7 +5363,7 @@ function renderCsqDetail(){
   var nf4=function(x){return x.toLocaleString('fr',{minimumFractionDigits:4,maximumFractionDigits:4});};
   var cU={},cA={},grand=0; funds.forEach(function(f){cU[f]=0;cA[f]=0;});
   dates.forEach(function(dt){var d=byDate[dt];funds.forEach(function(f){if(d[f]){cU[f]+=d[f].u;cA[f]+=d[f].a;grand+=d[f].a;}});});
-  var totalRow='<tr class="csq-tot"><td>Total</td>'+funds.map(function(f){return '<td class="mono" style="text-align:right">'+nf2(cU[f])+'</td><td class="mono" style="text-align:right">'+(cU[f]?nf4(cA[f]/cU[f]):'—')+'</td><td class="mono" style="text-align:right">'+nf0(cA[f])+'</td>';}).join('')+'<td class="mono" style="text-align:right">'+nf0(grand)+'</td></tr>';
+  var totalRow='<tr class="csq-tot"><td>Total</td>'+funds.map(function(f){return '<td class="mono" style="text-align:right">'+nf2(cU[f])+'</td><td class="mono" style="text-align:right">'+(Math.abs(cU[f])>1e-4?nf4(cA[f]/cU[f]):'—')+'</td><td class="mono" style="text-align:right">'+nf0(cA[f])+'</td>';}).join('')+'<td class="mono" style="text-align:right">'+nf0(grand)+'</td></tr>';
   var dataHtml=dates.map(function(dt){
     var d=byDate[dt],rt=0;
     var cells=funds.map(function(f){
@@ -5488,12 +5488,12 @@ function csqFundDetail(){
       '<td class="mono" style="text-align:right">'+(f.qty!=null?f.qty.toLocaleString('fr',{maximumFractionDigits:2}):'—')+'</td>'+
       '<td style="text-align:right"><input type="number" step="0.0001" value="'+(f.nav!=null?f.nav:'')+'" onchange="csqSetNav('+i+',this.value)" style="'+inpS+'"><div style="font-size:9px;color:var(--text2);margin-top:2px">maj '+(f.navDate||'—')+'</div></td>'+
       '<td class="mono" style="text-align:right">'+nf4(avg)+'</td>'+
-      '<td class="mono" style="text-align:right">'+csqFmt(val)+' CZK</td>'+
       '<td class="mono" style="text-align:right">'+csqFmt(inv)+' CZK</td>'+
+      '<td class="mono" style="text-align:right">'+csqFmt(val)+' CZK</td>'+
       '<td class="mono" style="text-align:right;color:'+(pnlPct==null?'var(--text2)':pc(pnlPct))+'">'+(pnlPct!=null?((pnlPct>=0?'+':'')+pnlPct.toFixed(1).replace('.',',')+'%'):'—')+'</td>'+
       '<td style="text-align:right"><input type="number" step="1" value="'+(f.nonInvest||0)+'" onchange="csqSetNonInvest('+i+',this.value)" style="'+inpS+'"></td>'+
       '<td class="mono" style="text-align:right;font-weight:700">'+csqFmt(tot)+' CZK</td></tr>';
-  }).join('')+'<tr style="border-top:2px solid var(--border2);font-weight:700;background:var(--bg3)"><td colspan="4" style="text-align:right">Total</td><td class="mono" style="text-align:right">'+csqFmt(tA)+' CZK</td><td class="mono" style="text-align:right">'+csqFmt(tI)+' CZK</td><td class="mono" style="text-align:right;color:'+(tI?pc((tA-tI)/tI*100):'var(--text2)')+'">'+(tI?(((tA-tI)/tI*100>=0?'+':'')+((tA-tI)/tI*100).toFixed(1).replace('.',',')+'%'):'—')+'</td><td class="mono" style="text-align:right">'+csqFmt(tn)+' CZK</td><td class="mono" style="text-align:right">'+csqFmt(tt)+' CZK</td></tr>';
+  }).join('')+'<tr style="border-top:2px solid var(--border2);font-weight:700;background:var(--bg3)"><td colspan="4" style="text-align:right">Total</td><td class="mono" style="text-align:right">'+csqFmt(tI)+' CZK</td><td class="mono" style="text-align:right">'+csqFmt(tA)+' CZK</td><td class="mono" style="text-align:right;color:'+(tI?pc((tA-tI)/tI*100):'var(--text2)')+'">'+(tI?(((tA-tI)/tI*100>=0?'+':'')+((tA-tI)/tI*100).toFixed(1).replace('.',',')+'%'):'—')+'</td><td class="mono" style="text-align:right">'+csqFmt(tn)+' CZK</td><td class="mono" style="text-align:right">'+csqFmt(tt)+' CZK</td></tr>';
 }
 function renderConseqSection(){
   if(!CONSEQ_DATA) return;
@@ -5504,13 +5504,19 @@ function renderConseqSection(){
   var perf=totInv?gain/totInv*100:0;
   var fmt=csqFmt;
   var eurTxt=function(czk){return '≈ '+csqFmt(csqEur(czk))+' €';};
+  var ytdPerf=null;
+  if(years.length>=2){
+    var _ly=years[years.length-1], _py=years[years.length-2];
+    var _base=(_py.valueEnd||0)+(_ly.invested||0);
+    if(_base) ytdPerf=((valNow-(_py.valueEnd||0)-(_ly.invested||0))/_base)*100;
+  }
   var kel=document.getElementById('csq_kpis');
   if(kel){
     var cards=[
       {l:'Total investi',v:fmt(totInv)+' CZK',s:eurTxt(totInv),c:'var(--text)'},
       {l:'Valeur actuelle',v:fmt(valNow)+' CZK',s:eurTxt(valNow),c:'var(--text)'},
       {l:'Plus-value',v:(gain>=0?'+':'')+fmt(gain)+' CZK',s:eurTxt(gain),c:gain>=0?'#4caf82':'#e06c6c'},
-      {l:'Performance',v:(perf>=0?'+':'')+perf.toFixed(1).replace('.',',')+'%',s:"depuis l'origine",c:perf>=0?'#4caf82':'#e06c6c'}
+      {l:'Performance',v:(perf>=0?'+':'')+perf.toFixed(1).replace('.',',')+'% <span style="font-size:13px;color:'+(ytdPerf!=null?(ytdPerf>=0?'#4caf82':'#e06c6c'):'var(--text2)')+'">· YTD '+(ytdPerf!=null?((ytdPerf>=0?'+':'')+ytdPerf.toFixed(1).replace('.',',')+'%'):'—')+'</span>',s:"depuis l'origine",c:perf>=0?'#4caf82':'#e06c6c'}
     ];
     kel.innerHTML=cards.map(function(c){return '<div style="background:var(--bg2);border-radius:8px;padding:14px 16px;border:1px solid var(--border2)"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:6px">'+c.l+'</div><div style="font-size:19px;font-weight:700;color:'+c.c+'">'+c.v+'</div><div style="font-size:11px;color:var(--text2);margin-top:3px">'+c.s+'</div></div>';}).join('');
   }
