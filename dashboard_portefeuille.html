@@ -1906,7 +1906,14 @@ function renderDashboard() {
 
   const typeData = CATS.map(cat => {
     const inv = investedByCat[cat] || 0, val = valueByCat[cat] || 0;
-    return { label: cat, inv, val, pnl: val - inv, perf: inv > 0 ? (val - inv) / inv * 100 : null,
+    let perf = inv > 0 ? (val - inv) / inv * 100 : null;
+    if (cat === 'Obligations non cotées' && typeof OBLIG_DATA !== 'undefined') {
+      // Obligations : performance = intérêts reçus à ce jour / montant initialement investi
+      const _t = new Date().toISOString().slice(0,10); let _oi = 0, _on = 0;
+      OBLIG_DATA.forEach(p => { const fx = (typeof obFx === 'function') ? obFx(p) : 1; _oi += (p.montant||0)*fx; (p.echeancier||[]).forEach(e => { if (e.date <= _t) _on += (typeof echIntEur === 'function') ? echIntEur(p,e) : (e.interet||0); }); });
+      perf = _oi > 0 ? _on / _oi * 100 : null;
+    }
+    return { label: cat, inv, val, pnl: val - inv, perf: perf,
              ytd: periodPct(val, inv, catSuffixes(cat), YTD_CUT), mtd: periodPct(val, inv, catSuffixes(cat), MTD_CUT) };
   });
   // Par broker : regrouper "KB obligations" sous "KB"
@@ -5942,22 +5949,43 @@ function renderObligCharts(data) {
   // Créer le conteneur si absent
   var wrap = document.getElementById('obligChartsWrap');
   if (!wrap) {
+    var sec = document.getElementById('oblig');
+    if (!sec) return;
+    var _kpi = document.createElement('div');
+    _kpi.id = 'obligKpis';
+    _kpi.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:18px 0 12px';
     wrap = document.createElement('div');
     wrap.id = 'obligChartsWrap';
-    wrap.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;margin-top:28px;align-items:start';
-    var sec = document.getElementById('oblig');
-    if (sec) sec.appendChild(wrap);
-    else return;
+    wrap.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin:0 0 28px;align-items:start';
+    var _tbl = document.getElementById('obligTable');
+    var _tw = _tbl ? _tbl.parentElement : null;
+    if (_tw && _tw.parentElement === sec) { sec.insertBefore(_kpi, _tw); sec.insertBefore(wrap, _tw); }
+    else { sec.appendChild(_kpi); sec.appendChild(wrap); }
   }
+  (function(){
+    var _today = new Date().toISOString().slice(0,10);
+    var _ti=0,_int=0;
+    OBLIG_DATA.forEach(function(p){
+      var fx=(typeof obFx==='function')?obFx(p):1;
+      _ti += (p.montant||0)*fx;
+      (p.echeancier||[]).forEach(function(e){ if(e.date<=_today) _int += (typeof echIntEur==='function')?echIntEur(p,e):(e.interet||0); });
+    });
+    var _pf=_ti?_int/_ti*100:0;
+    var _ke=document.getElementById('obligKpis');
+    if(_ke){ var _f=function(n){return Math.round(n).toLocaleString('fr');};
+      _ke.innerHTML='<div class="card" style="padding:16px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:6px">Montant investi</div><div style="font-size:20px;font-weight:700">'+_f(_ti)+' €</div></div>'+
+        '<div class="card" style="padding:16px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:6px">Intérêts reçus</div><div style="font-size:20px;font-weight:700;color:#4caf82">'+_f(_int)+' €</div></div>'+
+        '<div class="card" style="padding:16px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:6px">Performance</div><div style="font-size:20px;font-weight:700;color:'+(_pf>=0?'#4caf82':'#e06c6c')+'">'+(_pf>=0?'+':'')+_pf.toFixed(1).replace(".",",")+' %</div></div>';
+    }
+  })();
 
   // Détruire anciens charts
-  ['obligChartProjet','obligChartType','obligChartBroker','obligChartBar'].forEach(function(id) {
+  ['obligChartType','obligChartBroker','obligChartBar'].forEach(function(id) {
     if (_obligCharts[id]) { try { _obligCharts[id].destroy(); } catch(e){} delete _obligCharts[id]; }
   });
 
   // Recréer les canvas (forcer les dimensions explicitement)
   wrap.innerHTML = ''
-    + '<div class="card" style="padding:20px"><h3 style="font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text2)">Valorisation par projet</h3><canvas id="obligChartProjet" width="300" height="220" style="max-height:220px"></canvas></div>'
     + '<div class="card" style="padding:20px"><h3 style="font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text2)">Valorisation par type</h3><canvas id="obligChartType" width="300" height="220" style="max-height:220px"></canvas></div>'
     + '<div class="card" style="padding:20px"><h3 style="font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text2)">Valorisation par broker</h3><canvas id="obligChartBroker" width="300" height="220" style="max-height:220px"></canvas></div>'
     + '<div class="card" style="padding:20px"><h3 style="font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text2)">&#201;ch&#233;ancier par ann&#233;e</h3><canvas id="obligChartBar" width="300" height="220" style="max-height:220px"></canvas></div>';
@@ -5966,16 +5994,6 @@ function renderObligCharts(data) {
 
   var PALETTE = ['#5a8dee','#4caf82','#f97316','#a78bfa','#f59e0b','#ec4899','#14b8a6','#84cc16','#e06c6c','#60a5fa'];
   var TYPE_COLORS = { 'Energie solaire':'#f59e0b','Energie eolienne':'#84cc16','Energie hydraulique':'#06b6d4','Biomasse / Biogaz':'#10b981','Renovation energetique':'#5a8dee','Immobilier':'#8b5cf6','Agriculture':'#d97706','Financement entreprise':'#f97316','Autre':'#6b7280' };
-
-  // Donut 1 — par projet (montant initial si montantInvesti est 0)
-  var projVals   = data.map(function(p){ return Math.max(0.01, p.montantInvesti||0) || Math.max(0.01, p.montant||0); });
-  var projTotal  = projVals.reduce(function(s,v){ return s+v; },0);
-  var c1 = document.getElementById('obligChartProjet');
-  if (c1) _obligCharts['obligChartProjet'] = new Chart(c1, {
-    type: 'doughnut',
-    data: { labels: data.map(function(p){ return p.nom; }), datasets: [{ data: projVals, backgroundColor: data.map(function(p,i){ return PALETTE[i%PALETTE.length]; }), borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }] },
-    options: { responsive: false, cutout: '60%', plugins: { legend: { display: true, position: 'bottom', labels: { color: '#8b95a8', font: { size: 10 }, boxWidth: 10, padding: 6 } }, tooltip: { callbacks: { label: function(c){ return ' '+Math.round(c.parsed).toLocaleString('fr')+' \u20ac'; } } } } }
-  });
 
   // Donut 2 — par type
   var typeMap = {};
