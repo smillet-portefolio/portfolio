@@ -4224,6 +4224,19 @@ async function gsAutoLoadOnConnect() {
   }
 }
 
+function gsApplyConseqNav(){
+  if (typeof CONSEQ_DATA === 'undefined' || !CONSEQ_DATA || !CONSEQ_DATA.funds || typeof CSQ_NAME2CODE === 'undefined') return;
+  var today = new Date().toISOString().slice(0,10), changed = false;
+  CONSEQ_DATA.funds.forEach(function(f){
+    var code = CSQ_NAME2CODE[f.name]; if (!code) return;
+    var info = CURRENT_PRICES['CONSEQ_' + code];
+    if (info && info.price > 0) { f.nav = info.price; f.navDate = today; changed = true; }
+  });
+  if (changed) {
+    if (typeof csqRecalc === 'function') csqRecalc();
+    if (typeof renderConseqSection === 'function' && document.getElementById('conseq')) renderConseqSection();
+  }
+}
 async function gsLoadPrices() {
   const status = document.getElementById('fetchStatus');
   if (!_gsToken) return;
@@ -4302,6 +4315,7 @@ async function gsLoadPrices() {
       CURRENT_PRICES[t] = { ...priceMap[t], source: 'gsheets' };
       if (varMap[t]) CURRENT_VARIATIONS[t] = varMap[t];
     });
+    if (typeof gsApplyConseqNav === 'function') gsApplyConseqNav();
 
     const portfolioTickers = [...new Set(BOOK2_ROWS.map(r => r.ticker))];
     let matched = 0, unmatched = [];
