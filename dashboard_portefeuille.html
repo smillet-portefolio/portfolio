@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard Portefeuille — Mai 2026</title>
+<title>Dashboard Financier</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiNmZmZkZjkiIHN0cm9rZT0iI2VkZTllMSIgc3Ryb2tlLXdpZHRoPSIyIi8+PHBhdGggZD0iTTExIDQ4IEwyMiAzMyBMMzEgMzkgTDQyIDIxIEw1MSAxMyBMNTEgNDggWiIgZmlsbD0iIzRjYWY4MjMzIi8+PHBvbHlsaW5lIHBvaW50cz0iMTEsNDggMjIsMzMgMzEsMzkgNDIsMjEgNTEsMTMiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzRjYWY4MiIgc3Ryb2tlLXdpZHRoPSIzLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxjaXJjbGUgY3g9IjUxIiBjeT0iMTMiIHI9IjQiIGZpbGw9IiM0Y2FmODIiLz48dGV4dCB4PSIxMSIgeT0iMjUiIGZpbGw9IiMyYzJhMjYiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiBmb250LXdlaWdodD0iNzAwIiBmb250LXNpemU9IjE4Ij4mIzgzNjQ7PC90ZXh0Pjwvc3ZnPg==">
 <script>
 (function(){
   if (localStorage.getItem("_data_v5")) return;
@@ -290,8 +291,7 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
 
 <div class="header">
   <div class="header-left">
-    <h1>Portefeuille Boursier</h1>
-    <p>Analyse complète avec look-through ETFs — Mai 2026</p>
+    <h1>Portefeuille Boursier &amp; Fond de Retraite</h1>
   </div>
   <div class="header-badge" id="headerBadge">142 965 € · 27 lignes</div>
 </div>
@@ -316,7 +316,6 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
     <button class="tab" onclick="sw('editeur',this)">✏️ Éditer</button>
     <button class="tab" onclick="sw('cash',this)">💰 Dépôts & Cash</button>
     <button class="tab" onclick="sw('dividend',this)">💸 Dividendes</button>
-    <button class="tab" onclick="sw('conseq',this)">🏦 Conseq Retraite</button>
     <button class="tab" onclick="sw('oblig',this)">📋 Obligations non cotées</button>
     <button class="tab" onclick="sw('clotures',this)">📤 Clôturées</button>
     <button class="tab" onclick="sw('actions',this)">Actions directes</button>
@@ -324,6 +323,7 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
     <button class="tab" onclick="sw('positions',this)">Positions</button>
     <button class="tab" onclick="sw('geo',this)">Géographie</button>
     <button class="tab" onclick="sw('sect',this)">Secteurs</button>
+    <button class="tab" onclick="sw('conseq',this)">🏦 Conseq Retraite</button>
   </div>
 
   <!-- ======== DASHBOARD ======== -->
@@ -5516,12 +5516,14 @@ function renderConseqSection(){
     var _base=(_py.valueEnd||0)+(_ly.invested||0);
     if(_base) ytdPerf=((valNow-(_py.valueEnd||0)-(_ly.invested||0))/_base)*100;
   }
-  var _prod=1,_nY=0,_pv=0;
+  // Performance annuelle moyenne = moyenne GEOMETRIQUE des rendements annuels.
+  // On n'inclut QUE les années complètes (l'année en cours, partielle, est exclue).
+  var _prod=1,_nY=0,_pv=0,_cy=new Date().getFullYear();
   years.forEach(function(y,i){
     var v=y.valueEnd; if(v==null) return;
     var _b=(i===0||!_pv)?(y.invested||0):(_pv+(y.invested||0));
-    var _r=_b?((v-_pv-(y.invested||0))/_b):null;
-    if(_r!=null){ _prod*=(1+_r); _nY++; }
+    var _r=_b?((v-_pv-(y.invested||0))/_b):null;       // rendement annuel pondéré par les flux
+    if(_r!=null && y.year<_cy){ _prod*=(1+_r); _nY++; } // année complète uniquement
     _pv=v;
   });
   var avgAnnPerf=_nY?(Math.pow(_prod,1/_nY)-1)*100:null;
@@ -5532,7 +5534,7 @@ function renderConseqSection(){
       {l:'Valeur actuelle',v:fmt(valNow)+' CZK',s:eurTxt(valNow),c:'var(--text)'},
       {l:'Plus-value',v:(gain>=0?'+':'')+fmt(gain)+' CZK',s:eurTxt(gain),c:gain>=0?'#4caf82':'#e06c6c'},
       {l:'Performance totale',v:(perf>=0?'+':'')+perf.toFixed(1).replace('.',',')+'%',s:"depuis l'origine",c:perf>=0?'#4caf82':'#e06c6c'},
-      {l:'Performance annuelle moyenne',v:(avgAnnPerf!=null?((avgAnnPerf>=0?'+':'')+avgAnnPerf.toFixed(1).replace('.',',')+'%'):'—'),s:'annualisée',c:avgAnnPerf!=null?(avgAnnPerf>=0?'#4caf82':'#e06c6c'):'var(--text2)'},
+      {l:'Performance annuelle moyenne',v:(avgAnnPerf!=null?((avgAnnPerf>=0?'+':'')+avgAnnPerf.toFixed(1).replace('.',',')+'%'):'—'),s:'annualisée · années complètes',c:avgAnnPerf!=null?(avgAnnPerf>=0?'#4caf82':'#e06c6c'):'var(--text2)'},
       {l:'Performance YTD',v:(ytdPerf!=null?((ytdPerf>=0?'+':'')+ytdPerf.toFixed(1).replace('.',',')+'%'):'—'),s:'année en cours',c:ytdPerf!=null?(ytdPerf>=0?'#4caf82':'#e06c6c'):'var(--text2)'}
     ];
     kel.innerHTML=cards.map(function(c){return '<div style="background:var(--bg2);border-radius:8px;padding:14px 16px;border:1px solid var(--border2)"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:6px">'+c.l+'</div><div style="font-size:19px;font-weight:700;color:'+c.c+'">'+c.v+'</div><div style="font-size:11px;color:var(--text2);margin-top:3px">'+c.s+'</div></div>';}).join('');
