@@ -4087,6 +4087,7 @@ function gsSignIn() {
     callback: (resp) => {
       if (resp.error) { gsSetMsg('❌ ' + resp.error, '#e06c6c'); return; }
       _gsToken = resp.access_token;
+      try { sessionStorage.setItem('_gs_token', _gsToken); } catch(_){}
       gsSetStatus('✅ Connecté à Google Sheets', '#4caf82');
       document.getElementById('syncLoginBtn').style.display = 'none';
       document.getElementById('syncSaveBtn').style.display  = '';
@@ -4594,17 +4595,24 @@ function mergeEvoRows() {
   // Une seule fois par jour, et uniquement pour les dates posterieures au seed
   // (l'historique <= EVO_SEED_MAXDATE est fige dans EVO_HISTORY).
   let rows = getEvoRows();
-  const yd = new Date(); yd.setDate(yd.getDate() - 1);
-  const yesterday = yd.toISOString().slice(0, 10);
+  // Nettoyer d'éventuelles lignes week-end (samedi/dimanche) créées à tort, postérieures au seed
+  const _dow = ds => { const a = String(ds).split('-'); return new Date(+a[0], (+a[1])-1, +a[2]).getDay(); };
+  const _cleaned = rows.filter(r => !(r.date > EVO_SEED_MAXDATE && (_dow(r.date) === 0 || _dow(r.date) === 6)));
+  if (_cleaned.length !== rows.length) { rows = _cleaned; saveEvoRows(rows); }
 
-  if (yesterday > EVO_SEED_MAXDATE &&
+  // Geler le DERNIER JOUR OUVRÉ avant aujourd'hui (on saute samedi/dimanche : marchés fermés)
+  const lbd = new Date();
+  do { lbd.setDate(lbd.getDate() - 1); } while (lbd.getDay() === 0 || lbd.getDay() === 6);
+  const lastBiz = lbd.toISOString().slice(0, 10);
+
+  if (lastBiz > EVO_SEED_MAXDATE &&
       Object.keys(CURRENT_PRICES).length > 0 &&
-      !rows.some(r => r.date === yesterday)) {
+      !rows.some(r => r.date === lastBiz)) {
     const snap = getTodayEvoRow();          // valeurs actuelles = Dashboard par broker
-    snap.date   = yesterday;
+    snap.date   = lastBiz;
     snap.live   = false;
     snap.frozen = true;
-    const before = rows.filter(r => r.date < yesterday)
+    const before = rows.filter(r => r.date < lastBiz)
                        .sort((a, b) => b.date.localeCompare(a.date))[0];
     snap.act_delta = before ? Math.round((snap.act_total - before.act_total) * 100) / 100 : null;
     rows = [...rows, snap];
@@ -8485,6 +8493,16 @@ const ETF_HOLDINGS_BACKUP = ETF_HOLDINGS.map(e => ({...e}));
 // Auto-restore saved prices on every page load
 window.addEventListener('load', () => {
   setTimeout(() => {
+    try {
+      var _gt = sessionStorage.getItem('_gs_token');
+      if (_gt) { _gsToken = _gt;
+        var _lb=document.getElementById('syncLoginBtn'), _sb=document.getElementById('syncSaveBtn'), _ldb=document.getElementById('syncLoadBtn');
+        if(_lb)_lb.style.display='none'; if(_sb)_sb.style.display=''; if(_ldb)_ldb.style.display='';
+        if(typeof gsSetStatus==='function') gsSetStatus('✅ Connecté à Google Sheets','#4caf82');
+        if(typeof gsLoadPrices==='function') gsLoadPrices();
+        if(typeof gsLoadETFComp==='function') gsLoadETFComp();
+      }
+    } catch(_){}
     try {
       const saved = localStorage.getItem('portfolio_prices');
       if (!saved) return;
