@@ -179,9 +179,6 @@
   /* ---- TABLE ---- */
   table { width: 100%; border-collapse: collapse; font-size: 12px; }
   th { text-align: left; padding: 8px 10px; font-size: 11px; font-weight: 500; color: var(--text2); border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: .4px; }
-  thead tr:first-child th { position: sticky; top: var(--head-h, 64px); z-index: 20; background: var(--bg2); box-shadow: inset 0 -1px 0 var(--border); }
-  #csq_evo_tbl thead th { top: 0; }
-  .csq-scroll1 thead th, .csq-scroll2 thead th { box-shadow: none; }
   td { padding: 8px 10px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
   tr:last-child td { border-bottom: none; }
   tr:hover td { background: rgba(255,255,255,0.02); }
@@ -8919,6 +8916,5 @@ window.addEventListener('load', () => {
   document.head.appendChild(s);
 })();
 </script>
-<script>(function(){function sh(){var x=document.querySelector('.header');if(x)document.documentElement.style.setProperty('--head-h',x.offsetHeight+'px');}window.addEventListener('load',sh);window.addEventListener('resize',sh);document.addEventListener('DOMContentLoaded',sh);setTimeout(sh,250);setTimeout(sh,1000);})();</script>
 </body>
 </html>
