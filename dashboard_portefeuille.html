@@ -5944,7 +5944,7 @@ function renderObligCharts(data) {
   if (!wrap) {
     wrap = document.createElement('div');
     wrap.id = 'obligChartsWrap';
-    wrap.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-top:28px;align-items:start';
+    wrap.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;margin-top:28px;align-items:start';
     var sec = document.getElementById('oblig');
     if (sec) sec.appendChild(wrap);
     else return;
@@ -5960,7 +5960,7 @@ function renderObligCharts(data) {
     + '<div class="card" style="padding:20px"><h3 style="font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text2)">Valorisation par projet</h3><canvas id="obligChartProjet" width="300" height="220" style="max-height:220px"></canvas></div>'
     + '<div class="card" style="padding:20px"><h3 style="font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text2)">Valorisation par type</h3><canvas id="obligChartType" width="300" height="220" style="max-height:220px"></canvas></div>'
     + '<div class="card" style="padding:20px"><h3 style="font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text2)">Valorisation par broker</h3><canvas id="obligChartBroker" width="300" height="220" style="max-height:220px"></canvas></div>'
-    + '<div class="card" style="padding:20px;grid-column:1/-1"><h3 style="font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text2)">&#201;ch&#233;ancier par ann&#233;e</h3><canvas id="obligChartBar" width="600" height="220" style="max-height:220px"></canvas></div>';
+    + '<div class="card" style="padding:20px"><h3 style="font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text2)">&#201;ch&#233;ancier par ann&#233;e</h3><canvas id="obligChartBar" width="300" height="220" style="max-height:220px"></canvas></div>';
 
   if (data.length === 0) { wrap.innerHTML = '<p style="color:var(--text2);font-size:12px;padding:20px">Aucun projet.</p>'; return; }
 
@@ -5974,7 +5974,7 @@ function renderObligCharts(data) {
   if (c1) _obligCharts['obligChartProjet'] = new Chart(c1, {
     type: 'doughnut',
     data: { labels: data.map(function(p){ return p.nom; }), datasets: [{ data: projVals, backgroundColor: data.map(function(p,i){ return PALETTE[i%PALETTE.length]; }), borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }] },
-    options: { responsive: false, cutout: '60%', plugins: { legend: { display: true, position: 'right', labels: { color: '#8b95a8', font: { size: 10 }, boxWidth: 10, padding: 6 } }, tooltip: { callbacks: { label: function(c){ return ' '+Math.round(c.parsed).toLocaleString('fr')+' \u20ac'; } } } } }
+    options: { responsive: false, cutout: '60%', plugins: { legend: { display: true, position: 'bottom', labels: { color: '#8b95a8', font: { size: 10 }, boxWidth: 10, padding: 6 } }, tooltip: { callbacks: { label: function(c){ return ' '+Math.round(c.parsed).toLocaleString('fr')+' \u20ac'; } } } } }
   });
 
   // Donut 2 — par type
@@ -5985,7 +5985,7 @@ function renderObligCharts(data) {
   if (c2) _obligCharts['obligChartType'] = new Chart(c2, {
     type: 'doughnut',
     data: { labels: tEntries.map(function(e){ return e[0]; }), datasets: [{ data: tEntries.map(function(e){ return e[1]; }), backgroundColor: tEntries.map(function(e){ return TYPE_COLORS[e[0]]||'#6b7280'; }), borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }] },
-    options: { responsive: false, cutout: '60%', plugins: { legend: { display: true, position: 'right', labels: { color: '#8b95a8', font: { size: 10 }, boxWidth: 10, padding: 6 } }, tooltip: { callbacks: { label: function(c){ return ' '+Math.round(c.parsed).toLocaleString('fr')+' \u20ac'; } } } } }
+    options: { responsive: false, cutout: '60%', plugins: { legend: { display: true, position: 'bottom', labels: { color: '#8b95a8', font: { size: 10 }, boxWidth: 10, padding: 6 } }, tooltip: { callbacks: { label: function(c){ return ' '+Math.round(c.parsed).toLocaleString('fr')+' \u20ac'; } } } } }
   });
 
   // Donut 3 — par broker (plateforme)
@@ -5996,7 +5996,7 @@ function renderObligCharts(data) {
   if (c4) _obligCharts['obligChartBroker'] = new Chart(c4, {
     type: 'doughnut',
     data: { labels: bEntries.map(function(e){ return e[0]; }), datasets: [{ data: bEntries.map(function(e){ return e[1]; }), backgroundColor: bEntries.map(function(e,i){ return (typeof PLAT_COLORS!=='undefined' && PLAT_COLORS[e[0]]) || PALETTE[i%PALETTE.length]; }), borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }] },
-    options: { responsive: false, cutout: '60%', plugins: { legend: { display: true, position: 'right', labels: { color: '#8b95a8', font: { size: 10 }, boxWidth: 10, padding: 6 } }, tooltip: { callbacks: { label: function(c){ return ' '+Math.round(c.parsed).toLocaleString('fr')+' \u20ac'; } } } } }
+    options: { responsive: false, cutout: '60%', plugins: { legend: { display: true, position: 'bottom', labels: { color: '#8b95a8', font: { size: 10 }, boxWidth: 10, padding: 6 } }, tooltip: { callbacks: { label: function(c){ return ' '+Math.round(c.parsed).toLocaleString('fr')+' \u20ac'; } } } } }
   });
 
   // Bar chart — toutes années
