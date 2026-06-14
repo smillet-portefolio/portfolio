@@ -5261,7 +5261,7 @@ function _csqTh(col,label,align){ return '<th onclick="csqSort(\''+col+'\')" dat
     '<p class="section-desc" style="margin-bottom:16px">Épargne retraite Conseq (DPS) — montants en CZK. Cotisations employeur, participant et allocations de l\'État.</p>'+
     '<div class="sub-tabs" style="margin-bottom:16px"><button class="sub-tab active" data-v="main" onclick="csqSwitchView(\'main\')">Vue d\'ensemble</button><button class="sub-tab" data-v="hist" onclick="csqSwitchView(\'hist\')">Historique des versements</button><button class="sub-tab" data-v="funds" onclick="csqSwitchView(\'funds\')">Détail par fond</button></div>'+
     '<div id="csq_view_main">'+
-    '<div id="csq_kpis" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px"></div>'+
+    '<div id="csq_kpis" style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:18px"></div>'+
     '<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:20px;margin-bottom:22px">'+
       '<div class="card" style="padding:18px"><p style="'+TP+'">Évolution par année</p><div class="chart-wrap" style="height:300px"><canvas id="csq_evo"></canvas></div></div>'+
       '<div class="card" style="padding:18px"><p style="'+TP+'">Répartition par fonds</p><div style="display:flex;flex-direction:column;align-items:center;gap:14px"><canvas id="csq_funds" width="200" height="200"></canvas><div id="csq_funds_leg" style="width:100%"></div></div></div>'+
@@ -5464,11 +5464,14 @@ function csqEvoChart(){
   var labels=years.map(function(y){return String(y.year);});
   var cum=0; var cumInv=years.map(function(y){cum+=(y.invested||0);return Math.round(cum);});
   var vals=years.map(function(y){return y.valueEnd!=null?Math.round(y.valueEnd):null;});
+  var pv=0; var pvAnn=years.map(function(y){ var v=y.valueEnd; if(v==null) return null; var r=Math.round((v-pv)-(y.invested||0)); pv=v; return r; });
+  var barCols=pvAnn.map(function(x){return x==null?'rgba(0,0,0,0)':(x>=0?'rgba(76,175,130,0.55)':'rgba(224,108,108,0.6)');});
   if(window._csqEvoChart){try{window._csqEvoChart.destroy();}catch(e){}}
-  window._csqEvoChart=new Chart(cv.getContext('2d'),{type:'line',data:{labels:labels,datasets:[
-    {label:'Valeur',data:vals,borderColor:'#4caf82',backgroundColor:'rgba(76,175,130,0.12)',fill:true,tension:0.25,borderWidth:2,pointRadius:3,spanGaps:true},
-    {label:'Investi cumulé',data:cumInv,borderColor:'#5a8dee',backgroundColor:'transparent',borderDash:[5,4],fill:false,tension:0.25,borderWidth:2,pointRadius:3}
-  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{color:'#8b95a8',font:{size:12},boxWidth:14,usePointStyle:true}},tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+csqFmt(c.parsed.y)+' CZK';}}}},scales:{y:{ticks:{callback:function(v){return (v/1e6).toFixed(1)+'M';},color:'#8b95a8'},grid:{color:'rgba(0,0,0,0.05)'}},x:{grid:{display:false},ticks:{color:'#8b95a8'}}}}});
+  window._csqEvoChart=new Chart(cv.getContext('2d'),{type:'bar',data:{labels:labels,datasets:[
+    {type:'bar',label:'Plus-value annuelle',data:pvAnn,backgroundColor:barCols,yAxisID:'y1',borderRadius:4,order:3,categoryPercentage:0.55,barPercentage:0.8},
+    {type:'line',label:'Valeur',data:vals,borderColor:'#4caf82',backgroundColor:'rgba(76,175,130,0.12)',fill:true,tension:0.25,borderWidth:2,pointRadius:3,spanGaps:true,yAxisID:'y',order:1},
+    {type:'line',label:'Investi cumulé',data:cumInv,borderColor:'#5a8dee',backgroundColor:'transparent',borderDash:[5,4],fill:false,tension:0.25,borderWidth:2,pointRadius:3,yAxisID:'y',order:2}
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{color:'#8b95a8',font:{size:12},boxWidth:14,usePointStyle:true}},tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+csqFmt(c.parsed.y)+' CZK';}}}},scales:{y:{position:'left',ticks:{callback:function(v){return (v/1e6).toFixed(1)+'M';},color:'#8b95a8'},grid:{color:'rgba(0,0,0,0.05)'}},y1:{position:'right',grid:{display:false},ticks:{callback:function(v){return (v/1e3).toFixed(0)+'k';},color:'#8b95a8'},title:{display:true,text:'Plus-value annuelle',color:'#8b95a8',font:{size:10}}},x:{grid:{display:false},ticks:{color:'#8b95a8'}}}}});
 }
 
 function csqFundDetail(){
@@ -5513,6 +5516,15 @@ function renderConseqSection(){
     var _base=(_py.valueEnd||0)+(_ly.invested||0);
     if(_base) ytdPerf=((valNow-(_py.valueEnd||0)-(_ly.invested||0))/_base)*100;
   }
+  var _prod=1,_nY=0,_pv=0;
+  years.forEach(function(y,i){
+    var v=y.valueEnd; if(v==null) return;
+    var _b=(i===0||!_pv)?(y.invested||0):(_pv+(y.invested||0));
+    var _r=_b?((v-_pv-(y.invested||0))/_b):null;
+    if(_r!=null){ _prod*=(1+_r); _nY++; }
+    _pv=v;
+  });
+  var avgAnnPerf=_nY?(Math.pow(_prod,1/_nY)-1)*100:null;
   var kel=document.getElementById('csq_kpis');
   if(kel){
     var cards=[
@@ -5520,6 +5532,7 @@ function renderConseqSection(){
       {l:'Valeur actuelle',v:fmt(valNow)+' CZK',s:eurTxt(valNow),c:'var(--text)'},
       {l:'Plus-value',v:(gain>=0?'+':'')+fmt(gain)+' CZK',s:eurTxt(gain),c:gain>=0?'#4caf82':'#e06c6c'},
       {l:'Performance totale',v:(perf>=0?'+':'')+perf.toFixed(1).replace('.',',')+'%',s:"depuis l'origine",c:perf>=0?'#4caf82':'#e06c6c'},
+      {l:'Performance annuelle moyenne',v:(avgAnnPerf!=null?((avgAnnPerf>=0?'+':'')+avgAnnPerf.toFixed(1).replace('.',',')+'%'):'—'),s:'annualisée',c:avgAnnPerf!=null?(avgAnnPerf>=0?'#4caf82':'#e06c6c'):'var(--text2)'},
       {l:'Performance YTD',v:(ytdPerf!=null?((ytdPerf>=0?'+':'')+ytdPerf.toFixed(1).replace('.',',')+'%'):'—'),s:'année en cours',c:ytdPerf!=null?(ytdPerf>=0?'#4caf82':'#e06c6c'):'var(--text2)'}
     ];
     kel.innerHTML=cards.map(function(c){return '<div style="background:var(--bg2);border-radius:8px;padding:14px 16px;border:1px solid var(--border2)"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:6px">'+c.l+'</div><div style="font-size:19px;font-weight:700;color:'+c.c+'">'+c.v+'</div><div style="font-size:11px;color:var(--text2);margin-top:3px">'+c.s+'</div></div>';}).join('');
