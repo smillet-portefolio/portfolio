@@ -1910,7 +1910,7 @@ function renderDashboard() {
     if (cat === 'Obligations non cotées' && typeof OBLIG_DATA !== 'undefined') {
       // Obligations : performance = intérêts reçus à ce jour / montant initialement investi
       const _t = new Date().toISOString().slice(0,10); let _oi = 0, _on = 0;
-      OBLIG_DATA.forEach(p => { const fx = (typeof obFx === 'function') ? obFx(p) : 1; _oi += (p.montant||0)*fx; (p.echeancier||[]).forEach(e => { if (e.date <= _t) _on += (typeof echIntEur === 'function') ? echIntEur(p,e) : (e.interet||0); }); });
+      OBLIG_DATA.forEach(p => { _oi += (p.montant||0); (p.echeancier||[]).forEach(e => { if (e.date <= _t) _on += (typeof echIntEur === 'function') ? echIntEur(p,e) : (e.interet||0); }); });
       perf = _oi > 0 ? _on / _oi * 100 : null;
     }
     return { label: cat, inv, val, pnl: val - inv, perf: perf,
@@ -5966,14 +5966,13 @@ function renderObligCharts(data) {
     var _today = new Date().toISOString().slice(0,10);
     var _ti=0,_int=0;
     OBLIG_DATA.forEach(function(p){
-      var fx=(typeof obFx==='function')?obFx(p):1;
-      _ti += (p.montant||0)*fx;
+      _ti += (p.montant||0);
       (p.echeancier||[]).forEach(function(e){ if(e.date<=_today) _int += (typeof echIntEur==='function')?echIntEur(p,e):(e.interet||0); });
     });
     var _pf=_ti?_int/_ti*100:0;
     var _ke=document.getElementById('obligKpis');
     if(_ke){ var _f=function(n){return Math.round(n).toLocaleString('fr');};
-      _ke.innerHTML='<div class="card" style="padding:16px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:6px">Montant investi</div><div style="font-size:20px;font-weight:700">'+_f(_ti)+' €</div></div>'+
+      _ke.innerHTML='<div class="card" style="padding:16px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:6px">Montant initial investi</div><div style="font-size:20px;font-weight:700">'+_f(_ti)+' €</div></div>'+
         '<div class="card" style="padding:16px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:6px">Intérêts reçus</div><div style="font-size:20px;font-weight:700;color:#4caf82">'+_f(_int)+' €</div></div>'+
         '<div class="card" style="padding:16px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:6px">Performance</div><div style="font-size:20px;font-weight:700;color:'+(_pf>=0?'#4caf82':'#e06c6c')+'">'+(_pf>=0?'+':'')+_pf.toFixed(1).replace(".",",")+' %</div></div>';
     }
@@ -5988,7 +5987,7 @@ function renderObligCharts(data) {
   wrap.innerHTML = ''
     + '<div class="card" style="padding:20px"><h3 style="font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text2)">Valorisation par type</h3><canvas id="obligChartType" width="300" height="220" style="max-height:220px"></canvas></div>'
     + '<div class="card" style="padding:20px"><h3 style="font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text2)">Valorisation par broker</h3><canvas id="obligChartBroker" width="300" height="220" style="max-height:220px"></canvas></div>'
-    + '<div class="card" style="padding:20px"><h3 style="font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text2)">&#201;ch&#233;ancier par ann&#233;e</h3><canvas id="obligChartBar" width="300" height="220" style="max-height:220px"></canvas></div>';
+    + '<div class="card" style="padding:20px"><h3 style="font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text2)">&#201;ch&#233;ancier par ann&#233;e</h3><div style="position:relative;width:100%;height:240px"><canvas id="obligChartBar"></canvas></div></div>';
 
   if (data.length === 0) { wrap.innerHTML = '<p style="color:var(--text2);font-size:12px;padding:20px">Aucun projet.</p>'; return; }
 
@@ -6029,7 +6028,7 @@ function renderObligCharts(data) {
       { label: 'Int\u00e9r\u00eats', data: yrs.map(function(y){ return Math.round(intByYr[y]); }), backgroundColor: 'rgba(52,211,153,0.8)', stack: 's', borderRadius: 3 },
       { label: 'Capital',   data: yrs.map(function(y){ return Math.round(capByYr[y]);  }), backgroundColor: 'rgba(6,95,70,0.9)',   stack: 's', borderRadius: 3 }
     ]},
-    options: { responsive: false, plugins: { legend: { display: true, position: 'bottom', labels: { color: '#8b95a8', font: { size: 11 }, boxWidth: 12 } }, tooltip: { callbacks: { label: function(c){ return ' '+c.dataset.label+' : '+Math.round(c.parsed.y).toLocaleString('fr')+' \u20ac'; } } } }, scales: { x: { stacked: true, ticks: { color:'#8b95a8', font:{size:10} }, grid:{color:'rgba(255,255,255,0.04)'}, border:{display:false} }, y: { stacked: true, ticks: { color:'#8b95a8', font:{size:10}, callback: function(v){ return v.toLocaleString('fr'); } }, grid:{color:'rgba(255,255,255,0.04)'}, border:{display:false} } } }
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'bottom', labels: { color: '#8b95a8', font: { size: 11 }, boxWidth: 12 } }, tooltip: { callbacks: { label: function(c){ return ' '+c.dataset.label+' : '+Math.round(c.parsed.y).toLocaleString('fr')+' \u20ac'; } } } }, scales: { x: { stacked: true, ticks: { color:'#8b95a8', font:{size:10} }, grid:{color:'rgba(255,255,255,0.04)'}, border:{display:false} }, y: { stacked: true, ticks: { color:'#8b95a8', font:{size:10}, callback: function(v){ return v.toLocaleString('fr'); } }, grid:{color:'rgba(255,255,255,0.04)'}, border:{display:false} } } }
   });
 }
 // ── Create and inject clotures section into the DOM ──────────────────────────
