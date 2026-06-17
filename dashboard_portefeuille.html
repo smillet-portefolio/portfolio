@@ -4534,11 +4534,13 @@ function getEvoRows() {
   //  - valeur actuelle KB pour 15/06 = 72547 €, 16/06 = 72554 €
   const KBFIX_INV = { '2026-06-12': 65011, '2026-06-15': 65011, '2026-06-16': 65011 };
   const KBFIX_ACT = { '2026-06-12': 72527, '2026-06-15': 72547, '2026-06-16': 72554 };
+  const XTBFIX_ACT = { '2026-06-15': 15702 };
   let _kbCh = false;
   rows.forEach(r => {
     if (!r) return;
     if (KBFIX_INV[r.date] != null && r.inv_kb !== KBFIX_INV[r.date]) { r.inv_kb = KBFIX_INV[r.date]; _kbCh = true; }
     if (KBFIX_ACT[r.date] != null && r.act_kb !== KBFIX_ACT[r.date]) { r.act_kb = KBFIX_ACT[r.date]; _kbCh = true; }
+    if (XTBFIX_ACT[r.date] != null && r.act_xtb !== XTBFIX_ACT[r.date]) { r.act_xtb = XTBFIX_ACT[r.date]; _kbCh = true; }
   });
   // Reconcilier les lignes GELEES : total = somme exacte des 11 colonnes par broker
   const _BRK = ['kb','lumo','lendo','enerfip','linxea','saxo','ibkr','t212','xtb','ledger','binance'];
