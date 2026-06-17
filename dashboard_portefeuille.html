@@ -1172,6 +1172,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (added) localStorage.setItem('closed_positions', JSON.stringify(arr));
   } catch(e) {}
 
+  // 2c. Recalcul force de la ligne du 17/06/2026 (une seule fois) : on la retire
+  //     du stockage pour que mergeEvoRows la recree "live" avec les valeurs actuelles.
+  try {
+    if (!localStorage.getItem('evo_recalc_20260617')) {
+      let _rr = JSON.parse(localStorage.getItem('evo_history') || '[]');
+      _rr = _rr.filter(r => r && r.date !== '2026-06-17');
+      localStorage.setItem('evo_history', JSON.stringify(_rr));
+      localStorage.setItem('evo_recalc_20260617', '1');
+    }
+  } catch(e) {}
+
   // 3. Restaurer ETF_COMP_OVERRIDE depuis localStorage
   try {
     const saved = localStorage.getItem('etf_comp_override');
@@ -4568,7 +4579,7 @@ function getTodayEvoRow() {
   (typeof OBLIG_DATA !== 'undefined' ? OBLIG_DATA : []).forEach(p => {
     const recuCap = (p.echeancier || []).filter(e => e.date <= today).reduce((s,e) => s + echCapEur(p, e), 0);
     const cap = (p.montant || 0) - recuCap;
-    const b = p.plateforme || '—';
+    const b = normBroker(p.plateforme || '—');   // KB obligations -> KB (capital restant)
     pfByBroker[b] = (pfByBroker[b] || 0) + cap;
   });
 
