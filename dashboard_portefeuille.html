@@ -4540,6 +4540,15 @@ function getEvoRows() {
     if (KBFIX_INV[r.date] != null && r.inv_kb !== KBFIX_INV[r.date]) { r.inv_kb = KBFIX_INV[r.date]; _kbCh = true; }
     if (KBFIX_ACT[r.date] != null && r.act_kb !== KBFIX_ACT[r.date]) { r.act_kb = KBFIX_ACT[r.date]; _kbCh = true; }
   });
+  // Reconcilier les lignes GELEES : total = somme exacte des 11 colonnes par broker
+  const _BRK = ['kb','lumo','lendo','enerfip','linxea','saxo','ibkr','t212','xtb','ledger','binance'];
+  rows.forEach(r => {
+    if (!r || !r.frozen) return;
+    const _at = _BRK.reduce((s,k) => s + (r['act_'+k] || 0), 0);
+    const _it = _BRK.reduce((s,k) => s + (r['inv_'+k] || 0), 0);
+    if (Math.round(_at) !== Math.round(r.act_total || 0)) { r.act_total = _at; _kbCh = true; }
+    if (Math.round(_it) !== Math.round(r.inv_total || 0)) { r.inv_total = _it; _kbCh = true; }
+  });
   if (_kbCh) { try { localStorage.setItem('evo_history', JSON.stringify(rows)); } catch(e) {} }
   return rows;
 }
