@@ -4512,11 +4512,18 @@ async function gsLoadETFComp() {
 function getEvoRows() {
   // Re-applique le seed Excel si la copie stockee est obsolete (idempotent)
   try { applyEvoSeed(); } catch(e) {}
+  let rows = null;
   try {
     const saved = localStorage.getItem('evo_history');
-    if (saved) return JSON.parse(saved);
+    if (saved) rows = JSON.parse(saved);
   } catch(e) {}
-  return EVO_HISTORY || [];
+  if (!rows) rows = EVO_HISTORY || [];
+  // Correction manuelle : investi KB pour 12/15/16-06-2026 = 65011 € (inclut KB obligations)
+  const KBFIX = { '2026-06-12': 65011, '2026-06-15': 65011, '2026-06-16': 65011 };
+  let _kbCh = false;
+  rows.forEach(r => { if (r && KBFIX[r.date] != null && r.inv_kb !== KBFIX[r.date]) { r.inv_kb = KBFIX[r.date]; _kbCh = true; } });
+  if (_kbCh) { try { localStorage.setItem('evo_history', JSON.stringify(rows)); } catch(e) {} }
+  return rows;
 }
 
 function saveEvoRows(rows) {
@@ -4528,6 +4535,7 @@ function getTodayEvoRow() {
   const today = new Date().toISOString().slice(0,10);
 
   const normBroker = b => {
+    if (b && String(b).toUpperCase().startsWith('KB')) return 'KB';  // KB + "KB obligations" -> KB (meme logique que le tableau par broker)
     const map = { 'ledger':'Ledger','LEDGER':'Ledger','binance':'Binance','BINANCE':'Binance','trading 212':'TRADING 212' };
     return map[b] || b;
   };
@@ -4554,7 +4562,8 @@ function getTodayEvoRow() {
   });
   Object.entries((typeof CASH_DATA !== 'undefined' && CASH_DATA.cash) || {}).forEach(([b, c]) => {
     const cashEur = (c.EUR || 0) + toEur(c.USD || 0, 'USD') + toEur(c.CZK || 0, 'CZK');
-    pfByBroker[b] = (pfByBroker[b] || 0) + cashEur;
+    const bn = normBroker(b);
+    pfByBroker[bn] = (pfByBroker[bn] || 0) + cashEur;
   });
   (typeof OBLIG_DATA !== 'undefined' ? OBLIG_DATA : []).forEach(p => {
     const recuCap = (p.echeancier || []).filter(e => e.date <= today).reduce((s,e) => s + echCapEur(p, e), 0);
@@ -4604,33 +4613,25 @@ function freezeYesterdayIfNeeded(rows) {
 }
 
 function mergeEvoRows() {
-  // Gel automatique : a chaque ouverture, on fige la VEILLE avec le snapshot
-  // courant du portefeuille (memes valeurs "par broker" que l'onglet Dashboard).
-  // Une seule fois par jour, et uniquement pour les dates posterieures au seed
-  // (l'historique <= EVO_SEED_MAXDATE est fige dans EVO_HISTORY).
+  // Plus de gel automatique. Chaque matin (1re ouverture du jour) on crée une
+  // nouvelle ligne LIVE pour aujourd'hui ; tant qu'elle n'est pas gelée
+  // manuellement (bouton « Geler »), elle est rafraîchie à chaque affichage avec
+  // les valeurs courantes (mêmes valeurs « par broker » que l'onglet Dashboard).
   let rows = getEvoRows();
-  // Nettoyer d'éventuelles lignes week-end (samedi/dimanche) créées à tort, postérieures au seed
-  const _dow = ds => { const a = String(ds).split('-'); return new Date(+a[0], (+a[1])-1, +a[2]).getDay(); };
-  const _cleaned = rows.filter(r => !(r.date > EVO_SEED_MAXDATE && (_dow(r.date) === 0 || _dow(r.date) === 6)));
-  if (_cleaned.length !== rows.length) { rows = _cleaned; saveEvoRows(rows); }
-
-  // Geler le DERNIER JOUR OUVRÉ avant aujourd'hui (on saute samedi/dimanche : marchés fermés)
-  const lbd = new Date();
-  do { lbd.setDate(lbd.getDate() - 1); } while (lbd.getDay() === 0 || lbd.getDay() === 6);
-  const lastBiz = lbd.toISOString().slice(0, 10);
-
-  if (lastBiz > EVO_SEED_MAXDATE &&
-      Object.keys(CURRENT_PRICES).length > 0 &&
-      !rows.some(r => r.date === lastBiz)) {
+  const today = new Date().toISOString().slice(0, 10);
+  const idx = rows.findIndex(r => r.date === today);
+  if (Object.keys(CURRENT_PRICES).length > 0 || idx !== -1) {
     const snap = getTodayEvoRow();          // valeurs actuelles = Dashboard par broker
-    snap.date   = lastBiz;
-    snap.live   = false;
-    snap.frozen = true;
-    const before = rows.filter(r => r.date < lastBiz)
+    const before = rows.filter(r => r.date < today)
                        .sort((a, b) => b.date.localeCompare(a.date))[0];
     snap.act_delta = before ? Math.round((snap.act_total - before.act_total) * 100) / 100 : null;
-    rows = [...rows, snap];
-    saveEvoRows(rows);
+    if (idx === -1) {
+      rows = [...rows, snap];               // nouvelle ligne du matin
+      saveEvoRows(rows);
+    } else if (!rows[idx].frozen) {
+      rows[idx] = snap;                      // rafraîchir la ligne live non gelée
+      saveEvoRows(rows);
+    }
   }
   return rows.sort((a, b) => b.date.localeCompare(a.date));
 }
@@ -4845,9 +4846,9 @@ function _renderEvoContent(rows, period) {
       const pnl = (r.act_total||0) - (r.inv_total||0);
       const pnlPct = r.inv_total > 0 ? pnl / r.inv_total : 0;
       const bg = i % 2 === 0 ? 'var(--bg)' : 'var(--bg2)';
-      const statusBadge = r.live
-        ? `<span style="background:rgba(90,141,238,0.2);color:#60a5fa;padding:2px 7px;border-radius:10px;font-size:10px">🔴 Live</span>`
-        : `<span style="background:rgba(100,100,100,0.2);color:var(--text2);padding:2px 7px;border-radius:10px;font-size:10px">❄️ Gelé</span>`;
+      const statusBadge = r.frozen
+        ? `<span style="background:rgba(100,100,100,0.2);color:var(--text2);padding:2px 7px;border-radius:10px;font-size:10px">❄️ Gelé</span>`
+        : `<span style="background:rgba(90,141,238,0.2);color:#60a5fa;padding:2px 7px;border-radius:10px;font-size:10px">🔴 Live</span><button onclick="evoFreezeRow('${r.date}')" style="margin-left:7px;padding:2px 9px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);border-radius:8px;font-size:10px;cursor:pointer">❄️ Geler</button>`;
       return `<tr style="background:${bg}">
         <td style="padding:6px 10px;font-weight:600">${r.date}</td>
         <td style="padding:6px 8px;text-align:right;font-family:'DM Mono',monospace">${fmtE(r.act_total)}</td>
@@ -4888,6 +4889,25 @@ function setEvoGran(gran, btn) {
   window._evoGran = gran;
   document.querySelectorAll('.evo-gran-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
+  _renderEvoContent(mergeEvoRows(), window._evoPeriod || 'all');
+}
+
+function evoFreezeRow(date) {
+  // Gel manuel d'une ligne : verrouille les valeurs affichées (snapshot).
+  const rows = getEvoRows();
+  const i = rows.findIndex(r => r.date === date);
+  if (i < 0) return;
+  const today = new Date().toISOString().slice(0, 10);
+  if (date === today && !rows[i].frozen) {
+    const snap = getTodayEvoRow();          // fige avec les valeurs courantes
+    const before = rows.filter(r => r.date < today).sort((a, b) => b.date.localeCompare(a.date))[0];
+    snap.act_delta = before ? Math.round((snap.act_total - before.act_total) * 100) / 100 : null;
+    snap.frozen = true; snap.live = false;
+    rows[i] = snap;
+  } else {
+    rows[i] = { ...rows[i], frozen: true, live: false };
+  }
+  saveEvoRows(rows);
   _renderEvoContent(mergeEvoRows(), window._evoPeriod || 'all');
 }
 
