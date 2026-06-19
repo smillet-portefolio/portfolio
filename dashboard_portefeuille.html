@@ -179,6 +179,7 @@
   /* ---- TABLE ---- */
   table { width: 100%; border-collapse: collapse; font-size: 12px; }
   th { text-align: left; padding: 8px 10px; font-size: 11px; font-weight: 500; color: var(--text2); border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: .4px; }
+  #evoTable thead th { position: sticky; top: 0; z-index: 5; background: var(--bg3); box-shadow: inset 0 -1px 0 var(--border2); }
   td { padding: 8px 10px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
   tr:last-child td { border-bottom: none; }
   tr:hover td { background: rgba(255,255,255,0.02); }
@@ -4703,12 +4704,12 @@ function renderEvolution() {
         <div style="font-size:13px;font-weight:600;margin-bottom:12px">Delta quotidien (€) — hors dépôts / retraits</div>
         <div style="position:relative;height:160px"><canvas id="evoDeltaChart"></canvas></div>
       </div>
-      <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);padding:16px;overflow-x:auto">
+      <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);padding:16px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
           <span style="font-size:13px;font-weight:600">Historique quotidien</span>
           <span id="evo_status" style="font-size:11px;color:var(--text2)"></span>
         </div>
-        <table style="border-collapse:collapse;font-size:11px;width:100%;min-width:1650px">
+        <div style="max-height:70vh;overflow:auto"><table id="evoTable" style="border-collapse:collapse;font-size:11px;width:100%;min-width:1650px">
           <thead>
             <tr style="background:var(--bg3)">
               <th style="padding:7px 10px;text-align:left;border-bottom:2px solid var(--border2);min-width:90px">Date</th>
@@ -4732,7 +4733,7 @@ function renderEvolution() {
             </tr>
           </thead>
           <tbody id="evoTableBody"></tbody>
-        </table>
+        </table></div>
       </div>`;
   }
 
