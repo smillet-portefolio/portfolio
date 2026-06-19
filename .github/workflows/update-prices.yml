@@ -2,15 +2,16 @@ name: Update prix Google Sheets (2x/jour)
 
 # À placer dans le repo sous : .github/workflows/update-prices.yml
 #
-# GitHub cron = UTC sans heure d'été. Pour viser EXACTEMENT 06:00 et 18:00 à Prague
-# toute l'année, on programme les 4 horaires UTC possibles (été CEST=UTC+2,
-# hiver CET=UTC+1) puis un "garde" ne laisse passer que si l'heure réelle de
-# Prague est 06h (matin) ou 18h (soir) ; les 2 doublons du jour sont ignorés.
-#   04:00 UTC = 06:00 Prague (été)   | 05:00 UTC = 06:00 Prague (hiver)
-#   16:00 UTC = 18:00 Prague (été)   | 17:00 UTC = 18:00 Prague (hiver)
+# GitHub cron = UTC, sans heure d'été, et "best effort" (souvent retardé).
+# On programme 4 horaires UTC (couvrant été CEST=UTC+2 et hiver CET=UTC+1),
+# à la minute 17 pour éviter la congestion du "pile à l'heure". Un garde
+# classe ensuite par demi-journée (Prague) : matin = créer/live, soir = geler.
+# Robuste aux retards : toute exécution déclenchée s'exécute (idempotent).
+#   04:17 / 05:17 UTC -> matin Prague (06:17 été / 05:17-06:17 hiver)
+#   16:17 / 17:17 UTC -> soir  Prague (18:17 été / 17:17-18:17 hiver)
 
 on:
-  workflow_dispatch:            # exécution manuelle
+  workflow_dispatch:
     inputs:
       mode:
         description: "Mode (exécution manuelle)"
@@ -18,16 +19,16 @@ on:
         options: [morning, evening]
         default: morning
   schedule:
-    - cron: '0 4 * * *'
-    - cron: '0 5 * * *'
-    - cron: '0 16 * * *'
-    - cron: '0 17 * * *'
+    - cron: '17 4 * * *'
+    - cron: '17 5 * * *'
+    - cron: '17 16 * * *'
+    - cron: '17 17 * * *'
 
 jobs:
   update:
     runs-on: ubuntu-latest
     steps:
-      - name: Garde horaire (Prague) + mode
+      - name: Garde + mode (heure de Prague)
         id: guard
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -37,13 +38,11 @@ jobs:
           else
             H=$(TZ=Europe/Prague date +%H)
             echo "Heure Prague : ${H}h"
-            if [ "$H" = "06" ]; then
-              echo "proceed=true"  >> "$GITHUB_OUTPUT"; echo "mode=morning" >> "$GITHUB_OUTPUT"
-            elif [ "$H" = "18" ]; then
-              echo "proceed=true"  >> "$GITHUB_OUTPUT"; echo "mode=evening" >> "$GITHUB_OUTPUT"
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+            if [ "$H" -lt 12 ]; then
+              echo "mode=morning" >> "$GITHUB_OUTPUT"; echo "-> matin (créer / live)"
             else
-              echo "proceed=false" >> "$GITHUB_OUTPUT"
-              echo "Hors créneau (doublon heure d'été/hiver) — exécution ignorée."
+              echo "mode=evening" >> "$GITHUB_OUTPUT"; echo "-> soir (mettre à jour + geler)"
             fi
           fi
 
@@ -61,7 +60,7 @@ jobs:
         if: steps.guard.outputs.proceed == 'true'
         run: pip install yfinance pandas requests google-auth google-api-python-client
 
-      - name: Mise à jour des prix (matin ET soir)
+      - name: Mise à jour des prix
         if: steps.guard.outputs.proceed == 'true'
         env:
           GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
@@ -72,6 +71,5 @@ jobs:
         if: steps.guard.outputs.proceed == 'true'
         env:
           GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
-          RUN_MODE: ${{ steps.guard.outputs.mode }}   # "morning" (live) ou "evening" (gel)
-          # DRY_RUN: '1'   # décommente pour tester sans écrire dans le Sheet
+          RUN_MODE: ${{ steps.guard.outputs.mode }}
         run: python update_evolution_gsheet.py
