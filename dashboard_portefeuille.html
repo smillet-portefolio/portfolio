@@ -3394,8 +3394,10 @@ function openNewLineModal() {
       if (match) {
         const ticker = document.getElementById('nl_ticker');
         const type   = document.getElementById('nl_type');
+        const isin   = document.getElementById('nl_isin');
         if (ticker && !ticker.value) ticker.value = match.ticker || '';
         if (type   && !type.value)   type.value   = match.typeInv || '';
+        if (isin   && !isin.value)   isin.value   = (match.isin || '').toUpperCase();
       }
     };
   }
