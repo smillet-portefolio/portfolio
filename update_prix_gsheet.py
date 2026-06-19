@@ -214,8 +214,9 @@ def collecter_prix():
         print(f"  OK {devise}/CZK -> {val}")
 
     print("\n--- Crypto Binance ---")
-    btc = prix_binance("BTCEUR")
-    eth = prix_binance("ETHEUR")
+    # Binance bloque les IP de GitHub (erreur 451) -> repli sur Yahoo Finance.
+    btc = prix_binance("BTCEUR") or prix_yahoo("BTC-EUR")
+    eth = prix_binance("ETHEUR") or prix_yahoo("ETH-EUR")
     print(f"  {'OK' if btc else 'KO'} Bitcoin  -> {btc}")
     print(f"  {'OK' if eth else 'KO'} Ethereum -> {eth}")
 
