@@ -2,15 +2,17 @@ name: Update prix Google Sheets (2x/jour)
 
 # À placer dans le repo sous : .github/workflows/update-prices.yml
 #
-# GitHub cron = UTC, sans heure d'été, et "best effort" (souvent retardé).
-# On programme 4 horaires UTC (couvrant été CEST=UTC+2 et hiver CET=UTC+1),
-# à la minute 17 pour éviter la congestion du "pile à l'heure". Un garde
-# classe ensuite par demi-journée (Prague) : matin = créer/live, soir = geler.
-# Robuste aux retards : toute exécution déclenchée s'exécute (idempotent).
-#   04:17 / 05:17 UTC -> matin Prague (06:17 été / 05:17-06:17 hiver)
-#   16:17 / 17:17 UTC -> soir  Prague (18:17 été / 17:17-18:17 hiver)
+# Déclencheurs :
+#   1) repository_dispatch (PRINCIPAL) : appelé par cron-job.org à 06:00 et 18:00
+#      heure de Prague (fuseau géré par cron-job.org -> DST automatique, à l'heure pile).
+#      event_type = "morning" ou "evening".
+#   2) schedule (SECOURS) : crons UTC, au cas où l'appel externe échoue. Garde par
+#      demi-journée (Prague). Idempotent : un double déclenchement est sans effet néfaste.
+#   3) workflow_dispatch : lancement manuel (menu mode).
 
 on:
+  repository_dispatch:
+    types: [morning, evening]
   workflow_dispatch:
     inputs:
       mode:
@@ -28,22 +30,22 @@ jobs:
   update:
     runs-on: ubuntu-latest
     steps:
-      - name: Garde + mode (heure de Prague)
+      - name: Garde + mode
         id: guard
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          EV="${{ github.event_name }}"
+          echo "proceed=true" >> "$GITHUB_OUTPUT"
+          if [ "$EV" = "workflow_dispatch" ]; then
             echo "mode=${{ github.event.inputs.mode }}" >> "$GITHUB_OUTPUT"
-            echo "Exécution manuelle — mode=${{ github.event.inputs.mode }}"
+            echo "Manuel — ${{ github.event.inputs.mode }}"
+          elif [ "$EV" = "repository_dispatch" ]; then
+            ACT="${{ github.event.action }}"
+            if [ "$ACT" = "evening" ]; then echo "mode=evening" >> "$GITHUB_OUTPUT"; else echo "mode=morning" >> "$GITHUB_OUTPUT"; fi
+            echo "Externe (cron-job.org) — $ACT"
           else
             H=$(TZ=Europe/Prague date +%H)
-            echo "Heure Prague : ${H}h"
-            echo "proceed=true" >> "$GITHUB_OUTPUT"
-            if [ "$H" -lt 12 ]; then
-              echo "mode=morning" >> "$GITHUB_OUTPUT"; echo "-> matin (créer / live)"
-            else
-              echo "mode=evening" >> "$GITHUB_OUTPUT"; echo "-> soir (mettre à jour + geler)"
-            fi
+            echo "Planifié — Prague ${H}h"
+            if [ "$H" -lt 12 ]; then echo "mode=morning" >> "$GITHUB_OUTPUT"; else echo "mode=evening" >> "$GITHUB_OUTPUT"; fi
           fi
 
       - name: Checkout
