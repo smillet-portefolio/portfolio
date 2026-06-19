@@ -1,50 +1,77 @@
 name: Update prix Google Sheets (2x/jour)
 
-# À placer dans le repo GitHub sous :  .github/workflows/update-prices.yml
-# Cron en UTC. Heure de Prague : été (CEST) = UTC+2, hiver (CET) = UTC+1.
-#   - 04:00 UTC = 06:00 Prague (été)  /  05:00 Prague (hiver)
-#   - 16:00 UTC = 18:00 Prague (été)  /  17:00 Prague (hiver)
-# (décalage d'1 h en hiver ; dis-moi si tu veux un calage exact toute l'année)
+# À placer dans le repo sous : .github/workflows/update-prices.yml
+#
+# GitHub cron = UTC sans heure d'été. Pour viser EXACTEMENT 06:00 et 18:00 à Prague
+# toute l'année, on programme les 4 horaires UTC possibles (été CEST=UTC+2,
+# hiver CET=UTC+1) puis un "garde" ne laisse passer que si l'heure réelle de
+# Prague est 06h (matin) ou 18h (soir) ; les 2 doublons du jour sont ignorés.
+#   04:00 UTC = 06:00 Prague (été)   | 05:00 UTC = 06:00 Prague (hiver)
+#   16:00 UTC = 18:00 Prague (été)   | 17:00 UTC = 18:00 Prague (hiver)
 
 on:
-  workflow_dispatch:           # déclenchement manuel (app GitHub mobile)
+  workflow_dispatch:            # exécution manuelle
+    inputs:
+      mode:
+        description: "Mode (exécution manuelle)"
+        type: choice
+        options: [morning, evening]
+        default: morning
   schedule:
-    - cron: '0 4 * * *'        # matin  ~06:00 Prague — prix (+ ligne évolution si activée plus tard)
-    - cron: '0 16 * * *'       # soir   ~18:00 Prague — prix
+    - cron: '0 4 * * *'
+    - cron: '0 5 * * *'
+    - cron: '0 16 * * *'
+    - cron: '0 17 * * *'
 
 jobs:
   update:
     runs-on: ubuntu-latest
     steps:
+      - name: Garde horaire (Prague) + mode
+        id: guard
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+            echo "mode=${{ github.event.inputs.mode }}" >> "$GITHUB_OUTPUT"
+            echo "Exécution manuelle — mode=${{ github.event.inputs.mode }}"
+          else
+            H=$(TZ=Europe/Prague date +%H)
+            echo "Heure Prague : ${H}h"
+            if [ "$H" = "06" ]; then
+              echo "proceed=true"  >> "$GITHUB_OUTPUT"; echo "mode=morning" >> "$GITHUB_OUTPUT"
+            elif [ "$H" = "18" ]; then
+              echo "proceed=true"  >> "$GITHUB_OUTPUT"; echo "mode=evening" >> "$GITHUB_OUTPUT"
+            else
+              echo "proceed=false" >> "$GITHUB_OUTPUT"
+              echo "Hors créneau (doublon heure d'été/hiver) — exécution ignorée."
+            fi
+          fi
+
       - name: Checkout
+        if: steps.guard.outputs.proceed == 'true'
         uses: actions/checkout@v4
 
       - name: Python
+        if: steps.guard.outputs.proceed == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: Install dependencies
+        if: steps.guard.outputs.proceed == 'true'
         run: pip install yfinance pandas requests google-auth google-api-python-client
 
-      - name: Déterminer le mode (matin / soir)
-        id: mode
-        run: |
-          if [ "${{ github.event.schedule }}" = "0 16 * * *" ]; then
-            echo "mode=evening" >> "$GITHUB_OUTPUT"
-          else
-            echo "mode=morning" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Mise à jour des prix (matin ET soir)
+        if: steps.guard.outputs.proceed == 'true'
         env:
           GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
-          RUN_MODE: ${{ steps.mode.outputs.mode }}   # "morning" ou "evening"
+          RUN_MODE: ${{ steps.guard.outputs.mode }}
         run: python update_prix_gsheet.py
 
       - name: Ligne Évolution (matin = créer/live · soir = mettre à jour + geler)
+        if: steps.guard.outputs.proceed == 'true'
         env:
           GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
-          RUN_MODE: ${{ steps.mode.outputs.mode }}   # "morning" (live) ou "evening" (gel)
+          RUN_MODE: ${{ steps.guard.outputs.mode }}   # "morning" (live) ou "evening" (gel)
           # DRY_RUN: '1'   # décommente pour tester sans écrire dans le Sheet
         run: python update_evolution_gsheet.py
