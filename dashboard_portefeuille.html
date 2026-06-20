@@ -594,19 +594,8 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
       <div>
         <p style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Look-through ETFs</p>
         <p class="section-desc" style="margin-bottom:10px">Top holdings réels des ETFs, triés par valeur exposée</p>
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+        <div id="ltFilterBtns" style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
           <button class="filter-btn active" onclick="filterLT('all',this)">Tous</button>
-          <button class="filter-btn" onclick="filterLT('XDWD',this)">MSCI World</button>
-          <button class="filter-btn" onclick="filterLT('EMXC',this)">EM ex-CN</button>
-          <button class="filter-btn" onclick="filterLT('I500',this)">S&P500</button>
-          <button class="filter-btn" onclick="filterLT('IQQH',this)">Clean</button>
-          <button class="filter-btn" onclick="filterLT('JEDI',this)">Space</button>
-          <button class="filter-btn" onclick="filterLT('HYDE',this)">H₂</button>
-          <button class="filter-btn" onclick="filterLT('VGWE',this)">Div</button>
-          <button class="filter-btn" onclick="filterLT('NUKL',this)">Nuclear</button>
-          <button class="filter-btn" onclick="filterLT('LSMC',this)">Semis</button>
-        <button class="filter-btn" onclick="filterLT('D5BI',this)">Mexico</button>
-        <button class="filter-btn" onclick="filterLT('MTPI',this)">ex-Chine</button>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;font-size:11px" id="ltChartLegend"></div>
         <div id="ltChartWrap" style="position:relative;width:100%;height:3200px">
@@ -2240,7 +2229,7 @@ const LT_ETF_COLORS = {
   'XDWD.DE':'#5a8dee','EMXC.DE':'#9b87d4','I500.DE':'#5bbfcc',
   'IQQH.DE':'#4caf82','JEDI.DE':'#e8a838','HYDE.DE':'#e891b8',
   'VGWE.DE':'#5ec9a4','NUKL.DE':'#f0956e','LSMC.DE':'#7c7ed4',
-  'MTPI.PA':'#b8a8e0','D5BI.DE':'#5ec5c0'
+  'MTPI.PA':'#b8a8e0','D5BI.DE':'#5ec5c0','Q8Y0.DE':'#22c55e','MWRE.DE':'#2563eb'
 };
 // Mapping short → ticker complet
 const LT_SHORT_TO_TICKER = {
@@ -2259,7 +2248,7 @@ function buildLTData(filter) {
   const allTickers = Object.keys(ETF_META);
   const tickers = filter === 'all'
     ? allTickers
-    : [LT_SHORT_TO_TICKER[filter]].filter(Boolean);
+    : [LT_SHORT_TO_TICKER[filter] || filter].filter(t => ETF_META[t]);
 
   // Agréger : { "NVIDIA Corp." : { valEur, ticker (plus gros contributeur) } }
   const posMap = {};
@@ -2289,6 +2278,7 @@ function renderLTChart(filter) {
   const wrap = document.getElementById('ltChartWrap');
   const leg  = document.getElementById('ltChartLegend');
   if (!wrap) return;
+  renderLTFilters();
 
   const hasComp = Object.keys(ETF_META).some(t => (ETF_COMP_OVERRIDE[t]?.positionsAll || ETF_META[t]?.positions || []).length > 0);
   const hasVal  = Object.keys(_compValMap).length > 0;
@@ -2313,7 +2303,7 @@ function renderLTChart(filter) {
   if (leg) {
     const tickers = filter === 'all'
       ? Object.keys(ETF_META).filter(t => _compValMap[t] > 0)
-      : [LT_SHORT_TO_TICKER[filter]].filter(t => t && _compValMap[t] > 0);
+      : [LT_SHORT_TO_TICKER[filter] || filter].filter(t => t && _compValMap[t] > 0);
     leg.innerHTML = tickers.map(t => {
       const meta = ETF_META[t] || {};
       return `<span style="display:inline-flex;align-items:center;gap:4px">
@@ -2328,9 +2318,21 @@ function renderLTChart(filter) {
   ltChartInstance = makeBar('ltChart', data, tot || 1);
 }
 
+function renderLTFilters() {
+  const box = document.getElementById('ltFilterBtns');
+  if (!box) return;
+  const held = Object.keys(ETF_META)
+    .filter(t => (_compValMap[t] || 0) > 0)
+    .sort((a, b) => (_compValMap[b] || 0) - (_compValMap[a] || 0));
+  const active = window._ltFilter || 'all';
+  box.innerHTML = `<button class="filter-btn${active === 'all' ? ' active' : ''}" onclick="filterLT('all',this)">Tous</button>`
+    + held.map(t => {
+        const meta = ETF_META[t] || {};
+        return `<button class="filter-btn${active === t ? ' active' : ''}" onclick="filterLT('${t}',this)">${meta.short || t}</button>`;
+      }).join('');
+}
 function filterLT(id, btn) {
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
+  window._ltFilter = id;
   renderLTChart(id);
 }
 
