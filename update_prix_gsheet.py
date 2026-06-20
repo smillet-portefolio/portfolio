@@ -213,6 +213,8 @@ def fmt_var(v):
 YS_OVERRIDE = {t: y for (t, n, c, y) in TICKERS if t != y}
 # Tickers internes "non actions" (crypto / FX) gérés en statique
 STATIC_TICKS = {"BTC/EUR", "ETH/EUR", "EUR/CZK", "USD/CZK", "GBP/CZK"}
+# Produits à prix MANUEL (épargne / structurés) — non cotés sur Yahoo, on les saute
+SKIP_TICKS = {"CASH3.5"}
 
 
 def _get_creds():
@@ -288,9 +290,13 @@ def tickers_portefeuille():
         tk = (r.get("ticker") or "").strip()
         if not tk or tk in STATIC_TICKS:
             continue
+        if tk.upper() in SKIP_TICKS:
+            continue
         br = (r.get("broker") or "").strip().lower()
         ty = (r.get("typeInv") or "").strip().lower()
         if br in CRYPTO_BROKERS or "crypto" in ty:
+            continue
+        if re.search(r"structur|épargn|epargn|livret", ty):  # produits prix manuel
             continue
         if tk not in seen:
             seen[tk] = (r.get("name") or tk)
