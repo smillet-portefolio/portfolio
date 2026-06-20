@@ -4591,16 +4591,17 @@ function getEvoRows() {
   // valeur actuelle = cours de clôture quotidiens (EMXC.DE / Q8Y0.DE / MWRE.DE, EUR).
   const JITO_INV = 8198.4;
   const JITO_ACT = {'2026-05-04':8109.88,'2026-05-05':8258.08,'2026-05-06':8354.94,'2026-05-07':8334.28,'2026-05-08':8337.79,'2026-05-11':8443.41,'2026-05-12':8262.17,'2026-05-13':8454.28,'2026-05-14':8544.49,'2026-05-15':8433.28,'2026-05-18':8352.03,'2026-05-19':8270.55,'2026-05-20':8415.53,'2026-05-21':8490.89,'2026-05-22':8623.03,'2026-05-25':8742.33,'2026-05-26':8743.32,'2026-05-27':8765.86,'2026-05-28':8808.45,'2026-05-29':8831.89,'2026-06-01':8868.57,'2026-06-02':8942.67,'2026-06-03':8889.57,'2026-06-04':8795.9,'2026-06-05':8598.99,'2026-06-08':8521.8,'2026-06-09':8376.92,'2026-06-10':8295.21,'2026-06-11':8366.42,'2026-06-12':8581.14,'2026-06-15':8698.27,'2026-06-16':8688.03,'2026-06-17':8710.22,'2026-06-18':8810.61,'2026-06-19':8828.17};
+  const _JBRK = ['kb','lumo','lendo','enerfip','linxea','saxo','ibkr','t212','jito','xtb','ledger','binance'];
   rows.forEach(r => {
     if (!r || JITO_ACT[r.date] == null) return;
-    const _na = JITO_ACT[r.date], _ni = JITO_INV, _oa = r.act_jito || 0, _oi = r.inv_jito || 0;
-    if (_oa !== _na || _oi !== _ni) {
-      r.act_total = (r.act_total || 0) - _oa + _na;   // intègre JITO au total actuel
-      r.inv_total = (r.inv_total || 0) - _oi + _ni;   // intègre le dépôt JITO à l'investi
-      r.act_jito = _na; r.inv_jito = _ni;
-      r.perf_total = r.inv_total > 0 ? (r.act_total - r.inv_total) / r.inv_total : 0;
-      _kbCh = true;
-    }
+    r.act_jito = JITO_ACT[r.date];
+    r.inv_jito = JITO_INV;
+    // totaux recalculés = somme de toutes les colonnes par broker (JITO inclus)
+    const _ta = _JBRK.reduce((s,k) => s + (r['act_'+k] || 0), 0);
+    const _ti = _JBRK.reduce((s,k) => s + (r['inv_'+k] || 0), 0);
+    if (Math.round(_ta) !== Math.round(r.act_total||0) || Math.round(_ti) !== Math.round(r.inv_total||0)) _kbCh = true;
+    r.act_total = _ta; r.inv_total = _ti;
+    r.perf_total = r.inv_total > 0 ? (r.act_total - r.inv_total) / r.inv_total : 0;
   });
   // Reconcilier les lignes GELEES : total = somme exacte des 11 colonnes par broker
   const _BRK = ['kb','lumo','lendo','enerfip','linxea','saxo','ibkr','t212','jito','xtb','ledger','binance'];
