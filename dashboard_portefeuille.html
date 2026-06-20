@@ -4300,10 +4300,10 @@ async function gsLoadETFComp() {
     if (top10Raw.length > 1) {
       const posHeaders = top10Raw[0];
       const posData    = top10Raw.slice(1);
-      const SKIP_NAMES = new Set(['others','actual value','']);
+      const SKIP_NAMES = new Set(['others','actual value','','ticker','ticker alternatif','isin','nom','position']);
       posHeaders.slice(1).forEach((isin, colIdx) => {
         if (!isin) return;
-        const ticker = ETF_ISIN_MAP[isin];
+        const ticker = ETF_ISIN_MAP[isin] || (typeof ETF_META!=='undefined' && ETF_META[isin] ? isin : null);
         if (!ticker) return;
         const all = posData
           .filter(r => r[0] && !SKIP_NAMES.has(String(r[0]).toLowerCase().trim())
@@ -7755,9 +7755,9 @@ function importETFComposition(file) {
       // Positions — store ALL values + top3
       posISINs.forEach((isin, colIdx) => {
         if (!isin) return;
-        const ticker = ETF_ISIN_MAP[isin];
+        const ticker = ETF_ISIN_MAP[isin] || (typeof ETF_META!=='undefined' && ETF_META[isin] ? isin : null);
         if (!ticker) return;
-        const SKIP_NAMES = new Set(['others','actual value','']);
+        const SKIP_NAMES = new Set(['others','actual value','','ticker','ticker alternatif','isin','nom','position']);
         const all = posData
           .filter(r => r[0] && !SKIP_NAMES.has(String(r[0]).toLowerCase().trim())
                     && r[colIdx+1] != null && parseFloat(String(r[colIdx+1]).replace(",",".")) > 0)
