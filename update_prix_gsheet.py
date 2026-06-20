@@ -209,6 +209,94 @@ def fmt_var(v):
     return repr(v)
 
 
+# Symbole Yahoo quand le ticker interne diffère du symbole Yahoo (ex. Q8Y0 -> Q8Y0.DE)
+YS_OVERRIDE = {t: y for (t, n, c, y) in TICKERS if t != y}
+# Tickers internes "non actions" (crypto / FX) gérés en statique
+STATIC_TICKS = {"BTC/EUR", "ETH/EUR", "EUR/CZK", "USD/CZK", "GBP/CZK"}
+
+
+def _get_creds():
+    SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+    sa_env = os.environ.get("GOOGLE_SERVICE_ACCOUNT")
+    if sa_env:
+        return service_account.Credentials.from_service_account_info(json.loads(sa_env), scopes=SCOPES)
+    return service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+
+
+def lire_holdings_sheet():
+    """Lit les positions actuelles depuis l'onglet Data (clé book2_all_rows)."""
+    if not GOOGLE_OK:
+        return None
+    try:
+        svc = build("sheets", "v4", credentials=_get_creds()).spreadsheets()
+        res = svc.values().get(spreadsheetId=SHEET_ID, range="Data!A:Z").execute()
+        data = {}
+        for r in (res.get("values", []) or []):
+            if r and r[0]:
+                data[r[0]] = "".join(r[1:])   # recoller les morceaux (chunks 45000)
+        raw = data.get("book2_all_rows")
+        if not raw:
+            return None
+        rows = json.loads(raw)
+        return rows if isinstance(rows, list) else None
+    except Exception as e:
+        print(f"  [Data] lecture portefeuille impossible : {e}")
+        return None
+
+
+def prix_devise_yahoo(ticker):
+    """Retourne (prix, devise) depuis Yahoo (devise = monnaie de cotation réelle)."""
+    try:
+        t = yf.Ticker(ticker)
+        fi = t.fast_info
+        cur = None
+        try:
+            cur = fi.currency
+        except Exception:
+            cur = None
+        prix = None
+        try:
+            lp = fi.last_price
+            if lp and lp > 0:
+                prix = float(lp)
+        except Exception:
+            pass
+        if prix is None:
+            info = t.info
+            p = info.get("currentPrice") or info.get("regularMarketPrice")
+            prix = float(p) if p else None
+            if not cur:
+                cur = info.get("currency")
+        return prix, cur
+    except Exception as e:
+        print(f"  [Yahoo {ticker}] {e}")
+        return None, None
+
+
+def tickers_portefeuille():
+    """Liste DYNAMIQUE [(ticker, nom)] des actions/ETF détenus (hors crypto/FX).
+    Source : positions actuelles du dashboard (book2_all_rows). Les titres vendus
+    n'y figurant plus sont automatiquement exclus. Renvoie None si indisponible."""
+    hold = lire_holdings_sheet()
+    if not hold:
+        return None
+    CRYPTO_BROKERS = {"ledger", "binance"}
+    seen = {}
+    for r in hold:
+        if not isinstance(r, dict):
+            continue
+        tk = (r.get("ticker") or "").strip()
+        if not tk or tk in STATIC_TICKS:
+            continue
+        br = (r.get("broker") or "").strip().lower()
+        ty = (r.get("typeInv") or "").strip().lower()
+        if br in CRYPTO_BROKERS or "crypto" in ty:
+            continue
+        if tk not in seen:
+            seen[tk] = (r.get("name") or tk)
+    return [(tk, nm) for tk, nm in seen.items()]
+
+
 def collecter_prix():
     print("\n--- Taux CNB ---")
     cnb = taux_cnb()
@@ -222,36 +310,41 @@ def collecter_prix():
     print(f"  {'OK' if btc else 'KO'} Bitcoin  -> {btc}")
     print(f"  {'OK' if eth else 'KO'} Ethereum -> {eth}")
 
-    print("\n--- Actions / ETFs / Variations ---")
     maintenant = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     header = ["Ticker", "Nom", "price last closure", "currency", "Last Update"] + VAR_KEYS
     rows = [header]
 
-    for ticker, nom, currency, ysym in TICKERS:
-        if ticker == "BTC/EUR":
-            prix = btc
-        elif ticker == "ETH/EUR":
-            prix = eth
-        elif ticker == "EUR/CZK":
-            prix = cnb.get("EUR")
-        elif ticker == "USD/CZK":
-            prix = cnb.get("USD")
-        elif ticker == "GBP/CZK":
-            prix = cnb.get("GBP")
-        else:
-            prix = prix_yahoo(ticker)
-
-        # Variations calculées depuis l'historique Yahoo (relatif → source fiable)
+    # --- Crypto + FX : STATIQUES (comme aujourd'hui) -------------------------
+    STAT = [
+        ("BTC/EUR", "Bitcoin",                   btc,          "EUR", "BTC-EUR"),
+        ("ETH/EUR", "Ethereum",                  eth,          "EUR", "ETH-EUR"),
+        ("EUR/CZK", "Euro / Couronne tchèque",   cnb.get("EUR"), "CZK", "EURCZK=X"),
+        ("USD/CZK", "Dollar / Couronne tchèque", cnb.get("USD"), "CZK", "USDCZK=X"),
+        ("GBP/CZK", "Livre / Couronne tchèque",  cnb.get("GBP"), "CZK", "GBPCZK=X"),
+    ]
+    print("\n--- Crypto / FX (statique) ---")
+    for tick, nom, prix, cur, ysym in STAT:
         var = variations_yahoo(ysym)
-        var_str = "  ".join(f"{k}:{var[k]}" for k in VAR_KEYS)
-        status = "OK" if prix else "KO"
-        print(f"  {status} {nom:<40s} ({ticker}) -> {prix}  |  {var_str}")
+        print(f"  {'OK' if prix else 'KO'} {nom:<40s} ({tick}) -> {prix}")
+        rows.append([tick, nom, fmt_prix(prix), cur, maintenant if prix else ""]
+                    + [fmt_var(var[k]) for k in VAR_KEYS])
 
-        # Prix stocké comme STRING pour éviter l'arrondi Google Sheets
-        rows.append(
-            [ticker, nom, fmt_prix(prix), currency, maintenant if prix else ""]
-            + [fmt_var(var[k]) for k in VAR_KEYS]
-        )
+    # --- Actions / ETF : liste DYNAMIQUE depuis le portefeuille --------------
+    dyn = tickers_portefeuille()
+    if dyn is None:
+        print("\n--- Actions/ETF : portefeuille indisponible -> liste statique de secours ---")
+        dyn = [(t, n) for (t, n, c, y) in TICKERS if t not in STATIC_TICKS]
+    else:
+        print(f"\n--- Actions / ETFs du portefeuille ({len(dyn)} tickers, DYNAMIQUE) ---")
+    for tick, nom in sorted(dyn, key=lambda x: x[0]):
+        ysym = YS_OVERRIDE.get(tick, tick)          # symbole Yahoo (suffixe .DE/.PA…)
+        prix, cur = prix_devise_yahoo(ysym)
+        if not cur:
+            cur = "EUR"
+        var = variations_yahoo(ysym)
+        print(f"  {'OK' if prix else 'KO'} {str(nom)[:40]:<40s} ({tick}) -> {prix} [{cur}]")
+        rows.append([tick, nom, fmt_prix(prix), cur, maintenant if prix else ""]
+                    + [fmt_var(var[k]) for k in VAR_KEYS])
 
     print("\n--- Conseq (fonds retraite) ---")
     for tick, nom, slug in CONSEQ_FUNDS:
