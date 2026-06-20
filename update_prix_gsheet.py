@@ -236,11 +236,17 @@ def lire_holdings_sheet():
         for r in (res.get("values", []) or []):
             if r and r[0]:
                 data[r[0]] = "".join(r[1:])   # recoller les morceaux (chunks 45000)
-        raw = data.get("book2_all_rows")
-        if not raw:
-            return None
-        rows = json.loads(raw)
-        return rows if isinstance(rows, list) else None
+        rows = []
+        for key in ("book2_all_rows", "book2_extra_rows"):
+            raw = data.get(key)
+            if raw:
+                try:
+                    lst = json.loads(raw)
+                    if isinstance(lst, list):
+                        rows += lst
+                except Exception:
+                    pass
+        return rows or None
     except Exception as e:
         print(f"  [Data] lecture portefeuille impossible : {e}")
         return None

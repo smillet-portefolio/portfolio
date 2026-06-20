@@ -4166,6 +4166,9 @@ async function gsSaveAll(opts) {
   if (!_gsToken) { if (!opts.silent) gsSetMsg('⚠️ Connectez-vous d\'abord', '#f59e0b'); return; }
   if (!opts.silent) gsSetMsg('💾 Sauvegarde...', '#60a5fa');
   try {
+    // Rafraîchir le snapshot complet des positions avant sauvegarde
+    // (pour que book2_all_rows inclue les lignes ajoutées localement).
+    try { localStorage.setItem('book2_all_rows', JSON.stringify(BOOK2_ROWS)); } catch(_){}
     // Google Sheets limite chaque cellule à 50 000 caractères → on découpe les
     // grandes valeurs sur plusieurs colonnes (B, C, D, …) recollées au chargement.
     const CHUNK = 45000;
