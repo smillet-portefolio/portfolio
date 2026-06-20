@@ -4906,7 +4906,7 @@ function _renderEvoContent(rows, period) {
         <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_xtb, r.act_xtb)}</td>
         <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_ledger, r.act_ledger)}</td>
         <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_binance, r.act_binance)}</td>
-        <td style="padding:6px 8px">${statusBadge}</td>
+        <td style="padding:6px 8px;white-space:nowrap">${statusBadge}<button onclick="evoEditRow('${r.date}')" title="Modifier" style="margin-left:6px;padding:2px 7px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);border-radius:8px;font-size:10px;cursor:pointer">✏️</button></td>
       </tr>`;
     }).join('');
   }
@@ -4928,6 +4928,59 @@ function setEvoGran(gran, btn) {
   window._evoGran = gran;
   document.querySelectorAll('.evo-gran-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
+  _renderEvoContent(mergeEvoRows(), window._evoPeriod || 'all');
+}
+
+function evoEditRow(date) {
+  const rows = getEvoRows();
+  const r = rows.find(x => x.date === date);
+  if (!r) return;
+  const BRK = [['KB','kb'],['LUMO','lumo'],['LENDO.','lendo'],['ENERFIP','enerfip'],['LINXEA','linxea'],['SAXO','saxo'],['IBKR','ibkr'],['T212','t212'],['XTB','xtb'],['LEDGER','ledger'],['BINANCE','binance']];
+  let m = document.getElementById('evoEditModal');
+  if (!m) { m = document.createElement('div'); m.id = 'evoEditModal'; m.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center'; document.body.appendChild(m); }
+  const inp = 'width:100%;box-sizing:border-box;padding:5px 7px;border:1px solid var(--border2);border-radius:5px;background:var(--bg2);color:var(--text);font-size:12px;text-align:right';
+  const rowsHtml = BRK.map(function(b) {
+    const lbl = b[0], k = b[1];
+    const iv = (r['inv_'+k] != null) ? Math.round(r['inv_'+k]*100)/100 : '';
+    const av = (r['act_'+k] != null) ? Math.round(r['act_'+k]*100)/100 : '';
+    return '<div style="display:grid;grid-template-columns:84px 1fr 1fr;gap:8px;align-items:center;margin-bottom:5px">'
+      + '<div style="font-size:12px;font-weight:600">' + lbl + '</div>'
+      + '<input id="evoed_inv_' + k + '" type="number" step="0.01" value="' + iv + '" style="' + inp + '">'
+      + '<input id="evoed_act_' + k + '" type="number" step="0.01" value="' + av + '" style="' + inp + '">'
+      + '</div>';
+  }).join('');
+  m.innerHTML = '<div style="background:var(--bg);border-radius:12px;padding:22px;width:520px;max-width:94vw;max-height:88vh;overflow:auto;border:1px solid var(--border2)">'
+    + '<h3 style="margin:0 0 4px;font-size:16px">Modifier la ligne du ' + date + '</h3>'
+    + '<p style="font-size:11px;color:var(--text2);margin:0 0 12px">Montants par broker (en €). Les totaux, la performance et le delta sont recalculés automatiquement.</p>'
+    + '<div style="display:grid;grid-template-columns:84px 1fr 1fr;gap:8px;margin-bottom:6px;font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--text2)"><div>Broker</div><div style="text-align:right">Investi €</div><div style="text-align:right">Actuel €</div></div>'
+    + rowsHtml
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button onclick="evoEditClose()" style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:8px 14px;cursor:pointer">Annuler</button>'
+    + '<button onclick="evoEditSave(\'' + date + '\')" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-weight:600">Enregistrer</button></div></div>';
+  m.style.display = 'flex';
+}
+function evoEditClose() { const m = document.getElementById('evoEditModal'); if (m) m.style.display = 'none'; }
+function evoEditSave(date) {
+  const rows = getEvoRows();
+  const i = rows.findIndex(x => x.date === date);
+  if (i < 0) return;
+  const r = rows[i];
+  const BRK = ['kb','lumo','lendo','enerfip','linxea','saxo','ibkr','t212','xtb','ledger','binance'];
+  BRK.forEach(function(k) {
+    const iv = document.getElementById('evoed_inv_' + k);
+    const av = document.getElementById('evoed_act_' + k);
+    if (iv) r['inv_' + k] = parseFloat(iv.value) || 0;
+    if (av) r['act_' + k] = parseFloat(av.value) || 0;
+  });
+  // Recalcul des totaux = somme des colonnes par broker
+  r.inv_total = BRK.reduce(function(s,k){ return s + (r['inv_'+k]||0); }, 0);
+  r.act_total = BRK.reduce(function(s,k){ return s + (r['act_'+k]||0); }, 0);
+  r.inv_bonds = (r.inv_lumo||0) + (r.inv_lendo||0) + (r.inv_enerfip||0);
+  r.act_bonds = (r.act_lumo||0) + (r.act_lendo||0) + (r.act_enerfip||0);
+  r.perf_total = r.inv_total ? (r.act_total - r.inv_total) / r.inv_total : 0;
+  const before = rows.filter(function(x){ return x.date < date; }).sort(function(a,b){ return b.date.localeCompare(a.date); })[0];
+  r.act_delta = before ? Math.round((r.act_total - before.act_total) * 100) / 100 : null;
+  saveEvoRows(rows);
+  evoEditClose();
   _renderEvoContent(mergeEvoRows(), window._evoPeriod || 'all');
 }
 
