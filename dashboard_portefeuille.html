@@ -3365,15 +3365,17 @@ function openNewLineModal() {
   // Alimenter la liste d'autocomplétion avec les noms existants
   const datalist = document.getElementById('nl_nom_list');
   if (datalist) {
-    const names = [...new Set(BOOK2_ROWS.map(r => r.name).filter(Boolean))].sort();
-    datalist.innerHTML = names.map(n => `<option value="${n.replace(/"/g,'&quot;')}">`).join('');
+    const namesSet = new Set(BOOK2_ROWS.map(r => r.name).filter(Boolean));
+    if (typeof ETF_META !== 'undefined') Object.values(ETF_META).forEach(m => { if (m && m.name) namesSet.add(m.name); });
+    datalist.innerHTML = [...namesSet].sort().map(n => `<option value="${n.replace(/"/g,'&quot;')}">`).join('');
   }
 
   // Alimenter la liste brokers
   const datalistBroker = document.getElementById('nl_broker_list');
   if (datalistBroker) {
-    const brokers = [...new Set(BOOK2_ROWS.map(r => r.broker).filter(Boolean))].sort();
-    datalistBroker.innerHTML = brokers.map(b => `<option value="${b.replace(/"/g,'&quot;')}">`).join('');
+    const brokersSet = new Set(BOOK2_ROWS.map(r => r.broker).filter(Boolean));
+    if (typeof CASH_BROKERS !== 'undefined') CASH_BROKERS.forEach(b => brokersSet.add(b));
+    datalistBroker.innerHTML = [...brokersSet].sort().map(b => `<option value="${b.replace(/"/g,'&quot;')}">`).join('');
   }
   document.getElementById('nl_fx_row').style.display = 'none';
   document.getElementById('nl_devise').value = 'EUR';
@@ -3418,6 +3420,16 @@ function openNewLineModal() {
         if (ticker && !ticker.value) ticker.value = match.ticker || '';
         if (type   && !type.value)   type.value   = match.typeInv || '';
         if (isin   && !isin.value)   isin.value   = (match.isin || '').toUpperCase();
+      } else if (typeof ETF_META !== 'undefined') {
+        const tk = Object.keys(ETF_META).find(k => ETF_META[k] && ETF_META[k].name === val);
+        if (tk) {
+          const ticker = document.getElementById('nl_ticker');
+          const type   = document.getElementById('nl_type');
+          const isin   = document.getElementById('nl_isin');
+          if (ticker && !ticker.value) ticker.value = tk;
+          if (type   && !type.value)   type.value   = 'ETF';
+          if (isin   && !isin.value && ETF_META[tk].isin) isin.value = (ETF_META[tk].isin || '').toUpperCase();
+        }
       }
     };
   }
@@ -7795,11 +7807,11 @@ const ETF_META = {
     geo:[['🇹🇼 Taïwan',29.7],['🇰🇷 Corée du Sud',20.6],['🇮🇳 Inde',14.8]],
     sectors:[['Technologie',39.7],['Finance',20.5],['Matériaux',6.8]],
     positions:[['Taiwan Semiconductor Mfg.',17.8],['Samsung Electronics',7.5],['SK hynix',3.8]] },
-  'Q8Y0': { name:'iShares Global Clean Energy Transition', short:'Q8Y0', ter:0.65, index:'S&P Global Clean Energy Transition', type:'Thématique', badge:'badge-amber',
+  'Q8Y0': { name:'iShares Global Clean Energy Transition', short:'Q8Y0', isin:'IE000U58J0M1', ter:0.65, index:'S&P Global Clean Energy Transition', type:'Thématique', badge:'badge-amber',
     geo:[['🇺🇸 États-Unis',30.0],['🇨🇳 Chine',15.0],['🇪🇸 Espagne',7.0]],
     sectors:[['Services publics',42.0],['Industrie',26.0],['Technologie',15.0]],
     positions:[['First Solar',7.0],['Iberdrola',6.0],['Enphase Energy',5.0]] },
-  'MWRE': { name:'Amundi Core MSCI World', short:'MWRE', ter:0.12, index:'MSCI World', type:'Cœur large', badge:'badge-blue',
+  'MWRE': { name:'Amundi Core MSCI World', short:'MWRE', isin:'IE000BI8OT95', ter:0.12, index:'MSCI World', type:'Cœur large', badge:'badge-blue',
     geo:[['🇺🇸 États-Unis',71.0],['🇯🇵 Japon',5.5],['🇬🇧 Royaume-Uni',3.4]],
     sectors:[['Technologie',26.0],['Finance',15.0],['Industrie',11.0]],
     positions:[['Apple',5.0],['NVIDIA Corp.',5.0],['Microsoft',4.0]] },
