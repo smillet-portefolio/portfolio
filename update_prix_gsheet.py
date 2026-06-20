@@ -57,6 +57,8 @@ TICKERS = [
     ("XDWD.DE",  "Xtrackers MSCI World",          "EUR", "XDWD.DE"),
     ("MTPI.PA",  "iShares MSCI ex China",         "EUR", "MTPI.PA"),
     ("VGWE.DE",  "Vanguard All-World High Div",   "EUR", "VGWE.DE"),
+    ("Q8Y0",     "iShares Global Clean Energy Transition", "EUR", "Q8Y0.DE"),
+    ("MWRE",     "Amundi Core MSCI World",        "EUR", "MWRE.DE"),
     ("BTC/EUR",  "Bitcoin",                       "EUR", "BTC-EUR"),
     ("ETH/EUR",  "Ethereum",                      "EUR", "ETH-EUR"),
     ("EUR/CZK",  "Euro / Couronne tchèque",       "CZK", "EURCZK=X"),
