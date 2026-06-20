@@ -60,7 +60,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.guard.outputs.proceed == 'true'
-        run: pip install yfinance pandas requests google-auth google-api-python-client
+        run: pip install yfinance pandas requests beautifulsoup4 openpyxl google-auth google-api-python-client
 
       - name: Mise à jour des prix
         if: steps.guard.outputs.proceed == 'true'
@@ -75,3 +75,11 @@ jobs:
           GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
           RUN_MODE: ${{ steps.guard.outputs.mode }}
         run: python update_evolution_gsheet.py
+
+      - name: Compositions ETF (soir uniquement, 1x/jour)
+        if: steps.guard.outputs.proceed == 'true' && steps.guard.outputs.mode == 'evening'
+        env:
+          GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+        run: |
+          python update_etf_compo.py
+          python upload_etf_to_gsheet.py
