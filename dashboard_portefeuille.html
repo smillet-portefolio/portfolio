@@ -4228,25 +4228,23 @@ async function gsLoadPrices() {
 async function gsLoadETFComp() {
   const status = document.getElementById('etfCompStatus');
 
-  // Si compositions déjà en mémoire avec 10 positions : appliquer directement
-  const hasFullPositions = Object.keys(ETF_COMP_OVERRIDE).some(t =>
-    (ETF_COMP_OVERRIDE[t]?.positionsAll || []).length >= 5
-  );
-  if (Object.keys(ETF_COMP_OVERRIDE).length > 0 && hasFullPositions) {
-    applyETFCompositionOverride();
-    renderETFFiches();
-    renderCompTables();
-    renderETFGeoTables();
-    const date = localStorage.getItem('etf_comp_date');
-    if (status && date) {
-      const fmt = new Date(date).toLocaleString('fr',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-      status.innerHTML = `<span style="color:var(--text2)">Compositions du ${fmt}</span>`;
+  // Connecté + pas encore rechargé durant cette session -> aller chercher les données
+  // FRAÎCHES dans Google Sheets (code plus bas). Sinon (déjà rechargé cette session,
+  // ou hors-ligne) -> réappliquer ce qui est déjà en mémoire (cache local).
+  if (!_gsToken || window._etfCompSessionLoaded) {
+    if (Object.keys(ETF_COMP_OVERRIDE).length > 0) {
+      applyETFCompositionOverride();
+      renderETFFiches();
+      renderCompTables();
+      renderETFGeoTables();
+      const date = localStorage.getItem('etf_comp_date');
+      if (status && date) {
+        const fmt = new Date(date).toLocaleString('fr',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+        status.innerHTML = `<span style="color:var(--text2)">Compositions du ${fmt}</span>`;
+      }
     }
     return;
   }
-
-  // Sinon charger depuis GSheets (onglets ETF_Country/ETF_Sector/ETF_Top10)
-  if (!_gsToken) return;
   if (status) status.innerHTML = `<span style="color:#60a5fa">⏳ Chargement compositions ETF depuis Google Sheets…</span>`;
   try {
     const [rCountry, rSector, rTop10] = await Promise.all([
@@ -4319,6 +4317,7 @@ async function gsLoadETFComp() {
     const now = new Date().toISOString();
     Object.keys(result).forEach(t => { result[t].date = now; });
     ETF_COMP_OVERRIDE = result;
+    window._etfCompSessionLoaded = true;
     try {
       localStorage.setItem('etf_comp_override', JSON.stringify(result));
       localStorage.setItem('etf_comp_date', now);
