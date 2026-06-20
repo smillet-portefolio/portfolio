@@ -4588,7 +4588,7 @@ function getEvoRows() {
     if (XTBFIX_ACT[r.date] != null && r.act_xtb !== XTBFIX_ACT[r.date]) { r.act_xtb = XTBFIX_ACT[r.date]; _kbCh = true; }
   });
   // Reconcilier les lignes GELEES : total = somme exacte des 11 colonnes par broker
-  const _BRK = ['kb','lumo','lendo','enerfip','linxea','saxo','ibkr','t212','xtb','ledger','binance'];
+  const _BRK = ['kb','lumo','lendo','enerfip','linxea','saxo','ibkr','t212','jito','xtb','ledger','binance'];
   rows.forEach(r => {
     if (!r || !r.frozen) return;
     const _at = _BRK.reduce((s,k) => s + (r['act_'+k] || 0), 0);
@@ -4610,7 +4610,7 @@ function getTodayEvoRow() {
 
   const normBroker = b => {
     if (b && String(b).toUpperCase().startsWith('KB')) return 'KB';  // KB + "KB obligations" -> KB (meme logique que le tableau par broker)
-    const map = { 'ledger':'Ledger','LEDGER':'Ledger','binance':'Binance','BINANCE':'Binance','trading 212':'TRADING 212','TRADING 212 JITO':'TRADING 212' };
+    const map = { 'ledger':'Ledger','LEDGER':'Ledger','binance':'Binance','BINANCE':'Binance','trading 212':'TRADING 212','TRADING 212 JITO':'TRADING 212 JITO' };
     return map[b] || b;
   };
 
@@ -4650,22 +4650,22 @@ function getTodayEvoRow() {
   const I = b => investedByBroker[b] || 0;  // investi net
 
   const act_kb=A('KB'), act_lumo=A('LUMO'), act_lendo=A('LENDOSPHERE'), act_enerfip=A('ENERFIP'),
-        act_linxea=A('LINXEA'), act_saxo=A('SAXO'), act_ibkr=A('IBKR'), act_t212=A('TRADING 212'),
+        act_linxea=A('LINXEA'), act_saxo=A('SAXO'), act_ibkr=A('IBKR'), act_t212=A('TRADING 212'), act_jito=A('TRADING 212 JITO'),
         act_xtb=A('XTB'), act_ledger=A('Ledger'), act_binance=A('Binance');
   const act_bonds = act_lumo + act_lendo + act_enerfip;
   const act_total = Object.values(pfByBroker).reduce((s,v) => s + v, 0);
 
   const inv_kb=I('KB'), inv_lumo=I('LUMO'), inv_lendo=I('LENDOSPHERE'), inv_enerfip=I('ENERFIP'),
-        inv_linxea=I('LINXEA'), inv_saxo=I('SAXO'), inv_ibkr=I('IBKR'), inv_t212=I('TRADING 212'),
+        inv_linxea=I('LINXEA'), inv_saxo=I('SAXO'), inv_ibkr=I('IBKR'), inv_t212=I('TRADING 212'), inv_jito=I('TRADING 212 JITO'),
         inv_xtb=I('XTB'), inv_ledger=I('Ledger'), inv_binance=I('Binance');
   const inv_bonds = inv_lumo + inv_lendo + inv_enerfip;
   const inv_total = Object.values(investedByBroker).reduce((s,v) => s + v, 0);
 
   return {
     date: today,
-    act_kb, act_lumo, act_lendo, act_enerfip, act_bonds, act_linxea, act_saxo, act_ibkr, act_t212, act_xtb, act_ledger, act_binance, act_total,
+    act_kb, act_lumo, act_lendo, act_enerfip, act_bonds, act_linxea, act_saxo, act_ibkr, act_t212, act_jito, act_xtb, act_ledger, act_binance, act_total,
     act_delta: null,  // calculé après
-    inv_kb, inv_lumo, inv_lendo, inv_enerfip, inv_bonds, inv_linxea, inv_saxo, inv_ibkr, inv_t212, inv_xtb, inv_ledger, inv_binance, inv_total,
+    inv_kb, inv_lumo, inv_lendo, inv_enerfip, inv_bonds, inv_linxea, inv_saxo, inv_ibkr, inv_t212, inv_jito, inv_xtb, inv_ledger, inv_binance, inv_total,
     perf_total: inv_total > 0 ? (act_total - inv_total) / inv_total : 0,
     frozen: false,
     live: true
@@ -4693,6 +4693,8 @@ function mergeEvoRows() {
   // les valeurs courantes (mêmes valeurs « par broker » que l'onglet Dashboard).
   let rows = getEvoRows();
   const today = new Date().toISOString().slice(0, 10);
+  const _dow = new Date(today + 'T12:00:00').getDay();   // 0=dim, 6=sam
+  const _isWeekend = (_dow === 0 || _dow === 6);
   const idx = rows.findIndex(r => r.date === today);
   if (Object.keys(CURRENT_PRICES).length > 0 || idx !== -1) {
     const snap = getTodayEvoRow();          // valeurs actuelles = Dashboard par broker
@@ -4700,8 +4702,10 @@ function mergeEvoRows() {
                        .sort((a, b) => b.date.localeCompare(a.date))[0];
     snap.act_delta = before ? Math.round((snap.act_total - before.act_total) * 100) / 100 : null;
     if (idx === -1) {
-      rows = [...rows, snap];               // nouvelle ligne du matin
-      saveEvoRows(rows);
+      if (!_isWeekend) {                    // pas de nouvelle ligne le week-end (lun-ven)
+        rows = [...rows, snap];             // nouvelle ligne du matin
+        saveEvoRows(rows);
+      }
     } else if (!rows[idx].frozen) {
       rows[idx] = snap;                      // rafraîchir la ligne live non gelée
       saveEvoRows(rows);
@@ -4753,7 +4757,7 @@ function renderEvolution() {
           <span style="font-size:13px;font-weight:600">Historique quotidien</span>
           <span id="evo_status" style="font-size:11px;color:var(--text2)"></span>
         </div>
-        <div style="max-height:70vh;overflow:auto"><table id="evoTable" style="border-collapse:collapse;font-size:11px;width:100%;min-width:1650px">
+        <div style="max-height:70vh;overflow:auto"><table id="evoTable" style="border-collapse:collapse;font-size:11px;width:100%;min-width:1746px">
           <thead>
             <tr style="background:var(--bg3)">
               <th style="padding:7px 10px;text-align:left;border-bottom:2px solid var(--border2);min-width:90px">Date</th>
@@ -4770,6 +4774,7 @@ function renderEvolution() {
               <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">SAXO<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
               <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">IBKR<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
               <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">T212<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
+              <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">JITO<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
               <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">XTB<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
               <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">LEDGER<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
               <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">BINANCE<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
@@ -4938,6 +4943,7 @@ function _renderEvoContent(rows, period) {
         <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_saxo, r.act_saxo)}</td>
         <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_ibkr, r.act_ibkr)}</td>
         <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_t212, r.act_t212)}</td>
+        <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_jito, r.act_jito)}</td>
         <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_xtb, r.act_xtb)}</td>
         <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_ledger, r.act_ledger)}</td>
         <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_binance, r.act_binance)}</td>
@@ -4970,7 +4976,7 @@ function evoEditRow(date) {
   const rows = getEvoRows();
   const r = rows.find(x => x.date === date);
   if (!r) return;
-  const BRK = [['KB','kb'],['LUMO','lumo'],['LENDO.','lendo'],['ENERFIP','enerfip'],['LINXEA','linxea'],['SAXO','saxo'],['IBKR','ibkr'],['T212','t212'],['XTB','xtb'],['LEDGER','ledger'],['BINANCE','binance']];
+  const BRK = [['KB','kb'],['LUMO','lumo'],['LENDO.','lendo'],['ENERFIP','enerfip'],['LINXEA','linxea'],['SAXO','saxo'],['IBKR','ibkr'],['T212','t212'],['JITO','jito'],['XTB','xtb'],['LEDGER','ledger'],['BINANCE','binance']];
   let m = document.getElementById('evoEditModal');
   if (!m) { m = document.createElement('div'); m.id = 'evoEditModal'; m.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center'; document.body.appendChild(m); }
   const inp = 'width:100%;box-sizing:border-box;padding:5px 7px;border:1px solid var(--border2);border-radius:5px;background:var(--bg2);color:var(--text);font-size:12px;text-align:right';
@@ -4999,7 +5005,7 @@ function evoEditSave(date) {
   const i = rows.findIndex(x => x.date === date);
   if (i < 0) return;
   const r = rows[i];
-  const BRK = ['kb','lumo','lendo','enerfip','linxea','saxo','ibkr','t212','xtb','ledger','binance'];
+  const BRK = ['kb','lumo','lendo','enerfip','linxea','saxo','ibkr','t212','jito','xtb','ledger','binance'];
   BRK.forEach(function(k) {
     const iv = document.getElementById('evoed_inv_' + k);
     const av = document.getElementById('evoed_act_' + k);

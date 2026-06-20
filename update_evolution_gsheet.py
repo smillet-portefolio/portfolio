@@ -457,12 +457,14 @@ def get_today_evo_row(book2_rows, cash_data, oblig_data, current_prices):
 
     act_kb, act_lumo, act_lendo, act_enerfip = A("KB"), A("LUMO"), A("LENDOSPHERE"), A("ENERFIP")
     act_linxea, act_saxo, act_ibkr, act_t212 = A("LINXEA"), A("SAXO"), A("IBKR"), A("TRADING 212")
+    act_jito = A("TRADING 212 JITO")
     act_xtb, act_ledger, act_binance = A("XTB"), A("Ledger"), A("Binance")
     act_bonds = act_lumo + act_lendo + act_enerfip
     act_total = sum(pf_by_broker.values())
 
     inv_kb, inv_lumo, inv_lendo, inv_enerfip = I("KB"), I("LUMO"), I("LENDOSPHERE"), I("ENERFIP")
     inv_linxea, inv_saxo, inv_ibkr, inv_t212 = I("LINXEA"), I("SAXO"), I("IBKR"), I("TRADING 212")
+    inv_jito = I("TRADING 212 JITO")
     inv_xtb, inv_ledger, inv_binance = I("XTB"), I("Ledger"), I("Binance")
     inv_bonds = inv_lumo + inv_lendo + inv_enerfip
     inv_total = sum(invested_by_broker.values())
@@ -471,13 +473,13 @@ def get_today_evo_row(book2_rows, cash_data, oblig_data, current_prices):
         "date": today,
         "act_kb": act_kb, "act_lumo": act_lumo, "act_lendo": act_lendo,
         "act_enerfip": act_enerfip, "act_bonds": act_bonds, "act_linxea": act_linxea,
-        "act_saxo": act_saxo, "act_ibkr": act_ibkr, "act_t212": act_t212,
+        "act_saxo": act_saxo, "act_ibkr": act_ibkr, "act_t212": act_t212, "act_jito": act_jito,
         "act_xtb": act_xtb, "act_ledger": act_ledger, "act_binance": act_binance,
         "act_total": act_total,
         "act_delta": None,  # calculé après (vs dernière ligne précédente)
         "inv_kb": inv_kb, "inv_lumo": inv_lumo, "inv_lendo": inv_lendo,
         "inv_enerfip": inv_enerfip, "inv_bonds": inv_bonds, "inv_linxea": inv_linxea,
-        "inv_saxo": inv_saxo, "inv_ibkr": inv_ibkr, "inv_t212": inv_t212,
+        "inv_saxo": inv_saxo, "inv_ibkr": inv_ibkr, "inv_t212": inv_t212, "inv_jito": inv_jito,
         "inv_xtb": inv_xtb, "inv_ledger": inv_ledger, "inv_binance": inv_binance,
         "inv_total": inv_total,
         "perf_total": (act_total - inv_total) / inv_total if inv_total > 0 else 0,
@@ -690,6 +692,9 @@ def main():
 
     # act_delta = act_total du jour - act_total de la dernière ligne PRÉCÉDENTE
     today = snap["date"]
+    if datetime.date.fromisoformat(today).weekday() >= 5:   # 5=samedi, 6=dimanche
+        print(f"\n  Week-end ({today}) - pas de ligne Evolution (lun-ven uniquement).")
+        return
     before = [r for r in evo_history if r.get("date") and r["date"] < today]
     before.sort(key=lambda r: r["date"], reverse=True)
     if before:
@@ -710,6 +715,7 @@ def main():
         ("LENDOSPHERE", "act_lendo", "inv_lendo"), ("ENERFIP", "act_enerfip", "inv_enerfip"),
         ("LINXEA", "act_linxea", "inv_linxea"), ("SAXO", "act_saxo", "inv_saxo"),
         ("IBKR", "act_ibkr", "inv_ibkr"), ("TRADING 212", "act_t212", "inv_t212"),
+        ("TRADING 212 JITO", "act_jito", "inv_jito"),
         ("XTB", "act_xtb", "inv_xtb"), ("Ledger", "act_ledger", "inv_ledger"),
         ("Binance", "act_binance", "inv_binance"),
     ]
