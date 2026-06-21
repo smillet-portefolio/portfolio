@@ -5375,7 +5375,7 @@ function _csqTh(col,label,align){ return '<th onclick="csqSort(\''+col+'\')" dat
       '<p style="font-size:11px;color:var(--text2);margin-top:8px">Valeur part moyenne = montant investi / nb de parts (prix de revient). Valeur actuelle = parts × valeur de part. Valeur totale = actuelle + non investie. Le nb de parts et la valeur investie viennent du détail par fond ; les champs jaunes sont modifiables.</p></div>'+
     '<h3 style="font-size:14px;font-weight:700;margin:0 0 10px">Performance par année</h3>'+
     '<div style="overflow-x:auto;margin-bottom:24px"><table id="csq_perf_tbl"><thead><tr>'+
-      '<th>Année</th><th style="text-align:right">Investi (année)</th><th style="text-align:right">Investi cumulé</th><th style="text-align:right">Valeur</th><th style="text-align:right">Plus-value annuelle</th><th style="text-align:right">Plus-value cumulée</th><th style="text-align:right">Perf. cumulée</th><th style="text-align:right">Perf. annuelle</th>'+
+      '<th>Année</th><th style="text-align:right">Investi (année)</th><th style="text-align:right">Investi cumulé</th><th style="text-align:right">Valeur</th><th style="text-align:right">Plus-value annuelle</th><th style="text-align:right">Plus-value cumulée</th><th style="text-align:right">Perf. cumulée</th><th style="text-align:right">Perf. annuelle</th><th style="text-align:right" title="Rendement annualise money-weighted depuis le 1er versement">XIRR cumulé /an</th>'+
     '</tr></thead><tbody id="csq_perf_body"></tbody></table></div>'+
     '</div>'+
     '<div id="csq_view_hist" style="display:none">'+
@@ -5837,6 +5837,7 @@ function renderConseqSection(){
   var pb=document.getElementById('csq_perf_body');
   if(pb){
     var cum=0,prevVal=0,html='';
+    var _csqFlows=(function(){var bd={};(CONSEQ_DATA.tx||[]).forEach(function(t){if(t&&t.date&&t.amount)bd[t.date]=(bd[t.date]||0)+t.amount;});return Object.keys(bd).map(function(d){return {date:d,amt:bd[d]};}).sort(function(a,b){return a.date.localeCompare(b.date);});})();
     var col=function(n){return n==null?'var(--text2)':(n>=0?'#4caf82':'#e06c6c');};
     years.forEach(function(y,i){
       cum+=(y.invested||0);
@@ -5847,6 +5848,10 @@ function renderConseqSection(){
       var annual=null;
       if(v!=null&&i>0&&prevVal){ annual=(v-prevVal-(y.invested||0))/(prevVal+(y.invested||0))*100; }
       else if(v!=null&&i===0&&(y.invested||0)){ annual=(v-(y.invested||0))/(y.invested||0)*100; }
+      var _endISO=(i===years.length-1)?new Date().toISOString().slice(0,10):(y.year+'-12-31');
+      var _xc=null;
+      if(v!=null){ var _cfs=_csqFlows.filter(function(f){return f.date<=_endISO;}).map(function(f){return {t:new Date(f.date+'T00:00:00'),a:-f.amt};}); _cfs.push({t:new Date(_endISO+'T00:00:00'),a:v}); var _r=(typeof _xirrAnnual==='function')?_xirrAnnual(_cfs):null; _xc=(_r!=null)?_r*100:null; }
+      var _xcCell='<td class="mono" style="text-align:right;color:'+col(_xc)+'">'+(_xc!=null?((_xc>=0?'+':'')+_xc.toFixed(1).replace('.',',')+'%'):'—')+'</td>';
       var lbl=(i===years.length-1)?(y.year+' (actuel)'):String(y.year);
       html+='<tr><td><strong>'+lbl+'</strong></td>'+
         '<td class="mono" style="text-align:right">'+fmt(y.invested||0)+'</td>'+
@@ -5855,7 +5860,7 @@ function renderConseqSection(){
         '<td class="mono" style="text-align:right;color:'+col(pvAnnual)+'">'+(pvAnnual!=null?((pvAnnual>=0?'+':'')+fmt(pvAnnual)):'—')+'</td>'+
         '<td class="mono" style="text-align:right;color:'+col(gainC)+'">'+(gainC!=null?((gainC>=0?'+':'')+fmt(gainC)):'—')+'</td>'+
         '<td class="mono" style="text-align:right;color:'+col(perfC)+'">'+(perfC!=null?((perfC>=0?'+':'')+perfC.toFixed(1).replace('.',',')+'%'):'—')+'</td>'+
-        '<td class="mono" style="text-align:right;color:'+col(annual)+'">'+(annual!=null?((annual>=0?'+':'')+annual.toFixed(1).replace('.',',')+'%'):'—')+'</td></tr>';
+        '<td class="mono" style="text-align:right;color:'+col(annual)+'">'+(annual!=null?((annual>=0?'+':'')+annual.toFixed(1).replace('.',',')+'%'):'—')+'</td>'+_xcCell+'</tr>';
       if(v!=null) prevVal=v;
     });
     pb.innerHTML=html;
