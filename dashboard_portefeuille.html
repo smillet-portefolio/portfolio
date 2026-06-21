@@ -186,6 +186,7 @@
   #cashHistTable thead th { position: sticky; top: 0; z-index: 5; background: var(--bg3); box-shadow: inset 0 -1px 0 var(--border); }
   #divTable thead th { position: sticky; top: 0; z-index: 5; background: var(--bg2); box-shadow: inset 0 -1px 0 var(--border); }
   #closedTable thead th { position: sticky; top: 0; z-index: 5; background: var(--bg2); box-shadow: inset 0 -1px 0 var(--border); }
+  #closedByPosTable thead th { position: sticky; top: 0; z-index: 5; background: var(--bg2); box-shadow: inset 0 -1px 0 var(--border); }
   #csq_evo_tbl thead th { position: sticky; top: 0; z-index: 5; background: var(--bg2); box-shadow: inset 0 -1px 0 var(--border); }
   td { padding: 8px 10px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
   tr:last-child td { border-bottom: none; }
@@ -3736,29 +3737,41 @@ function renderClosedPositions() {
     set('closedTopCost', costS); set('closedTopVal', valS); set('closedTopPnl', pnlS); set('closedTopPct', pctS);
   }
 
-  // ── P&L par position (agrégé par ticker, toutes positions clôturées) ──────
-  const _bpEl = document.getElementById('closedByPosBody');
-  if (_bpEl) {
-    const _agg = {};
-    all.forEach(p => {
-      const k = (p.ticker || p.name || '').toString();
-      if (!_agg[k]) _agg[k] = { name:p.name, ticker:p.ticker, inv:0, sold:0 };
-      _agg[k].inv  += p.costEur || 0;
-      _agg[k].sold += p.saleEur || 0;
-    });
-    const _list = Object.values(_agg).map(a => { const pnl=a.sold-a.inv; return { ...a, pnl, pct:a.inv?pnl/a.inv*100:0 }; }).sort((x,y)=>y.pnl-x.pnl);
-    _bpEl.innerHTML = _list.length ? _list.map(a => {
-      const c=a.pnl>=0?'#4caf82':'#e06c6c'; const s=a.pnl>=0?'+':'';
-      return `<tr style="border-bottom:1px solid var(--border)">
-        <td style="padding:7px 12px"><strong>${a.name||''}</strong></td>
-        <td style="padding:7px 12px;font-size:11px;font-family:'DM Mono',monospace">${a.ticker||''}</td>
-        <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${Math.round(a.inv).toLocaleString('fr')} €</td>
-        <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${Math.round(a.sold).toLocaleString('fr')} €</td>
-        <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:${c}">${s}${Math.round(a.pnl).toLocaleString('fr')} €</td>
-        <td style="padding:7px 12px;text-align:right;color:${c}">${s}${a.pct.toFixed(1)}%</td>
-      </tr>`;
-    }).join('') : '<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--text2)">Aucune position clôturée.</td></tr>';
-  }
+  if (typeof renderClosedByPos === 'function') renderClosedByPos();
+}
+
+// ── P&L par position : tri + filtre (sélection) ─────────────────────────────
+window._cbpSort = window._cbpSort || { col:'pnl', dir:-1 };
+window._cbpFilter = window._cbpFilter || { nom:'', ticker:'' };
+function closedByPosSort(col){ const s=window._cbpSort; if(s.col===col) s.dir*=-1; else { s.col=col; s.dir=(col==='name'||col==='ticker')?1:-1; } renderClosedByPos(); }
+function closedByPosFilter(field,val){ window._cbpFilter[field]=(val||'').toLowerCase(); renderClosedByPos(); }
+function renderClosedByPos(){
+  const el=document.getElementById('closedByPosBody'); if(!el) return;
+  let all=[]; try{ all=JSON.parse(localStorage.getItem('closed_positions')||'[]'); }catch(e){}
+  const agg={};
+  all.forEach(p=>{ const k=(p.ticker||p.name||'').toString(); if(!agg[k]) agg[k]={name:p.name,ticker:p.ticker,inv:0,sold:0}; agg[k].inv+=p.costEur||0; agg[k].sold+=p.saleEur||0; });
+  let list=Object.values(agg).map(a=>{ const pnl=a.sold-a.inv; return {...a,pnl,pct:a.inv?pnl/a.inv*100:0}; });
+  const f=window._cbpFilter;
+  list=list.filter(a=> (!f.nom||(a.name||'').toLowerCase().includes(f.nom)) && (!f.ticker||(a.ticker||'').toLowerCase().includes(f.ticker)) );
+  const s=window._cbpSort;
+  list.sort((x,y)=>{ let a=x[s.col],b=y[s.col]; if(typeof a==='string'||typeof b==='string') return s.dir*String(a==null?'':a).localeCompare(String(b==null?'':b)); if(a==null)a=-Infinity; if(b==null)b=-Infinity; return s.dir*(a-b); });
+  document.querySelectorAll('#closedByPosTable th[data-cbp]').forEach(th=>{ const sp=th.querySelector('.cbp-arr'); if(sp) sp.textContent=(th.dataset.cbp===s.col)?(s.dir<0?' ▼':' ▲'):''; });
+  el.innerHTML = list.length ? list.map(a=>{ const c=a.pnl>=0?'#4caf82':'#e06c6c'; const sg=a.pnl>=0?'+':'';
+    return `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:7px 12px"><strong>${a.name||''}</strong></td>
+      <td style="padding:7px 12px;font-size:11px;font-family:'DM Mono',monospace">${a.ticker||''}</td>
+      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${Math.round(a.inv).toLocaleString('fr')} €</td>
+      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${Math.round(a.sold).toLocaleString('fr')} €</td>
+      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:${c}">${sg}${Math.round(a.pnl).toLocaleString('fr')} €</td>
+      <td style="padding:7px 12px;text-align:right;color:${c}">${sg}${a.pct.toFixed(1)}%</td>
+    </tr>`; }).join('') : '<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--text2)">Aucune position.</td></tr>';
+  const tInv=list.reduce((q,a)=>q+a.inv,0), tSold=list.reduce((q,a)=>q+a.sold,0), tPnl=tSold-tInv, tPct=tInv?tPnl/tInv*100:0;
+  const c2=tPnl>=0?'#4caf82':'#e06c6c', sg2=tPnl>=0?'+':'';
+  const setT=(id,v,c)=>{ const e=document.getElementById(id); if(e){ e.textContent=v; if(c)e.style.color=c; } };
+  setT('cbpTotInv',Math.round(tInv).toLocaleString('fr')+' €');
+  setT('cbpTotSold',Math.round(tSold).toLocaleString('fr')+' €');
+  setT('cbpTotPnl',sg2+Math.round(tPnl).toLocaleString('fr')+' €',c2);
+  setT('cbpTotPct',sg2+tPct.toFixed(1)+'%',c2);
 }
 
 // ── Persist ALL rows (extra + modifications des lignes statiques) ─────────────
@@ -6425,16 +6438,30 @@ function renderObligCharts(data) {
     <div id="closed_bypos" class="sub-section">
       <p class="section-desc" style="margin-bottom:12px">P&L réalisé agrégé — 1 ligne par action / ETF clôturé.</p>
       <div style="max-height:70vh;overflow:auto">
-        <table style="font-size:12px;width:100%;border-collapse:collapse">
-          <thead><tr style="background:var(--bg2);text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2)">
-            <th style="padding:8px 12px;text-align:left">Nom</th>
-            <th style="padding:8px 12px;text-align:left">Ticker</th>
-            <th style="padding:8px 12px;text-align:right">Montant investi</th>
-            <th style="padding:8px 12px;text-align:right">Montant vendu</th>
-            <th style="padding:8px 12px;text-align:right;font-weight:700">P&L €</th>
-            <th style="padding:8px 12px;text-align:right">P&L %</th>
-          </tr></thead>
+        <table id="closedByPosTable" style="font-size:12px;width:100%;border-collapse:collapse">
+          <thead>
+          <tr style="background:var(--bg2);text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2)">
+            <th onclick="closedByPosSort('name',this)" data-cbp="name" style="padding:8px 12px;text-align:left;cursor:pointer;user-select:none">Nom<span class="cbp-arr" style="font-size:9px"></span></th>
+            <th onclick="closedByPosSort('ticker',this)" data-cbp="ticker" style="padding:8px 12px;text-align:left;cursor:pointer;user-select:none">Ticker<span class="cbp-arr" style="font-size:9px"></span></th>
+            <th onclick="closedByPosSort('inv',this)" data-cbp="inv" style="padding:8px 12px;text-align:right;cursor:pointer;user-select:none">Montant investi<span class="cbp-arr" style="font-size:9px"></span></th>
+            <th onclick="closedByPosSort('sold',this)" data-cbp="sold" style="padding:8px 12px;text-align:right;cursor:pointer;user-select:none">Montant vendu<span class="cbp-arr" style="font-size:9px"></span></th>
+            <th onclick="closedByPosSort('pnl',this)" data-cbp="pnl" style="padding:8px 12px;text-align:right;cursor:pointer;user-select:none;font-weight:700">P&L €<span class="cbp-arr" style="font-size:9px"></span></th>
+            <th onclick="closedByPosSort('pct',this)" data-cbp="pct" style="padding:8px 12px;text-align:right;cursor:pointer;user-select:none">P&L %<span class="cbp-arr" style="font-size:9px"></span></th>
+          </tr>
+          <tr style="background:var(--bg2)">
+            <td style="padding:3px 8px"><input type="text" placeholder="Filtrer nom..." oninput="closedByPosFilter('nom',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>
+            <td style="padding:3px 8px"><input type="text" placeholder="Ticker..." oninput="closedByPosFilter('ticker',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>
+            <td colspan="4"></td>
+          </tr>
+          </thead>
           <tbody id="closedByPosBody"></tbody>
+          <tfoot><tr style="font-weight:700;background:var(--bg2)">
+            <td colspan="2" style="padding:8px 12px">Total (sélection)</td>
+            <td id="cbpTotInv" style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">—</td>
+            <td id="cbpTotSold" style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">—</td>
+            <td id="cbpTotPnl" style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:700">—</td>
+            <td id="cbpTotPct" style="padding:8px 12px;text-align:right">—</td>
+          </tr></tfoot>
         </table>
       </div>
     </div>
