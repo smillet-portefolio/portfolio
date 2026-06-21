@@ -5412,7 +5412,7 @@ function _csqTh(col,label,align){ return '<th onclick="csqSort(\''+col+'\')" dat
       '<p style="font-size:11px;color:var(--text2);margin-top:8px">Valeur part moyenne = montant investi / nb de parts (prix de revient). Valeur actuelle = parts × valeur de part. Valeur totale = actuelle + non investie. Le nb de parts et la valeur investie viennent du détail par fond ; les champs jaunes sont modifiables.</p></div>'+
     '<h3 style="font-size:14px;font-weight:700;margin:0 0 10px">Performance par année</h3>'+
     '<div style="overflow-x:auto;margin-bottom:24px"><table id="csq_perf_tbl"><thead><tr>'+
-      '<th>Année</th><th style="text-align:right">Investi (année)</th><th style="text-align:right">Investi cumulé</th><th style="text-align:right">Valeur</th><th style="text-align:right">Plus-value annuelle</th><th style="text-align:right">Plus-value cumulée</th><th style="text-align:right">Perf. cumulée</th><th style="text-align:right">Perf. annuelle</th><th style="text-align:right" title="Rendement annualise money-weighted depuis le 1er versement">XIRR /an</th>'+
+      '<th>Année</th><th style="text-align:right">Investi (année)</th><th style="text-align:right">Investi cumulé</th><th style="text-align:right">Valeur</th><th style="text-align:right">Plus-value annuelle</th><th style="text-align:right">Plus-value cumulée</th><th style="text-align:right">Perf. cumulée</th><th style="text-align:right">Perf. annuelle</th><th style="text-align:right" title="Rendement annualise money-weighted par annee (XIRR)">XIRR /an</th>'+
     '</tr></thead><tbody id="csq_perf_body"></tbody></table></div>'+
     '</div>'+
     '<div id="csq_view_hist" style="display:none">'+
@@ -5891,8 +5891,16 @@ function renderConseqSection(){
       if(v!=null&&i>0&&prevVal){ annual=(v-prevVal-(y.invested||0))/(prevVal+(y.invested||0))*100; }
       else if(v!=null&&i===0&&(y.invested||0)){ annual=(v-(y.invested||0))/(y.invested||0)*100; }
       var _endISO=(i===years.length-1)?new Date().toISOString().slice(0,10):(y.year+'-12-31');
+      var _ys=y.year+'-01-01';
       var _xc=null;
-      if(v!=null){ var _cfs=_csqFlows.filter(function(f){return f.date<=_endISO;}).map(function(f){return {t:new Date(f.date+'T00:00:00'),a:-f.amt};}); _cfs.push({t:new Date(_endISO+'T00:00:00'),a:v}); var _r=(typeof _xirrAnnual==='function')?_xirrAnnual(_cfs):null; _xc=(_r!=null)?_r*100:null; }
+      if(v!=null){
+        var _yf=_csqFlows.filter(function(f){return f.date>=_ys && f.date<=_endISO;});
+        var _cfs=[];
+        if(prevVal>0) _cfs.push({t:new Date(_ys+'T00:00:00'),a:-prevVal});
+        _yf.forEach(function(f){ _cfs.push({t:new Date(f.date+'T00:00:00'),a:-f.amt}); });
+        _cfs.push({t:new Date(_endISO+'T00:00:00'),a:v});
+        var _r=(typeof _xirrAnnual==='function')?_xirrAnnual(_cfs):null; _xc=(_r!=null)?_r*100:null;
+      }
       var _xcCell='<td class="mono" style="text-align:right;color:'+col(_xc)+'">'+(_xc!=null?((_xc>=0?'+':'')+_xc.toFixed(1).replace('.',',')+'%'):'—')+'</td>';
       var lbl=(i===years.length-1)?(y.year+' (actuel)'):String(y.year);
       html+='<tr><td><strong>'+lbl+'</strong></td>'+
