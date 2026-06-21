@@ -6917,10 +6917,11 @@ function renderPortfolio() {
 
   // ── FILTER ────────────────────────────────────────────────────────────────
   const filters = _pfxFilter;
+  const _na = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   rows = rows.filter(r => {
-    if (filters.nom    && !r.name.toLowerCase().includes(filters.nom.toLowerCase()))   return false;
-    if (filters.typeInv && !r.typeInv.toLowerCase().includes(filters.typeInv.toLowerCase())) return false;
-    if (filters.broker  && !r.brokers.toLowerCase().includes(filters.broker.toLowerCase())) return false;
+    if (filters.nom    && !_na(r.name).includes(_na(filters.nom)))   return false;
+    if (filters.typeInv && !_na(r.typeInv).includes(_na(filters.typeInv))) return false;
+    if (filters.broker  && !_na(r.brokers).includes(_na(filters.broker))) return false;
     if (filters.isin   && !r.isin.toLowerCase().includes(filters.isin.toLowerCase()))  return false;
     if (filters.ticker && !r.ticker.toLowerCase().includes(filters.ticker.toLowerCase())) return false;
     if (filters.qty    && r.qty < parseFloat(filters.qty))                             return false;
