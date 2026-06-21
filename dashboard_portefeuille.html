@@ -4536,6 +4536,98 @@ function mergeEvoRows() {
   return rows.sort((a, b) => b.date.localeCompare(a.date));
 }
 
+// ── Performance par année civile (money-weighted, pondérée par la date des flux) ──
+function _boursierFlows() {
+  const base = (typeof CASH_BASE_DEPOSITS !== 'undefined' ? CASH_BASE_DEPOSITS : []);
+  const dyn  = (typeof CASH_DATA !== 'undefined' && CASH_DATA.deposits) ? CASH_DATA.deposits : [];
+  return [...base, ...dyn].filter(d => d && d.date).map(d => {
+    const eur = (d.amountEur != null) ? d.amountEur
+              : (d.currency === 'EUR' ? d.amount : (toEur(d.amount, d.currency) || d.amount || 0));
+    return { date: d.date, eur: (d.type === 'dépôt' ? eur : -eur) };
+  });
+}
+function _xirrAnnual(cfs) {
+  cfs = cfs.filter(c => c.a !== 0);
+  if (cfs.length < 2) return null;
+  const d0 = cfs[0].t.getTime();
+  const npv = r => cfs.reduce((s, c) => s + c.a / Math.pow(1 + r, (c.t.getTime() - d0) / (365 * 86400000)), 0);
+  let lo = -0.9999, hi = 10;
+  const nlo = npv(lo), nhi = npv(hi);
+  if (!isFinite(nlo) || !isFinite(nhi) || nlo * nhi > 0) return null;
+  for (let i = 0; i < 200; i++) { const m = (lo + hi) / 2; (npv(lo) * npv(m) <= 0) ? (hi = m) : (lo = m); }
+  return (lo + hi) / 2;
+}
+function computeAnnualPerf(year) {
+  const rows = getEvoRows().filter(r => r && r.date).sort((a, b) => a.date.localeCompare(b.date));
+  const isCur = (new Date().getFullYear() === year);
+  const before = rows.filter(r => r.date < year + '-01-01');
+  const begin = before.length ? (before[before.length - 1].act_total || 0) : 0;
+  let endVal, endISO, endDate;
+  if (isCur) {
+    let t; try { t = getTodayEvoRow(); } catch (e) { t = rows[rows.length - 1] || {}; }
+    endVal = t.act_total || 0; endISO = new Date().toISOString().slice(0, 10);
+    endDate = new Date(endISO + 'T00:00:00');
+  } else {
+    const inY = rows.filter(r => r.date <= year + '-12-31');
+    if (!inY.length) return null;
+    endVal = inY[inY.length - 1].act_total || 0; endISO = year + '-12-31';
+    endDate = new Date(endISO + 'T00:00:00');
+  }
+  const flows = _boursierFlows().filter(f => f.date >= year + '-01-01' && f.date <= endISO);
+  if (!flows.length && begin === 0) return null;
+  const net = flows.reduce((s, f) => s + f.eur, 0);
+  const gain = endVal - begin - net;
+  const start = new Date(year + '-01-01T00:00:00');
+  const Tdays = Math.max(1, (endDate - start) / 86400000);
+  let cap = begin;
+  flows.forEach(f => { const t = (new Date(f.date + 'T00:00:00') - start) / 86400000; cap += ((Tdays - t) / Tdays) * f.eur; });
+  const dietz = (cap > 0) ? gain / cap : null;
+  const cfs = [{ t: start, a: -begin }]
+    .concat(flows.map(f => ({ t: new Date(f.date + 'T00:00:00'), a: -f.eur })))
+    .concat([{ t: endDate, a: endVal }])
+    .sort((a, b) => a.t - b.t);
+  const xirr = _xirrAnnual(cfs);
+  return { year, begin, net, endVal, gain, dietz, xirr, isCur };
+}
+function renderAnnualPerf() {
+  const box = document.getElementById('evoAnnualPerf');
+  if (!box) return;
+  const cur = new Date().getFullYear();
+  const years = [...new Set([2025, cur])].filter(y => y >= 2025).sort();
+  const fmtE = n => Math.round(n).toLocaleString('fr') + ' €';
+  const fmtPct = v => v == null ? '—' : ((v >= 0 ? '+' : '') + (v * 100).toFixed(1).replace('.', ',') + '%');
+  const col = v => v == null ? 'var(--text2)' : (v >= 0 ? '#4caf82' : '#e06c6c');
+  const rowsHtml = years.map(y => {
+    const p = computeAnnualPerf(y);
+    if (!p) return '';
+    const label = p.isCur ? (y + ' (en cours)') : String(y);
+    return `<tr>
+      <td style="padding:7px 10px;font-weight:600">${label}</td>
+      <td style="padding:7px 10px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${fmtE(p.net)}</td>
+      <td style="padding:7px 10px;text-align:right;font-family:'DM Mono',monospace">${fmtE(p.endVal)}</td>
+      <td style="padding:7px 10px;text-align:right;font-family:'DM Mono',monospace;color:${col(p.gain)}">${(p.gain >= 0 ? '+' : '') + fmtE(p.gain)}</td>
+      <td style="padding:7px 10px;text-align:right;font-weight:700;color:${col(p.dietz)}">${fmtPct(p.dietz)}</td>
+      <td style="padding:7px 10px;text-align:right;color:${col(p.xirr)}">${fmtPct(p.xirr)}</td>
+    </tr>`;
+  }).join('');
+  box.innerHTML = `
+    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);padding:16px 20px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px">📅 Performance par année civile</div>
+      <p style="font-size:11px;color:var(--text2);margin:0 0 12px">Rendement pondéré par la date des dépôts/retraits — portefeuille boursier</p>
+      <div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:12px;width:100%;min-width:560px">
+        <thead><tr style="color:var(--text2);font-size:10px;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border2)">
+          <th style="text-align:left;padding:6px 10px">Année</th>
+          <th style="text-align:right;padding:6px 10px">Net déposé</th>
+          <th style="text-align:right;padding:6px 10px">Valeur</th>
+          <th style="text-align:right;padding:6px 10px">Plus-value</th>
+          <th style="text-align:right;padding:6px 10px" title="Dietz modifié : rendement de la période, pondéré par les flux">Perf. (Dietz)</th>
+          <th style="text-align:right;padding:6px 10px" title="Taux de rendement interne annualisé (money-weighted)">Annualisé (XIRR)</th>
+        </tr></thead>
+        <tbody>${rowsHtml || '<tr><td colspan="6" style="padding:10px;color:var(--text2)">Données insuffisantes — connectez Google Sheets.</td></tr>'}</tbody>
+      </table></div>
+    </div>`;
+}
+
 function renderEvolution() {
   // Créer ou mettre à jour la section
   let evoDiv = document.getElementById('evolution');
@@ -4551,6 +4643,7 @@ function renderEvolution() {
       <h2 style="margin-bottom:4px">📈 Évolution du portefeuille</h2>
       <p class="section-desc" style="margin-bottom:20px">Historique quotidien — valeur actuelle et montant investi</p>
       <div id="evo_kpis" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:24px"></div>
+      <div id="evoAnnualPerf" style="margin-bottom:24px"></div>
       <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);padding:20px;margin-bottom:24px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
           <span style="font-size:13px;font-weight:600">Valeur actuelle vs Investi</span>
@@ -4613,6 +4706,7 @@ function renderEvolution() {
 }
 
 function _renderEvoContent(rows, period) {
+  try { renderAnnualPerf(); } catch (e) {}
   // Delta quotidien HORS dépôts/retraits : on retire la variation de l'investi
   // (dépôt ou retrait = différence d'investi entre le jour et la veille).
   const _allAsc = [...rows].sort((a, b) => a.date.localeCompare(b.date));
