@@ -185,7 +185,7 @@ def lire_portefeuille():
         return None
     try:
         svc = build("sheets", "v4", credentials=_get_creds()).spreadsheets()
-        res = svc.values().get(spreadsheetId=SHEET_ID, range="Data!A:Z").execute()
+        res = svc.values().get(spreadsheetId=SHEET_ID, range="Data!A:ZZZ").execute()
         data = {}
         for r in (res.get("values", []) or []):
             if r and r[0]:
@@ -256,11 +256,56 @@ def lire_etf_meta():
 # ==============================================================================
 # 3) Construction de la liste DYNAMIQUE des ETF detenus
 # ==============================================================================
+def etfs_from_xlsx():
+    """Repli : liste des ETF lue directement depuis repartition_ETFs.xlsx
+    (colonnes Nom/ISIN/ticker de l'onglet 'by country' ou 'by sector').
+    Utilise quand le portefeuille Google Sheets est indisponible : evite que
+    tout le script s'arrete (et donc que l'upload renvoie des donnees perimees)."""
+    if not os.path.exists(XLSX_FILE):
+        return None
+    try:
+        wb = load_workbook(XLSX_FILE)
+    except Exception as e:
+        log(f"  [xlsx] lecture impossible : {e}")
+        return None
+    # noms propres : on tente ETF_META (dashboard), indexe par ISIN si dispo,
+    # sinon par ticker (ETF_META utilise des cles 'IQQH.DE', etc.).
+    meta = lire_etf_meta()
+    isin2name = {v["isin"]: v["name"] for v in meta.values() if v.get("isin")}
+    tk2name = {k: v["name"] for k, v in meta.items() if v.get("name")}
+    seen = {}
+    for sh in ("by country", "by sector"):
+        if sh not in wb.sheetnames:
+            continue
+        ws = wb[sh]
+        cnom = col_index(ws, "Nom"); cisin = col_index(ws, "ISIN"); ctk = col_index(ws, "ticker")
+        if not (cisin and ctk):
+            continue
+        for r in range(2, ws.max_row + 1):
+            isin = str(ws.cell(r, cisin).value or "").strip().upper()
+            tk = str(ws.cell(r, ctk).value or "").strip()
+            nom = str(ws.cell(r, cnom).value or "").strip() if cnom else ""
+            # ignorer les formules residuelles (=[1]SAXO!U5, etc.)
+            if nom.startswith("=") or nom.startswith("["):
+                nom = ""
+            nom = isin2name.get(isin) or tk2name.get(tk) or nom or tk
+            if isin and isin not in seen:
+                seen[isin] = {"isin": isin, "ticker": tk or isin, "name": nom}
+    try:
+        wb.close()
+    except Exception:
+        pass
+    if seen:
+        log(f"  [xlsx] repli : {len(seen)} ETF lus depuis {os.path.basename(XLSX_FILE)} "
+            f"(portefeuille Google Sheets indisponible).")
+    return list(seen.values()) or None
+
+
 def etfs_du_portefeuille():
     """[{isin, ticker, name}] des ETF detenus (dedup par ISIN). None si indispo."""
     hold = lire_portefeuille()
     if not hold:
-        return None
+        return etfs_from_xlsx()
     meta = lire_etf_meta()
     meta_isins = {v["isin"] for v in meta.values()}
     seen = {}
