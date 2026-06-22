@@ -95,7 +95,7 @@ SYNTHETIC_PROXY = {
 # Pour ajouter un fonds : ouvrir sa fiche sur ishares.com et relever le numero
 # dans l'URL  .../products/<productId>/...
 ISHARES_PRODUCTID = {
-    "IE00B1XNHC34": "251382",   # iShares Global Clean Energy (IQQH)              [verifie 18/06/2026]
+    "IE00B1XNHC34": "251911",   # iShares Global Clean Energy Transition (IQQH/INRG) [corrige 22/06/2026 - 251382 etait un fonds Min Vol]
     "IE000U58J0M1": "326325",   # iShares Global Clean Energy Transition (Q8Y0)   [verifie 18/06/2026]
     "IE00BMG6Z448": "315592",   # iShares MSCI EM ex-China (MTPI) = proxy d'EMXC  [verifie 18/06/2026]
 }
