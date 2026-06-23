@@ -674,18 +674,22 @@ def main():
         print("❌ book2_all_rows vide ou invalide. Aucune écriture.")
         return
 
-    # 3) FX_RATES : on privilégie portfolio_fx (cohérence avec le dashboard),
-    #    sinon on complète par les paires CNB lues dans Prices.
-    FX_RATES["USD"] = portfolio_fx.get("USD") or fx_from_prices.get("USD")
-    FX_RATES["GBP"] = portfolio_fx.get("GBP") or fx_from_prices.get("GBP")
-    FX_RATES["CZK"] = portfolio_fx.get("CZK") or fx_from_prices.get("CZK")
+    # 3) FX_RATES : on privilégie le CNB FRAIS de l'onglet Prices (exactement
+    #    comme gsLoadPrices du dashboard, qui fixe FX_RATES.CZK = 1/eurCzk depuis
+    #    Prices et ne restaure JAMAIS le CZK depuis portfolio_fx). On ne retombe
+    #    sur portfolio_fx que si la paire CNB est absente de Prices.
+    #    [corrige 23/06/2026 : avant on privilegiait portfolio_fx (taux fige au
+    #     dernier 💾 Save) -> KB en CZK divergeait du dashboard]
+    FX_RATES["USD"] = fx_from_prices.get("USD") or portfolio_fx.get("USD")
+    FX_RATES["GBP"] = fx_from_prices.get("GBP") or portfolio_fx.get("GBP")
+    FX_RATES["CZK"] = fx_from_prices.get("CZK") or portfolio_fx.get("CZK")
     # Mêmes fallbacks que le dashboard
     if not FX_RATES["USD"]:
         FX_RATES["USD"] = 0.893
     if not FX_RATES["GBP"]:
         FX_RATES["GBP"] = 1.172
     print(f"  FX_RATES : USD={FX_RATES['USD']}, GBP={FX_RATES['GBP']}, CZK={FX_RATES['CZK']} "
-          f"(source: {'portfolio_fx' if portfolio_fx.get('USD') else 'Prices/CNB'})")
+          f"(source: {'Prices/CNB' if fx_from_prices.get('CZK') else 'portfolio_fx'})")
 
     # 4) Calcul de la ligne du jour
     snap = get_today_evo_row(book2_rows, cash_data, oblig_data, current_prices)
