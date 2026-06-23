@@ -670,6 +670,25 @@ def main():
     if not isinstance(evo_history, list):
         evo_history = []
 
+    # Prix MANUELS (CASH3.5, obligations XS, epargne/structures...) : ces produits
+    # ne sont PAS publies dans l'onglet Prices par update_prix_gsheet.py (prix
+    # saisis a la main). Le dashboard les conserve dans 'portfolio_prices'. Sans
+    # eux, le serveur retomberait sur le COUT (costEur) au lieu de la valeur de
+    # marche -> KB sous-evalue. On complete donc current_prices avec ces prix
+    # (l'onglet Prices reste prioritaire pour les tickers qu'il contient).
+    portfolio_prices = parse_json("portfolio_prices", {})
+    if isinstance(portfolio_prices, dict):
+        _added = 0
+        for _tk, _pi in portfolio_prices.items():
+            if _tk in current_prices:
+                continue
+            if isinstance(_pi, dict) and _pi.get("price"):
+                current_prices[_tk] = {"price": _pi["price"],
+                                       "currency": _pi.get("currency") or "EUR"}
+                _added += 1
+        if _added:
+            print(f"  Prix manuels ajoutes depuis portfolio_prices : {_added}")
+
     if not isinstance(book2_rows, list) or not book2_rows:
         print("❌ book2_all_rows vide ou invalide. Aucune écriture.")
         return
