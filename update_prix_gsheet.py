@@ -196,14 +196,19 @@ def prix_conseq(slug):
 
 
 def fmt_prix(p):
-    """Convertit un float en string avec toutes ses décimales significatives."""
+    """Prix en string a point decimal. Ecrit en RAW -> stocke tel quel (texte),
+    aucune conversion locale. Le dashboard lit le prix via parseFloat (sans
+    gestion de la virgule) : il FAUT donc garder le point."""
     if p is None:
         return ""
     return repr(p)
 
 
 def fmt_var(v):
-    """Variation en string ('' si indisponible) pour USER_ENTERED."""
+    """Variation en string a point decimal. ECRITE EN RAW : sans RAW (ex.
+    USER_ENTERED), Google Sheets en locale tchèque/française interpretait des
+    chaines comme '5.9', '11.9', '15.7' comme des DATES (5 sept / 11 sept /
+    15 juil) -> valeurs corrompues. RAW = stockage litteral, plus de date."""
     if v is None:
         return ""
     return repr(v)
@@ -399,7 +404,7 @@ def ecrire_google_sheets(rows):
         sheet.values().update(
             spreadsheetId=SHEET_ID,
             range=f"{SHEET_TAB}!A1",
-            valueInputOption="USER_ENTERED",
+            valueInputOption="RAW",
             body={"values": rows}
         ).execute()
         print(f"\n  ✅ {len(rows)-1} lignes (prix + variations) écrites")
