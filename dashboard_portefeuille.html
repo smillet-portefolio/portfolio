@@ -400,7 +400,7 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
           <span id="db_kpi_journ" class="kpi-value" style="font-size:20px">—</span>
           <span id="db_journ_val" class="kpi-value" style="font-size:20px">—</span>
         </div>
-        <div style="font-size:11px;color:var(--text2);margin-top:3px">Aujourd'hui (hors dépôts)</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:3px" id="db_journ_date">Aujourd'hui (hors dépôts)</div>
       </div>
     </div>
 
@@ -1476,7 +1476,27 @@ function renderDashboard() {
       set(elV, fmtP(pct), colPnl(pct));
       set(elE, `${gain >= 0 ? '+' : ''}${fmtE(gain)}`, colPnl(gain));
     };
-    calc(today,                       'db_kpi_journ', 'db_journ_val');
+    // ── Performance journalière : variation entre les 2 derniers jours COMPLETS ──
+    // Avant l'update de 18:00 (ligne du jour pas encore gelée) -> variation n-2 -> n-1.
+    // Après 18:00 (ligne du jour gelée) -> variation du jour (n-1 -> n). Hors dépôts.
+    (function() {
+      const completed = evo.filter(r => r.date < today || (r.date === today && r.frozen));
+      const last = completed[completed.length - 1];
+      const prev = completed[completed.length - 2];
+      const dl = document.getElementById('db_journ_date');
+      if (last && prev) {
+        const gain = ((last.act_total || 0) - (last.inv_total || 0))
+                   - ((prev.act_total || 0) - (prev.inv_total || 0));
+        const pct  = prev.act_total > 0 ? (gain / prev.act_total * 100) : null;
+        set('db_kpi_journ', fmtP(pct), colPnl(pct));
+        set('db_journ_val', `${gain >= 0 ? '+' : ''}${fmtE(gain)}`, colPnl(gain));
+        const fd = d => { const q = String(d).split('-'); return q.length === 3 ? (q[2] + '/' + q[1]) : d; };
+        if (dl) dl.textContent = `${fd(prev.date)} → ${fd(last.date)} · hors dépôts`;
+      } else {
+        set('db_kpi_journ', '—'); set('db_journ_val', '—');
+        if (dl) dl.textContent = 'Aucune donnée';
+      }
+    })();
     calc(today.slice(0,4) + '-01-01', 'db_kpi_ytd',   'db_ytd_val');
     calc(today.slice(0,7) + '-01',    'db_kpi_mtd',   'db_mtd_val');
   })();
