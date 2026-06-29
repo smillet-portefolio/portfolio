@@ -7341,6 +7341,8 @@ const STOCK_SECTORS = {
   'ALMIB.PA':'Biotech · Biocontrôle (micro-cap)',
   'FGR.PA':  'Industrie · Construction & Concessions',
   'VIE.PA':  'Industrie · Services environnementaux',
+  'IBE.MC':  'Services publics · Électricité renouvelable',
+  'VRT':     'Industrie · Infrastructure data centers',
 };
 
 // Country label by ticker
@@ -7363,6 +7365,8 @@ const STOCK_COUNTRY = {
   'ALMIB.PA':'🇫🇷 France',
   'FGR.PA':  '🇫🇷 France',
   'VIE.PA':  '🇫🇷 France',
+  'IBE.MC':  '🇪🇸 Espagne',
+  'VRT':     '🇺🇸 États-Unis',
 };
 
 // Sector badge style by ticker
@@ -7393,6 +7397,7 @@ function stockFlag(ticker) {
   if (ticker.endsWith('.PA'))                        return '🇫🇷';
   if (ticker.endsWith('.DE'))                        return '🇩🇪';
   if (ticker.endsWith('.MI'))                        return '🇮🇹';
+  if (ticker.endsWith('.MC'))                        return '🇪🇸';
   if (ticker.endsWith('.L'))                         return '🇬🇧';
   return '🏳️';
 }
@@ -7682,7 +7687,7 @@ function renderActions() {
     return { ...row, valEur, pnl, pnlPct, pxRevient, pxCurr, pxCur };
   }).sort((a, b) => {
     const st = window._actSort || { col:'valeur', dir:-1 };
-    const key = r => st.col==='name'?(r.name||''):st.col==='ticker'?(r.ticker||''):st.col==='pays'?(STOCK_COUNTRY[r.ticker]||stockFlag(r.ticker)||''):st.col==='secteur'?(STOCK_SECTORS[r.ticker]||DIRECT_SECTOR[r.ticker]||''):(r.valEur ?? r.costEur);
+    const key = r => st.col==='name'?(r.name||''):st.col==='ticker'?(r.ticker||''):st.col==='pays'?(STOCK_COUNTRY[r.ticker]||stockFlag(r.ticker)||''):st.col==='secteur'?(DIRECT_SECTOR[r.ticker]||STOCK_SECTORS[r.ticker]||''):(r.valEur ?? r.costEur);
     let x=key(a), y=key(b);
     if (typeof x==='string'||typeof y==='string') return st.dir*String(x).localeCompare(String(y));
     if (x==null) x=-Infinity; if (y==null) y=-Infinity;
@@ -7737,8 +7742,11 @@ function renderActions() {
       const refVal = r.valEur ?? r.costEur;
       const pctPF  = totPF ? (refVal/totPF*100).toFixed(1) : '—';
       const country = STOCK_COUNTRY[r.ticker] || stockFlag(r.ticker);
-      const sector  = STOCK_SECTORS[r.ticker] || DIRECT_SECTOR[r.ticker] || '—';
-      const badge   = STOCK_BADGE[r.ticker] || 'badge-gray';
+      // Nom de secteur HARMONISÉ avec l'onglet Secteurs (catégorie canonique)
+      // + couleur issue de la palette unifiée du donut "Par secteur".
+      const _canonSec = DIRECT_SECTOR[r.ticker] || (STOCK_SECTORS[r.ticker]||'').split(' · ')[0] || '—';
+      const _scol     = SECTOR_UNIFIED_COLORS[_canonSec] || '#c8c4be';
+      const _secDesc  = STOCK_SECTORS[r.ticker] || _canonSec;
       return `<tr>
         <td>
           <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${dotColor};margin-right:7px;vertical-align:middle;position:relative;top:-1px"></span>
@@ -7750,7 +7758,7 @@ function renderActions() {
         </td>
         <td><strong>${pctPF}%</strong></td>
         <td style="font-size:12px">${country}</td>
-        <td><span class="badge ${badge}">${sector.split(' · ')[0]}</span></td>
+        <td><span class="badge" title="${_secDesc}" style="background:${_scol}22;color:${_scol};border:1px solid ${_scol}55;font-weight:600">${_canonSec}</span></td>
       </tr>`;
     }).join('');
   }
