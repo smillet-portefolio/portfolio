@@ -4035,6 +4035,22 @@ async function gsSaveAll(opts) {
     try { localStorage.setItem('book2_all_rows', JSON.stringify(BOOK2_ROWS)); } catch(_){}
     // Google Sheets limite chaque cellule à 50 000 caractères → on découpe les
     // grandes valeurs sur plusieurs colonnes (B, C, D, …) recollées au chargement.
+    // Fusion evo_history : ne jamais perdre des jours ecrits cote serveur.
+    // On lit l'historique du Sheet et on fusionne (union par date) avec le local.
+    try {
+      const _cur = await gsRequest('GET', '/values/Data!A:Z');
+      const _rws = (_cur && _cur.values) || [];
+      const _eh = _rws.find(r => r[0] === 'evo_history');
+      if (_eh) {
+        const _remote = JSON.parse(_eh.slice(1).join('') || '[]');
+        const _local  = JSON.parse(localStorage.getItem('evo_history') || '[]');
+        const _byd = {};
+        (Array.isArray(_remote) ? _remote : []).forEach(r => { if (r && r.date) _byd[r.date] = r; });
+        (Array.isArray(_local)  ? _local  : []).forEach(r => { if (r && r.date) _byd[r.date] = r; }); // local prioritaire
+        const _merged = Object.values(_byd).sort((a, b) => (a.date < b.date ? -1 : 1));
+        localStorage.setItem('evo_history', JSON.stringify(_merged));
+      }
+    } catch(_) {}
     const CHUNK = 45000;
     const values = GS_KEYS.map(k => {
       const v = localStorage.getItem(k) || '';
@@ -4049,11 +4065,16 @@ async function gsSaveAll(opts) {
     try {
       await gsRequest('POST', ':batchUpdate', { requests: [{ addSheet: { properties: { title: 'Data' } } }] });
     } catch(_) {}
-    // Effacer l'ancien contenu (les valeurs peuvent occuper plusieurs colonnes)
-    await gsRequest('POST', '/values/Data!A:Z:clear', {});
-    // Écrire le nouveau contenu (lignes de largeur variable)
+    // ECRITURE ROBUSTE : on N'EFFACE PLUS avant d'ecrire. Un clear() suivi d'un
+    // echec d'ecriture (ex. token OAuth expire) laissait l'onglet Data VIDE et
+    // faisait perdre toutes les donnees. On pad chaque ligne a une largeur fixe
+    // (pour ecraser les anciens chunks) puis on ecrit en UNE requete : en cas
+    // d'echec, l'ancien contenu reste intact.
+    let _W = 20;
+    values.forEach(r => { if (r.length > _W) _W = r.length; });
+    const _padded = values.map(r => { const c = r.slice(); while (c.length < _W) c.push(''); return c; });
     await gsRequest('PUT', '/values/Data!A1?valueInputOption=RAW', {
-      range: 'Data!A1', majorDimension: 'ROWS', values
+      range: 'Data!A1', majorDimension: 'ROWS', values: _padded
     });
     try { localStorage.removeItem('_gs_pending_changes'); } catch(_){}
     gsSetMsg((opts.silent ? '✅ Auto-sauvegardé — ' : '✅ Sauvegardé — ') + new Date().toLocaleTimeString('fr'), '#4caf82');
