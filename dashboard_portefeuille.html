@@ -1316,6 +1316,8 @@ const DIRECT_COUNTRY = {
   'VST':'United States', 'IFX.DE':'Germany',       'ENR.DE':'Germany',
   'FGR.PA':'France',
   'VIE.PA':'France',
+  'IBE.MC':'Spain',          // Iberdrola
+  'VRT':'United States',     // Vertiv Holdings
 };
 let _geoCharts = {};
 
@@ -1884,6 +1886,8 @@ const DIRECT_SECTOR = {
   'VST':'Énergie',            'IFX.DE':'Technologie',
   'ENR.DE':'Énergie',         'FGR.PA':'Industrie',
   'VIE.PA':'Industrie',
+  'IBE.MC':'Services publics', // Iberdrola (utility)
+  'VRT':'Industrie',           // Vertiv Holdings
 };
 
 // Palette secteurs — utilise SECTOR_UNIFIED_COLORS déjà déclaré (noms FR)
@@ -3382,6 +3386,9 @@ function submitNewLine() {
     updateTableRows();              // apply current prices if available
   }
   refreshTotalFromRows();           // toujours mettre à jour TOTAL et header
+  if (typeof renderDashboard === 'function') renderDashboard();   // MAJ donuts Dashboard
+  if (typeof renderGeoCharts === 'function') renderGeoCharts();   // MAJ onglet Géographie
+  if (typeof renderSectCharts === 'function') renderSectCharts(); // MAJ onglet Secteurs
 
   // ── Récupérer le prix du nouveau ticker s'il n'est pas encore chargé ───────
   if (_gsToken && !CURRENT_PRICES[newRow.ticker]) {
@@ -3667,6 +3674,9 @@ function submitSellLine() {
 
   // Render closed positions tab
   renderClosedPositions();
+  if (typeof renderDashboard === 'function') renderDashboard();   // MAJ donuts Dashboard
+  if (typeof renderGeoCharts === 'function') renderGeoCharts();   // MAJ onglet Géographie
+  if (typeof renderSectCharts === 'function') renderSectCharts(); // MAJ onglet Secteurs
 
   closeSellLine();
 
