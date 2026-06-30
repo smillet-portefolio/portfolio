@@ -3708,6 +3708,10 @@ function renderClosedPositions() {
   const tbody = document.getElementById('closedBody'); if (!tbody) return;
   let all = [];
   try { all = JSON.parse(localStorage.getItem('closed_positions')||'[]'); } catch(e){}
+  // Identifiant stable par clôture (nécessaire pour l'édition)
+  let _idAdded = false;
+  all.forEach(p => { if (p && !p._id) { p._id = 'c' + Math.random().toString(36).slice(2,9); _idAdded = true; } });
+  if (_idAdded) { try { localStorage.setItem('closed_positions', JSON.stringify(all)); } catch(e){} }
   tbody.innerHTML = '';
   const emptyEl = document.getElementById('closed_empty');
   const tableEl = document.getElementById('closedTable');
@@ -3749,7 +3753,8 @@ function renderClosedPositions() {
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${Math.round(p.costEur).toLocaleString('fr')} €</td>
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${Math.round(p.saleEur).toLocaleString('fr')} €</td>
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:${col}">${sign}${Math.round(p.pnl).toLocaleString('fr')} €</td>
-      <td style="padding:7px 12px;text-align:right;color:${col}">${sign}${p.pnlPct.toFixed(1)}%</td>`;
+      <td style="padding:7px 12px;text-align:right;color:${col}">${sign}${p.pnlPct.toFixed(1)}%</td>
+      <td style="padding:7px 12px;text-align:center"><button onclick="editClosedPos('${p._id}')" title="Modifier prix de vente / FX" style="background:none;border:none;cursor:pointer;font-size:13px;line-height:1">✏️</button></td>`;
     tbody.appendChild(tr);
     totCost += p.costEur; totVal += p.saleEur; totPnl += p.pnl;
   });
@@ -3768,6 +3773,41 @@ function renderClosedPositions() {
   }
 
   if (typeof renderClosedByPos === 'function') renderClosedByPos();
+}
+
+// ── Édition d'une position clôturée : prix de vente + taux de change (FX) ─────
+function editClosedPos(id) {
+  let all = [];
+  try { all = JSON.parse(localStorage.getItem('closed_positions')||'[]'); } catch(e){ return; }
+  const i = all.findIndex(p => String(p._id) === String(id));
+  if (i < 0) { alert('Position introuvable'); return; }
+  const p   = all[i];
+  const cur = p.currencyVente || 'EUR';
+  const curFx = (p.qty && p.pxVente) ? +(p.saleEur / (p.qty * p.pxVente)).toFixed(6) : 1;
+  const sN = prompt('Prix de vente (' + cur + ') — ' + p.name + ' :', p.pxVente);
+  if (sN === null) return;
+  const npx = parseFloat(String(sN).replace(',', '.'));
+  if (!isFinite(npx) || npx < 0) { alert('Prix invalide'); return; }
+  const sF = prompt('Taux de change : 1 ' + cur + ' = ? EUR  (1 si déjà en EUR)', curFx);
+  if (sF === null) return;
+  const nfx = parseFloat(String(sF).replace(',', '.'));
+  if (!isFinite(nfx) || nfx <= 0) { alert('FX invalide'); return; }
+  p.pxVente = npx;
+  p.fx      = nfx;
+  p.saleEur = p.qty * npx * nfx;
+  p.pnl     = p.saleEur - (p.costEur || 0);
+  p.pnlPct  = p.costEur ? (p.pnl / p.costEur * 100) : 0;
+  all[i] = p;
+  try { localStorage.setItem('closed_positions', JSON.stringify(all)); } catch(e){}
+  renderClosedPositions();
+  if (typeof _gsToken !== 'undefined' && _gsToken && typeof gsSaveAll === 'function') gsSaveAll({ silent:true });
+  const st = document.getElementById('fetchStatus');
+  if (st) {
+    st.innerHTML = '✅ Clôture <strong>' + p.name + '</strong> modifiée — Vente ' +
+      Math.round(p.saleEur).toLocaleString('fr') + ' € · P&L ' +
+      (p.pnl>=0?'+':'') + Math.round(p.pnl).toLocaleString('fr') + ' €';
+    st.style.color = '#4caf82';
+  }
 }
 
 // ── P&L par position : tri + filtre (sélection) ─────────────────────────────
@@ -6474,11 +6514,12 @@ function renderObligCharts(data) {
             <th onclick="closedSort('saleEur',this)" data-csort="saleEur" style="padding:8px 12px;text-align:right;cursor:pointer;user-select:none">Vente €<span class="cs-arr" style="font-size:9px"></span></th>
             <th onclick="closedSort('pnl',this)" data-csort="pnl" style="padding:8px 12px;text-align:right;cursor:pointer;user-select:none;font-weight:700">P&amp;L €<span class="cs-arr" style="font-size:9px"></span></th>
             <th onclick="closedSort('pnlPct',this)" data-csort="pnlPct" style="padding:8px 12px;text-align:right;cursor:pointer;user-select:none">P&amp;L %<span class="cs-arr" style="font-size:9px"></span></th>
+            <th style="padding:8px 12px;text-align:center">Modifier</th>
           </tr>
           <tr style="background:var(--bg2)">
             <td style="padding:3px 8px"><input type="text" placeholder="Filtrer nom..." oninput="closedFilter('nom',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>
             <td style="padding:3px 8px"><input type="text" placeholder="Ticker..." oninput="closedFilter('ticker',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>
-            <td colspan="9"></td>
+            <td colspan="10"></td>
           </tr>
         </thead>
         <tbody id="closedBody"></tbody>
