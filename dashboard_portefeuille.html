@@ -879,48 +879,150 @@ const chartInited = {};
 //   - COÛTS / achats / dépenses  -> taux d'ACQUISITION (historique, champ .acq = CZK/€)
 //   - VALEUR actuelle (estimation de vente) -> taux COURANT (CNB du dashboard)
 const REAL_ESTATE = [
-  { id:'nuselsky', name:'Nuselský Pivovar', loc:'Nusle · Prague', m2:52, acq:25.15,
-    initial:9468516, total:10781322, mortgage:6900000, income:444666, sellEst:10500000,
+  { id:'nuselsky', name:'Nuselsky Pivovar', loc:'Nusle · Prague', desc:'Locatif', m2:52, acq:25.15,
+    initial:10781322, total:11242464, mortgage:6900000, income:444666, sellEst:10500000, hasLedger:true, mortPay:54376,
     details:[['Appartement',8710500],['Garage',560000],['Cave',198016],['Cuisine / équipement',1104533],['Modification appart.',29403],['Volets roulants',62658],['Borne de recharge',66812],['Contribution voirie',1000],['Projet déco intérieure',48400]] },
-  { id:'raichlova', name:'Raichlova', loc:'Prague', m2:null, acq:25.5,
-    initial:5700000, total:11063913, mortgage:4760000, income:0, sellEst:11000000,
-    details:[["Prix d'achat",5700000],['Apport (cash)',940000],['Hypothèque empruntée',4760000],['Mensualités hypothèque (cumul)',2953080],['Remboursement capital (cumul)',2920956],['Assurance hypothèque',42633]] },
-  { id:'pec', name:'Peć', loc:'Pec pod Sněžkou', m2:84.3, acq:25.7,
-    initial:7407900, total:9966110, mortgage:null, income:1331553, sellEst:11000000,
-    details:[['Appartement',7095000],['Garage',289000],['Box',23900],['Apport / paiement initial',4410817],['Remboursement hypothèque (cumul)',4820711],['Assurance hypothèque',53568],['Assurance',77605],['Charges mensuelles (cumul)',603409]] },
-  { id:'tisno', name:'Tisno', loc:'Croatie (côte)', m2:null, share:true, acq:24.87,
-    initial:5613459, total:5617637, mortgage:2220816, income:57325, sellEst:6370000,
-    details:[['Part par famille (prix)',5613459],['Apport (acompte)',538858],['Linxea',1238501],['Seb Jito',291004],['Codevi Seb',522270],['Codevi Estelle',549378],['Hypothèque',2220816],['Épargne CZ',251635]] },
+  { id:'raichlova', name:'Raichlova', loc:'Prague', desc:'Résidence principale', m2:94, m2txt:'94 m² + 25 m² terrasse', acq:25.5,
+    initial:5700000, total:11063913, mortgage:4760000, income:0, sellEst:11000000, detTitle:'Coût total',
+    details:[["Prix d'achat",5700000],['Reconstruction living room 2016',812067],['Bureau rénovation 2020',54412],['Pergola + terrasse 2022',446886],['Flat redesign 2023',2893879],['Assurance hypothèque',42633],['Coût hypothèque',1114036]] },
+  { id:'pec', name:'Pec', loc:'Pec pod Snezkou', desc:'Secondaire + locatif', m2:84.3, acq:25.7,
+    initial:8944401, total:9285096, mortgage:null, income:1331553, sellEst:11000000, detTitle:'Coût total', hasRent2:true,
+    details:[["Prix d'achat",8944401],['Assurance hypothèque',53568],['Coût hypothèque',287127]] },
+  { id:'tisno', name:'Tisno', loc:'Croatie (côte)', desc:'Secondaire + locatif', m2:78, share:true, acq:24.87, cur:'EUR',
+    initial:225672, total:235372, mortgage:null, income:2267, sellEst:256132, detTitle:'Coût total', hasRent3:true,
+    details:[['Prix initial',225672],["Frais d'acquisition",4000],['Climatisation',5700]] },
 ];
+const RE_MORT_SEED = { nuselsky: [{"m":"2025-01","principal":28133,"interest":26243},{"m":"2025-02","principal":26373,"interest":28003},{"m":"2025-03","principal":26481,"interest":27895},{"m":"2025-04","principal":26589,"interest":27787},{"m":"2025-05","principal":26697,"interest":27679},{"m":"2025-06","principal":26806,"interest":27570},{"m":"2025-07","principal":26915,"interest":27461},{"m":"2025-08","principal":27025,"interest":27351},{"m":"2025-09","principal":27135,"interest":27241},{"m":"2025-10","principal":27245,"interest":27131},{"m":"2025-11","principal":27356,"interest":27020},{"m":"2025-12","principal":27468,"interest":26908},{"m":"2026-01","principal":27580,"interest":26796},{"m":"2026-02","principal":27692,"interest":26684},{"m":"2026-03","principal":27805,"interest":26571},{"m":"2026-04","principal":27918,"interest":26458},{"m":"2026-05","principal":28032,"interest":26344}] };
+const RE_RENT_SEED = { nuselsky: [{"m":"2025-04","rev":71016,"cost":8206},{"m":"2025-05","rev":32800,"cost":6706},{"m":"2025-06","rev":32800,"cost":6706},{"m":"2025-07","rev":32800,"cost":6706},{"m":"2025-08","rev":32800,"cost":6706},{"m":"2025-09","rev":32800,"cost":6268},{"m":"2025-10","rev":32800,"cost":6706},{"m":"2025-11","rev":32800,"cost":6706},{"m":"2025-12","rev":32800,"cost":12103},{"m":"2026-01","rev":32800,"cost":6836},{"m":"2026-02","rev":32800,"cost":6836},{"m":"2026-03","rev":32800,"cost":6836},{"m":"2026-04","rev":34500,"cost":14757},{"m":"2026-05","rev":36350,"cost":4118}] };
+function _reLoadJSON(k){ try{ return JSON.parse(localStorage.getItem(k)||'{}'); }catch(e){ return {}; } }
+function _reMortList(id){ const m=_reLoadJSON('re_mortgage'); return Array.isArray(m[id])? m[id] : ((RE_MORT_SEED[id]||[]).map(x=>({...x}))); }
+function _reRentList(id){ const m=_reLoadJSON('re_rental'); return Array.isArray(m[id])? m[id] : ((RE_RENT_SEED[id]||[]).map(x=>({...x}))); }
+function _reMortCost(id){ return _reMortList(id).reduce((s,x)=>s+(+x.interest||0),0); }
+function _reRentRev(id){ return _reRentList(id).reduce((s,x)=>s+(+x.rev||0),0); }
+function _reSaveList(k,id,arr){ const m=_reLoadJSON(k); m[id]=arr; try{ localStorage.setItem(k,JSON.stringify(m)); }catch(e){} if(typeof _gsToken!=='undefined'&&_gsToken&&typeof gsSaveAll==='function') gsSaveAll({silent:true}); }
+function _reNum(v){ return parseFloat(String(v).replace(/[^\d.,-]/g,'').replace(/\s/g,'').replace(',','.')); }
+function _reNextMonth(arr,fb){ if(!arr.length) return fb; const p=arr[arr.length-1].m.split('-').map(Number); const d=new Date(p[0],p[1],1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function reAddMort(id){ const a=REAL_ESTATE.find(x=>x.id===id); const pay=a&&a.mortPay?a.mortPay:54376; const arr=_reMortList(id); const nm=_reNextMonth(arr,'2026-06'); const dft=arr.length?arr[arr.length-1].principal:28000; const pi=prompt('Mensualite '+nm+' : '+pay+' Kc.\nPart capital rembourse (Kc) ? Le reste = interets, ajoute au cout de l hypotheque.',dft); if(pi==null) return; const principal=_reNum(pi); if(!isFinite(principal)){ alert('Montant invalide'); return; } arr.push({m:nm,principal:Math.round(principal),interest:Math.round(pay-principal)}); _reSaveList('re_mortgage',id,arr); renderImmo(); }
+function reEditMort(id,i){ const a=REAL_ESTATE.find(x=>x.id===id); const pay=a&&a.mortPay?a.mortPay:54376; const arr=_reMortList(id); if(!arr[i])return; const pi=prompt('Part capital '+arr[i].m+' (Kc) ? Mensualite '+pay,arr[i].principal); if(pi==null)return; const p=_reNum(pi); if(!isFinite(p))return; arr[i].principal=Math.round(p); arr[i].interest=Math.round(pay-p); _reSaveList('re_mortgage',id,arr); renderImmo(); }
+function reDelMort(id){ const arr=_reMortList(id); if(!arr.length)return; if(!confirm('Retirer la derniere mensualite ('+arr[arr.length-1].m+') ?'))return; arr.pop(); _reSaveList('re_mortgage',id,arr); renderImmo(); }
+function reAddRent(id){ const arr=_reRentList(id); const nm=_reNextMonth(arr,'2026-06'); const rv=prompt('Revenus locatifs '+nm+' (loyer percu, Kc) ?',arr.length?arr[arr.length-1].rev:32800); if(rv==null)return; const rev=_reNum(rv); const cs=prompt('Couts locatifs '+nm+' (charges + assurances, Kc) ?',arr.length?arr[arr.length-1].cost:6836); if(cs==null)return; const cost=_reNum(cs); arr.push({m:nm,rev:Math.round(rev)||0,cost:Math.round(cost)||0}); _reSaveList('re_rental',id,arr); renderImmo(); }
+function reEditRent(id,i){ const arr=_reRentList(id); if(!arr[i])return; const rv=prompt('Revenus '+arr[i].m+' (Kc) ?',arr[i].rev); if(rv==null)return; const cs=prompt('Couts '+arr[i].m+' (Kc) ?',arr[i].cost); if(cs==null)return; arr[i].rev=Math.round(_reNum(rv))||0; arr[i].cost=Math.round(_reNum(cs))||0; _reSaveList('re_rental',id,arr); renderImmo(); }
+function reDelRent(id){ const arr=_reRentList(id); if(!arr.length)return; if(!confirm('Retirer le dernier mois ('+arr[arr.length-1].m+') ?'))return; arr.pop(); _reSaveList('re_rental',id,arr); renderImmo(); }
 function _reFxNow(){ return (typeof FX_RATES!=='undefined' && FX_RATES.CZK) ? FX_RATES.CZK : (1/24.5); } // 1 CZK = X EUR (courant)
 const _reHistE = (czk,a) => czk / a.acq;        // EUR au taux d'acquisition
 const _reNowE  = czk => czk * _reFxNow();       // EUR au taux courant
-const _reCZK   = n => Math.round(n).toLocaleString('fr')+' Kč';
-const _reEUR   = n => Math.round(n).toLocaleString('fr')+' €';
+const _reCur   = a => a.cur||'CZK';
+function _czkCost(a,n){ return _reCur(a)==='EUR'? n*a.acq : n; }
+function _czkEst(a,n){ return _reCur(a)==='EUR'? n/_reFxNow() : n; }
+function _eurCost(a,n){ return _reCur(a)==='EUR'? n : n/a.acq; }
+function _eurEst(a,n){ return _reCur(a)==='EUR'? n : n*_reFxNow(); }
+function _reP(a,n){ return _reCur(a)==='EUR'? _reEUR(n) : _reCZK(n); }
+const _reGrp   = n => { n=Math.round(n); const s=Math.abs(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,' '); return (n<0?'-':'')+s; };
+const _reCZK   = n => _reGrp(n)+' Kč';
+const _reEUR   = n => _reGrp(n)+' €';
 function _reLoadEst(){ try{ return JSON.parse(localStorage.getItem('re_estimates')||'{}'); }catch(e){ return {}; } }
 function _reEst(a){ const m=_reLoadEst(); return (m[a.id]!=null)? m[a.id] : a.sellEst; }  // en CZK
 function reSetEstimate(id,val){ const m=_reLoadEst(); const v=parseFloat(String(val).replace(/[^\d.,-]/g,'').replace(/\s/g,'').replace(',','.')); if(isFinite(v)) m[id]=v; try{ localStorage.setItem('re_estimates',JSON.stringify(m)); }catch(e){} renderImmo(); if(typeof _gsToken!=='undefined' && _gsToken && typeof gsSaveAll==='function') gsSaveAll({silent:true}); }
 function _reSwitch(id){ window._reActive=id; document.querySelectorAll('#immo .re-tab').forEach(t=>{ const on=t.dataset.re===id; t.style.background=on?'var(--card)':'var(--bg2)'; t.style.borderBottom=on?'2px solid var(--blue)':'2px solid transparent'; }); document.querySelectorAll('#immo .re-pane').forEach(p=>{ p.style.display=(p.dataset.re===id?'':'none'); }); }
+const RE_RENT2_SEED = { pec: [{"m": "2019-02", "ins": 8915, "fees": 0, "rev": 0}, {"m": "2019-05", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2019-06", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2019-07", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2019-08", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2019-09", "ins": 0, "fees": 21743, "rev": 73961}, {"m": "2019-10", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2019-11", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2019-12", "ins": 0, "fees": 3551, "rev": 10955}, {"m": "2020-01", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2020-02", "ins": 8915, "fees": 3551, "rev": 0}, {"m": "2020-03", "ins": 0, "fees": 14268, "rev": 50152}, {"m": "2020-04", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2020-05", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2020-06", "ins": 0, "fees": 3551, "rev": 8460}, {"m": "2020-07", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2020-08", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2020-09", "ins": 0, "fees": 14488, "rev": 54980}, {"m": "2020-10", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2020-11", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2020-12", "ins": 0, "fees": 3551, "rev": 12803}, {"m": "2021-01", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2021-02", "ins": 8915, "fees": 3551, "rev": 0}, {"m": "2021-03", "ins": 0, "fees": 24531, "rev": 31644}, {"m": "2021-04", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2021-05", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2021-06", "ins": 0, "fees": 8946, "rev": 18288}, {"m": "2021-07", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2021-08", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2021-09", "ins": 0, "fees": 13997, "rev": 67828}, {"m": "2021-10", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2021-11", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2021-12", "ins": 0, "fees": 14003, "rev": 71540}, {"m": "2022-01", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2022-02", "ins": 8915, "fees": 2951, "rev": 0}, {"m": "2022-03", "ins": 0, "fees": 23193, "rev": 97412}, {"m": "2022-04", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2022-05", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2022-06", "ins": 0, "fees": 15472, "rev": 33202}, {"m": "2022-07", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2022-08", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2022-09", "ins": 0, "fees": 9753, "rev": 47140}, {"m": "2022-10", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2022-11", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2022-12", "ins": 0, "fees": 13164, "rev": 31149}, {"m": "2023-01", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2023-02", "ins": 10140, "fees": 2951, "rev": 0}, {"m": "2023-03", "ins": 0, "fees": 24271, "rev": 52049}, {"m": "2023-04", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2023-05", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2023-06", "ins": 0, "fees": 10238, "rev": 28300}, {"m": "2023-07", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2023-08", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2023-09", "ins": 0, "fees": 18251, "rev": 54272}, {"m": "2023-10", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2023-11", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2023-12", "ins": 0, "fees": 16617, "rev": 36909}, {"m": "2024-01", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2024-02", "ins": 10140, "fees": 3979, "rev": 0}, {"m": "2024-03", "ins": 0, "fees": 27380, "rev": 32157}, {"m": "2024-04", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2024-05", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2024-06", "ins": 0, "fees": 18039, "rev": 13853}, {"m": "2024-07", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2024-08", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2024-09", "ins": 0, "fees": 17248, "rev": 33102}, {"m": "2024-10", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2024-11", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2024-12", "ins": 0, "fees": 16700, "rev": 30809}, {"m": "2025-01", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2025-02", "ins": 10557, "fees": 3979, "rev": 0}, {"m": "2025-03", "ins": 0, "fees": 21784, "rev": 117993}, {"m": "2025-04", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2025-05", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2025-06", "ins": 0, "fees": 10599, "rev": 46518}, {"m": "2025-07", "ins": 0, "fees": 4029, "rev": 0}, {"m": "2025-08", "ins": 0, "fees": 4029, "rev": 0}, {"m": "2025-09", "ins": 0, "fees": 10259, "rev": 67778}, {"m": "2025-10", "ins": 0, "fees": 4029, "rev": 0}, {"m": "2025-11", "ins": 0, "fees": 4029, "rev": 0}, {"m": "2025-12", "ins": 0, "fees": 13491, "rev": 102726}, {"m": "2026-01", "ins": 0, "fees": 4029, "rev": 0}, {"m": "2026-02", "ins": 11108, "fees": 4029, "rev": 0}, {"m": "2026-03", "ins": 0, "fees": 11403, "rev": 105574}, {"m": "2026-04", "ins": 0, "fees": 4029, "rev": 0}, {"m": "2026-05", "ins": 0, "fees": 4029, "rev": 0}] };
+function _reRent2List(id){ const m=_reLoadJSON('re_rental2'); return Array.isArray(m[id])? m[id] : ((RE_RENT2_SEED[id]||[]).map(x=>({...x}))); }
+function _reRent2Rev(id){ return _reRent2List(id).reduce((s,x)=>s+(+x.rev||0),0); }
+function reAddRent2(id){ const arr=_reRent2List(id); const nm=_reNextMonth(arr,'2026-06'); const last=arr.length?arr[arr.length-1]:{ins:0,fees:0,rev:0}; const iv=prompt('Assurance '+nm+' (Kc) ?',last.ins||0); if(iv==null)return; const fv=prompt('Charges mensuelles '+nm+' (Kc) ?',last.fees||0); if(fv==null)return; const rv=prompt('Revenus locatifs '+nm+' (Kc) ?',last.rev||0); if(rv==null)return; arr.push({m:nm,ins:Math.round(_reNum(iv))||0,fees:Math.round(_reNum(fv))||0,rev:Math.round(_reNum(rv))||0}); _reSaveList('re_rental2',id,arr); renderImmo(); }
+function reEditRent2(id,i){ const arr=_reRent2List(id); if(!arr[i])return; const iv=prompt('Assurance '+arr[i].m+' (Kc) ?',arr[i].ins); if(iv==null)return; const fv=prompt('Charges '+arr[i].m+' (Kc) ?',arr[i].fees); if(fv==null)return; const rv=prompt('Revenus '+arr[i].m+' (Kc) ?',arr[i].rev); if(rv==null)return; arr[i]={m:arr[i].m,ins:Math.round(_reNum(iv))||0,fees:Math.round(_reNum(fv))||0,rev:Math.round(_reNum(rv))||0}; _reSaveList('re_rental2',id,arr); renderImmo(); }
+function reDelRent2(id){ const arr=_reRent2List(id); if(!arr.length)return; if(!confirm('Retirer le dernier mois ('+arr[arr.length-1].m+') ?'))return; arr.pop(); _reSaveList('re_rental2',id,arr); renderImmo(); }
+function _reRent2Table(a){
+  const arr=_reRent2List(a.id);
+  const ti=arr.reduce((s,x)=>s+(+x.ins||0),0), tf=arr.reduce((s,x)=>s+(+x.fees||0),0), tr=arr.reduce((s,x)=>s+(+x.rev||0),0);
+  const net=tr-ti-tf;
+  let rr=''; arr.forEach((x,i)=>{ const n=(+x.rev||0)-(+x.ins||0)-(+x.fees||0); rr+=`<tr style="border-bottom:1px solid var(--border);cursor:pointer" onclick="reEditRent2('${a.id}',${i})" title="Cliquer pour modifier"><td style="padding:6px 12px">${x.m}</td><td style="padding:6px 12px;text-align:right;font-family:'DM Mono',monospace;color:#e06c6c">${_reCZK(x.ins)}</td><td style="padding:6px 12px;text-align:right;font-family:'DM Mono',monospace;color:#e06c6c">${_reCZK(x.fees)}</td><td style="padding:6px 12px;text-align:right;font-family:'DM Mono',monospace;color:#4caf82">${_reCZK(x.rev)}</td><td style="padding:6px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:600;color:${n>=0?'#4caf82':'#e06c6c'}">${n>=0?'+':''}${_reCZK(n)}</td></tr>`; });
+  const btn=(fn,txt,c)=>`<button onclick="${fn}" style="padding:6px 12px;border:1px solid var(--border2);border-radius:6px;background:${c||'var(--bg2)'};color:var(--text);cursor:pointer;font-size:12px;font-weight:600">${txt}</button>`;
+  return `<div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 8px;flex-wrap:wrap;gap:8px"><h4 style="margin:0">Revenus locatifs</h4><div style="display:flex;gap:8px">${btn(`reAddRent2('${a.id}')`,'+ Ajouter un mois','var(--blue)')}${btn(`reDelRent2('${a.id}')`,'↩ Retirer dernier')}</div></div>
+    <div class="card" style="padding:0;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:var(--bg2);text-transform:uppercase;font-size:10px;color:var(--text2)"><th style="padding:8px 12px;text-align:left">Mois</th><th style="padding:8px 12px;text-align:right">Assurance</th><th style="padding:8px 12px;text-align:right">Charges mensuelles</th><th style="padding:8px 12px;text-align:right">Revenus</th><th style="padding:8px 12px;text-align:right">Net</th></tr></thead><tbody>${rr}</tbody><tfoot><tr style="border-top:2px solid var(--border2);font-weight:700"><td style="padding:8px 12px">TOTAL (${arr.length} mois)</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:#e06c6c">${_reCZK(ti)}</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:#e06c6c">${_reCZK(tf)}</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:#4caf82">${_reCZK(tr)}</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:${net>=0?'#4caf82':'#e06c6c'}">${net>=0?'+':''}${_reCZK(net)}</td></tr></tfoot></table></div>
+    <p style="font-size:11px;color:var(--text2);margin:6px 0 0">💡 Historique importé de l'Excel. Clique une ligne pour corriger ; « + Ajouter un mois » propose les valeurs à modifier.</p>`;
+}
+
+const RE_RENT3_SEED = { tisno:[{"d":"31/12/2024","rev":2267,"label":"Revenus locatif 2024"}] };
+function _reRent3List(id){ const m=_reLoadJSON('re_rental3'); return Array.isArray(m[id])? m[id] : ((RE_RENT3_SEED[id]||[]).map(x=>({...x}))); }
+function _reRent3Rev(id){ return _reRent3List(id).reduce((s,x)=>s+(+x.rev||0),0); }
+function reAddRent3(id){ const arr=_reRent3List(id); const d=prompt('Date (JJ/MM/AAAA) ?',''); if(d==null)return; const rv=prompt('Revenus locatif ?',0); if(rv==null)return; const lb=prompt('Description ?',''); if(lb==null)return; arr.push({d:d||'',rev:Math.round(_reNum(rv))||0,label:lb||''}); _reSaveList('re_rental3',id,arr); renderImmo(); }
+function reEditRent3(id,i){ const arr=_reRent3List(id); if(!arr[i])return; const d=prompt('Date ?',arr[i].d); if(d==null)return; const rv=prompt('Revenus ?',arr[i].rev); if(rv==null)return; const lb=prompt('Description ?',arr[i].label); if(lb==null)return; arr[i]={d:d||'',rev:Math.round(_reNum(rv))||0,label:lb||''}; _reSaveList('re_rental3',id,arr); renderImmo(); }
+function reDelRent3(id){ const arr=_reRent3List(id); if(!arr.length)return; if(!confirm('Retirer la derniere ligne ?'))return; arr.pop(); _reSaveList('re_rental3',id,arr); renderImmo(); }
+function _reRent3Table(a){
+  const arr=_reRent3List(a.id); const tr=arr.reduce((s,x)=>s+(+x.rev||0),0);
+  let rr=''; arr.forEach((x,i)=>{ const alt=_reCur(a)==='EUR'? _reCZK(x.rev*a.acq) : _reEUR(x.rev/a.acq); rr+=`<tr style="border-bottom:1px solid var(--border);cursor:pointer" onclick="reEditRent3('${a.id}',${i})" title="Cliquer pour modifier"><td style="padding:6px 12px">${x.d||''}</td><td style="padding:6px 12px;text-align:right;font-family:'DM Mono',monospace;color:#4caf82">${_reP(a,x.rev)}</td><td style="padding:6px 12px;font-size:12px;color:var(--text2)">${x.label||''}</td></tr>`; });
+  const btn=(fn,txt,c)=>`<button onclick="${fn}" style="padding:6px 12px;border:1px solid var(--border2);border-radius:6px;background:${c||'var(--bg2)'};color:var(--text);cursor:pointer;font-size:12px;font-weight:600">${txt}</button>`;
+  return `<div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 8px;flex-wrap:wrap;gap:8px"><h4 style="margin:0">Revenus locatifs</h4><div style="display:flex;gap:8px">${btn(`reAddRent3('${a.id}')`,'+ Ajouter une ligne','var(--blue)')}${btn(`reDelRent3('${a.id}')`,'↩ Retirer dernier')}</div></div>
+    <div class="card" style="padding:0;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:var(--bg2);text-transform:uppercase;font-size:10px;color:var(--text2)"><th style="padding:8px 12px;text-align:left">Date</th><th style="padding:8px 12px;text-align:right">Revenus</th><th style="padding:8px 12px;text-align:left">Description</th></tr></thead><tbody>${rr}</tbody><tfoot><tr style="border-top:2px solid var(--border2);font-weight:700"><td style="padding:8px 12px">TOTAL</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:#4caf82">${_reP(a,tr)}</td><td></td></tr></tfoot></table></div>
+    <p style="font-size:11px;color:var(--text2);margin:6px 0 0">💡 Clique une ligne pour modifier ; « + Ajouter une ligne » pour un nouveau revenu.</p>`;
+}
+
+function _reLedgerPane(a,act){
+  const est=_reEst(a);
+  const iE=_reHistE(a.initial,a), tE=_reHistE(a.total,a), sE=_reNowE(est);
+  const pvCzk=est-a.total, pvE=sE-tE, pc=pvCzk>=0?'#4caf82':'#e06c6c';
+  const mort=_reMortList(a.id), rent=_reRentList(a.id);
+  const mortCost=mort.reduce((s,x)=>s+(+x.interest||0),0);
+  const sumCap=mort.reduce((s,x)=>s+(+x.principal||0),0);
+  const sumPay=mort.reduce((s,x)=>s+(+x.principal||0)+(+x.interest||0),0);
+  const rentRev=rent.reduce((s,x)=>s+(+x.rev||0),0);
+  const rentCost=rent.reduce((s,x)=>s+(+x.cost||0),0);
+  const rentNet=rentRev-rentCost;
+  const kpi=(label,val,sub,col)=>`<div class="card" style="padding:14px"><div class="kpi-label">${label}</div><div class="kpi-value" style="font-size:18px${col?';color:'+col:''}">${val}</div>${sub?`<div style="font-size:10px;color:var(--text2)">${sub}</div>`:''}</div>`;
+  let dr=''; a.details.forEach(d=>{ dr+=`<tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 12px">${d[0]}</td><td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(d[1])}</td><td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${_reEUR(_reHistE(d[1],a))}</td></tr>`; });
+  const detTot=a.details.reduce((s,d)=>s+d[1],0);
+  let mr=''; mort.forEach((x,i)=>{ const pay=(+x.principal||0)+(+x.interest||0); mr+=`<tr style="border-bottom:1px solid var(--border);cursor:pointer" onclick="reEditMort('${a.id}',${i})" title="Cliquer pour modifier la part capital"><td style="padding:6px 12px">${x.m}</td><td style="padding:6px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(pay)}</td><td style="padding:6px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(x.principal)}</td><td style="padding:6px 12px;text-align:right;font-family:'DM Mono',monospace;color:#f0956e">${_reCZK(x.interest)}</td></tr>`; });
+  let rr=''; rent.forEach((x,i)=>{ const net=(+x.rev||0)-(+x.cost||0); rr+=`<tr style="border-bottom:1px solid var(--border);cursor:pointer" onclick="reEditRent('${a.id}',${i})" title="Cliquer pour modifier"><td style="padding:6px 12px">${x.m}</td><td style="padding:6px 12px;text-align:right;font-family:'DM Mono',monospace;color:#4caf82">${_reCZK(x.rev)}</td><td style="padding:6px 12px;text-align:right;font-family:'DM Mono',monospace;color:#e06c6c">${_reCZK(x.cost)}</td><td style="padding:6px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:600;color:${net>=0?'#4caf82':'#e06c6c'}">${net>=0?'+':''}${_reCZK(net)}</td></tr>`; });
+  const btn=(fn,txt,c)=>`<button onclick="${fn}" style="padding:6px 12px;border:1px solid var(--border2);border-radius:6px;background:${c||'var(--bg2)'};color:var(--text);cursor:pointer;font-size:12px;font-weight:600">${txt}</button>`;
+  return `<div class="re-pane" data-re="${a.id}" style="${act===a.id?'':'display:none'}">
+    <h3 style="margin:0 0 4px">${a.name}</h3><p style="font-size:12px;color:var(--text2);margin:0 0 16px">${a.loc}${a.m2txt?' · '+a.m2txt:(a.m2?' · '+a.m2+' m²':'')} · taux d'achat ${a.acq} CZK/€</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px">
+      ${kpi('Prix initial',_reCZK(a.initial),_reEUR(iE)+' · taux achat')}
+      ${kpi('Coût hypothèque (intérêts)',_reCZK(mortCost),'cumul · '+_reEUR(_reHistE(mortCost,a)),'#f0956e')}
+      ${kpi('Coût total',_reCZK(a.total),'prix initial + intérêts')}
+      ${kpi('Revenus locatifs',_reCZK(rentRev),'cumul','#4caf82')}
+      ${kpi('Coûts locatifs',_reCZK(rentCost),'cumul','#e06c6c')}
+      ${kpi('Résultat locatif net',(rentNet>=0?'+':'')+_reCZK(rentNet),'revenus − coûts',rentNet>=0?'#4caf82':'#e06c6c')}
+      ${kpi('Estimation vente',_reCZK(est),_reEUR(sE)+' · taux courant')}
+      ${kpi('Plus-value estimée',(pvCzk>=0?'+':'')+_reCZK(pvCzk),(pvE>=0?'+':'')+_reEUR(pvE),pc)}
+    </div>
+    <h4 style="margin:14px 0 8px">Détail prix initial</h4>
+    <div class="card" style="padding:0;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:var(--bg2);text-transform:uppercase;font-size:10px;color:var(--text2)"><th style="padding:8px 12px;text-align:left">Poste</th><th style="padding:8px 12px;text-align:right">Montant (CZK)</th><th style="padding:8px 12px;text-align:right">EUR (taux achat)</th></tr></thead><tbody>${dr}</tbody><tfoot><tr style="border-top:2px solid var(--border2);font-weight:700"><td style="padding:8px 12px">TOTAL prix initial</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(detTot)}</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${_reEUR(_reHistE(detTot,a))}</td></tr></tfoot></table></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 8px;flex-wrap:wrap;gap:8px"><h4 style="margin:0">Hypothèque — remboursement mensuel</h4><div style="display:flex;gap:8px">${btn(`reAddMort('${a.id}')`,'+ Ajouter mensualité','var(--blue)')}${btn(`reDelMort('${a.id}')`,'↩ Retirer dernier')}</div></div>
+    <div class="card" style="padding:0;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:var(--bg2);text-transform:uppercase;font-size:10px;color:var(--text2)"><th style="padding:8px 12px;text-align:left">Mois</th><th style="padding:8px 12px;text-align:right">Mensualité</th><th style="padding:8px 12px;text-align:right">Part capital</th><th style="padding:8px 12px;text-align:right">Intérêts (coût)</th></tr></thead><tbody>${mr}</tbody><tfoot><tr style="border-top:2px solid var(--border2);font-weight:700"><td style="padding:8px 12px">TOTAL (${mort.length} mois)</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(sumPay)}</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(sumCap)}</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:#f0956e">${_reCZK(mortCost)}</td></tr></tfoot></table></div>
+    <p style="font-size:11px;color:var(--text2);margin:6px 0 0">💡 Chaque mois : mensualité ${_reCZK(a.mortPay||54376)}. Clique une ligne pour ajuster la part capital ; les intérêts (mensualité − capital) alimentent le coût de l'hypothèque et le coût total.</p>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 8px;flex-wrap:wrap;gap:8px"><h4 style="margin:0">Revenus & coûts locatifs</h4><div style="display:flex;gap:8px">${btn(`reAddRent('${a.id}')`,'+ Ajouter un mois','var(--blue)')}${btn(`reDelRent('${a.id}')`,'↩ Retirer dernier')}</div></div>
+    <div class="card" style="padding:0;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:var(--bg2);text-transform:uppercase;font-size:10px;color:var(--text2)"><th style="padding:8px 12px;text-align:left">Mois</th><th style="padding:8px 12px;text-align:right">Revenus</th><th style="padding:8px 12px;text-align:right">Coûts</th><th style="padding:8px 12px;text-align:right">Net</th></tr></thead><tbody>${rr}</tbody><tfoot><tr style="border-top:2px solid var(--border2);font-weight:700"><td style="padding:8px 12px">TOTAL (${rent.length} mois)</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:#4caf82">${_reCZK(rentRev)}</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:#e06c6c">${_reCZK(rentCost)}</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:${rentNet>=0?'#4caf82':'#e06c6c'}">${rentNet>=0?'+':''}${_reCZK(rentNet)}</td></tr></tfoot></table></div>
+    <p style="font-size:11px;color:var(--text2);margin:6px 0 0">💡 Électricité conservée dans l'historique ; actuellement payée par les locataires. Clique une ligne pour corriger les montants.</p>
+  </div>`;
+}
+
 function renderImmo(){
   const cont=document.getElementById('immo'); if(!cont) return;
   const act = window._reActive || 'summary';
+  REAL_ESTATE.forEach(a=>{ if(a.hasLedger){ a.total = a.initial + _reMortCost(a.id); a.income = _reRentRev(a.id); } if(a.hasRent2){ a.income = _reRent2Rev(a.id); } if(a.hasRent3){ a.income = _reRent3Rev(a.id); } });
   const tabBtn = (id,label,on) => `<button class="re-tab" data-re="${id}" onclick="_reSwitch('${id}')" style="padding:8px 15px;border:none;border-bottom:2px solid ${on?'var(--blue)':'transparent'};border-radius:6px 6px 0 0;cursor:pointer;font-size:13px;font-weight:600;background:${on?'var(--card)':'var(--bg2)'};color:var(--text)">${label}</button>`;
   let tabs = tabBtn('summary','Summary',act==='summary');
   REAL_ESTATE.forEach(a=> tabs += tabBtn(a.id,a.name,act===a.id));
 
   let tI=0,tT=0,tS=0, tIe=0,tTe=0,tSe=0, rows='';
   REAL_ESTATE.forEach(a=>{
-    const est=_reEst(a);
-    const iE=_reHistE(a.initial,a), tE=_reHistE(a.total,a), sE=_reNowE(est);
-    const pvCzk=est-a.total, pvp=a.total? pvCzk/a.total*100:0, pvE=sE-tE, pc=pvCzk>=0?'#4caf82':'#e06c6c';
-    tI+=a.initial; tT+=a.total; tS+=est; tIe+=iE; tTe+=tE; tSe+=sE;
+    const est=_reEst(a); const eur=_reCur(a)==='EUR';
+    const iC=_czkCost(a,a.initial), tC=_czkCost(a,a.total), sC=_czkEst(a,est);
+    const iE=_eurCost(a,a.initial), tE=_eurCost(a,a.total), sE=_eurEst(a,est);
+    const pvNat=est-a.total, pvp=a.total? pvNat/a.total*100:0, pvE=sE-tE, pvC=sC-tC, pc=pvC>=0?'#4caf82':'#e06c6c';
+    const subI= eur? _reCZK(iC)+' · taux achat' : _reEUR(iE)+' · taux achat';
+    const subT= eur? _reCZK(tC)+' · taux achat' : _reEUR(tE)+' · taux achat';
+    const subS= eur? _reCZK(sC)+' · taux courant' : _reEUR(sE)+' · taux courant';
+    const subPv= (pvp>=0?'+':'')+pvp.toFixed(1)+'% · '+(eur? ((pvC>=0?'+':'')+_reCZK(pvC)) : ((pvE>=0?'+':'')+_reEUR(pvE)));
+    tI+=iC; tT+=tC; tS+=sC; tIe+=iE; tTe+=tE; tSe+=sE;
     rows += `<tr style="border-bottom:1px solid var(--border)">
       <td style="padding:9px 12px"><strong>${a.name}</strong><div style="font-size:10px;color:var(--text2)">${a.loc}${a.share?' · part par famille':''}</div></td>
-      <td style="padding:9px 12px;text-align:right">${a.m2?a.m2+' m²':'—'}</td>
-      <td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(a.initial)}<div style="font-size:10px;color:var(--text2)">${_reEUR(iE)} · taux achat</div></td>
-      <td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(a.total)}<div style="font-size:10px;color:var(--text2)">${_reEUR(tE)} · taux achat</div></td>
-      <td style="padding:9px 12px;text-align:right"><input type="text" value="${Math.round(est).toLocaleString('fr')}" onchange="reSetEstimate('${a.id}',this.value)" style="width:118px;text-align:right;padding:5px 7px;background:var(--bg);border:1px solid var(--border2);border-radius:5px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px"> Kč<div style="font-size:10px;color:var(--text2)">${_reEUR(sE)} · taux courant</div></td>
-      <td style="padding:9px 12px;text-align:right;font-weight:700;color:${pc}">${pvCzk>=0?'+':''}${_reCZK(pvCzk)}<div style="font-size:10px">${pvp>=0?'+':''}${pvp.toFixed(1)}% · ${pvE>=0?'+':''}${_reEUR(pvE)}</div></td></tr>`;
+      <td style="padding:9px 12px;font-size:12px;color:var(--text2)">${a.desc||''}</td>
+      <td style="padding:9px 12px;text-align:right">${a.m2txt || (a.m2?a.m2+' m²':'—')}</td>
+      <td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace">${_reP(a,a.initial)}<div style="font-size:10px;color:var(--text2)">${subI}</div></td>
+      <td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace">${_reP(a,a.total)}<div style="font-size:10px;color:var(--text2)">${subT}</div></td>
+      <td style="padding:9px 12px;text-align:right"><input type="text" value="${_reGrp(est)}" onchange="reSetEstimate('${a.id}',this.value)" style="width:118px;text-align:right;padding:5px 7px;background:var(--bg);border:1px solid var(--border2);border-radius:5px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px"> ${eur?'€':'Kč'}<div style="font-size:10px;color:var(--text2)">${subS}</div></td>
+      <td style="padding:9px 12px;text-align:right;font-weight:700;color:${pc}">${pvNat>=0?'+':''}${_reP(a,pvNat)}<div style="font-size:10px">${subPv}</div></td></tr>`;
   });
   const tPv=tS-tT, tPvp=tT?tPv/tT*100:0, tPvE=tSe-tTe, tpc=tPv>=0?'#4caf82':'#e06c6c';
   const summary = `<div class="re-pane" data-re="summary" style="${act==='summary'?'':'display:none'}">
@@ -931,31 +1033,39 @@ function renderImmo(){
     </div>
     <div class="card" style="padding:0;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">
       <thead><tr style="background:var(--bg2);text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2)">
-        <th style="padding:9px 12px;text-align:left">Bien</th><th style="padding:9px 12px;text-align:right">Surface</th><th style="padding:9px 12px;text-align:right">Prix initial</th><th style="padding:9px 12px;text-align:right">Coût total</th><th style="padding:9px 12px;text-align:right">Estimation vente</th><th style="padding:9px 12px;text-align:right">Plus-value</th></tr></thead>
+        <th style="padding:9px 12px;text-align:left">Bien</th><th style="padding:9px 12px;text-align:left">Description</th><th style="padding:9px 12px;text-align:right">Surface</th><th style="padding:9px 12px;text-align:right">Prix initial</th><th style="padding:9px 12px;text-align:right">Coût total</th><th style="padding:9px 12px;text-align:right">Estimation vente</th><th style="padding:9px 12px;text-align:right">Plus-value</th></tr></thead>
       <tbody>${rows}</tbody>
-      <tfoot><tr style="border-top:2px solid var(--border2);font-weight:700"><td style="padding:9px 12px">TOTAL</td><td></td><td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(tI)}<div style="font-size:10px;color:var(--text2);font-weight:400">${_reEUR(tIe)}</div></td><td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(tT)}<div style="font-size:10px;color:var(--text2);font-weight:400">${_reEUR(tTe)}</div></td><td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(tS)}<div style="font-size:10px;color:var(--text2);font-weight:400">${_reEUR(tSe)}</div></td><td style="padding:9px 12px;text-align:right;color:${tpc}">${tPv>=0?'+':''}${_reCZK(tPv)}<div style="font-size:10px;font-weight:400">${tPvE>=0?'+':''}${_reEUR(tPvE)}</div></td></tr></tfoot>
+      <tfoot><tr style="border-top:2px solid var(--border2);font-weight:700"><td style="padding:9px 12px">TOTAL</td><td></td><td></td><td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(tI)}<div style="font-size:10px;color:var(--text2);font-weight:400">${_reEUR(tIe)}</div></td><td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(tT)}<div style="font-size:10px;color:var(--text2);font-weight:400">${_reEUR(tTe)}</div></td><td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(tS)}<div style="font-size:10px;color:var(--text2);font-weight:400">${_reEUR(tSe)}</div></td><td style="padding:9px 12px;text-align:right;color:${tpc}">${tPv>=0?'+':''}${_reCZK(tPv)}<div style="font-size:10px;font-weight:400">${tPvE>=0?'+':''}${_reEUR(tPvE)}</div></td></tr></tfoot>
     </table></div>
     <p style="font-size:11px;color:var(--text2);margin-top:10px">💡 Devise principale : CZK. EUR des coûts au <strong>taux d'acquisition</strong> ; EUR de l'estimation au <strong>taux courant</strong> (${(1/_reFxNow()).toFixed(2)} CZK/€). Estimation éditable (indicative — Prague ≈ 145–150k Kč/m² en 2026).</p>
   </div>`;
   let panes='';
   REAL_ESTATE.forEach(a=>{
-    const est=_reEst(a);
-    const iE=_reHistE(a.initial,a), tE=_reHistE(a.total,a), sE=_reNowE(est);
-    const pvCzk=est-a.total, pvE=sE-tE, pc=pvCzk>=0?'#4caf82':'#e06c6c';
+    if(a.hasLedger){ panes += _reLedgerPane(a,act); return; }
+    const est=_reEst(a); const eur=_reCur(a)==='EUR';
+    const altI= eur? _reCZK(_czkCost(a,a.initial)) : _reEUR(_eurCost(a,a.initial));
+    const altT= eur? _reCZK(_czkCost(a,a.total))   : _reEUR(_eurCost(a,a.total));
+    const altS= eur? _reCZK(_czkEst(a,est))        : _reEUR(_eurEst(a,est));
+    const pvNat=est-a.total, pc=pvNat>=0?'#4caf82':'#e06c6c';
+    const pvAltNum= eur? (_czkEst(a,est)-_czkCost(a,a.total)) : (_eurEst(a,est)-_eurCost(a,a.total));
+    const altPv=(pvAltNum>=0?'+':'')+(eur?_reCZK(pvAltNum):_reEUR(pvAltNum));
     let dr='';
-    a.details.forEach(d=>{ dr += `<tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 12px">${d[0]}</td><td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(d[1])}</td><td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${_reEUR(_reHistE(d[1],a))}</td></tr>`; });
+    a.details.forEach(d=>{ const alt=eur? _reCZK(d[1]*a.acq) : _reEUR(d[1]/a.acq); dr += `<tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 12px">${d[0]}</td><td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${_reP(a,d[1])}</td><td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${alt}</td></tr>`; });
     const kpi = (label,val,sub,col) => `<div class="card" style="padding:14px"><div class="kpi-label">${label}</div><div class="kpi-value" style="font-size:18px${col?';color:'+col:''}">${val}</div>${sub?`<div style="font-size:10px;color:var(--text2)">${sub}</div>`:''}</div>`;
     panes += `<div class="re-pane" data-re="${a.id}" style="${act===a.id?'':'display:none'}">
-      <h3 style="margin:0 0 4px">${a.name}</h3><p style="font-size:12px;color:var(--text2);margin:0 0 16px">${a.loc}${a.m2?' · '+a.m2+' m²':''}${a.share?' · part par famille':''} · taux d'achat ${a.acq} CZK/€</p>
+      <h3 style="margin:0 0 4px">${a.name}</h3><p style="font-size:12px;color:var(--text2);margin:0 0 16px">${a.loc}${a.m2txt?' · '+a.m2txt:(a.m2?' · '+a.m2+' m²':'')}${a.share?' · part par famille':''} · taux d'achat ${a.acq} CZK/€</p>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px">
-        ${kpi('Prix initial',_reCZK(a.initial),_reEUR(iE)+' · taux achat')}
-        ${kpi('Coût total',_reCZK(a.total),_reEUR(tE)+' · taux achat')}
-        ${a.mortgage?kpi('Hypothèque',_reCZK(a.mortgage),_reEUR(_reHistE(a.mortgage,a))+' · taux achat'):''}
-        ${a.income?kpi('Revenus locatifs (cumul)',_reCZK(a.income),_reEUR(_reHistE(a.income,a)),'#4caf82'):''}
-        ${kpi('Estimation vente',_reCZK(est),_reEUR(sE)+' · taux courant')}
-        ${kpi('Plus-value estimée',(pvCzk>=0?'+':'')+_reCZK(pvCzk),(pvE>=0?'+':'')+_reEUR(pvE),pc)}
+        ${kpi('Prix initial',_reP(a,a.initial),altI+' · taux achat')}
+        ${kpi(a.detTitle||'Coût total',_reP(a,a.total),altT+' · taux achat')}
+        ${a.mortgage?kpi('Hypothèque',_reP(a,a.mortgage),(eur?_reCZK(a.mortgage*a.acq):_reEUR(a.mortgage/a.acq))+' · taux achat'):''}
+        ${a.income?kpi('Revenus locatifs (cumul)',_reP(a,a.income),(eur?_reCZK(a.income*a.acq):_reEUR(a.income/a.acq)),'#4caf82'):''}
+        ${kpi('Estimation vente',_reP(a,est),altS+' · taux courant')}
+        ${kpi('Plus-value estimée',(pvNat>=0?'+':'')+_reP(a,pvNat),altPv+(eur?' · taux courant':''),pc)}
       </div>
-      <div class="card" style="padding:0;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:var(--bg2);text-transform:uppercase;font-size:10px;color:var(--text2)"><th style="padding:8px 12px;text-align:left">Poste</th><th style="padding:8px 12px;text-align:right">Montant (CZK)</th><th style="padding:8px 12px;text-align:right">EUR (taux achat)</th></tr></thead><tbody>${dr}</tbody></table></div>
+      ${a.detTitle?`<h4 style="margin:14px 0 8px">${a.detTitle}</h4>`:''}
+      <div class="card" style="padding:0;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:var(--bg2);text-transform:uppercase;font-size:10px;color:var(--text2)"><th style="padding:8px 12px;text-align:left">Poste</th><th style="padding:8px 12px;text-align:right">Montant (${eur?'EUR':'CZK'})</th><th style="padding:8px 12px;text-align:right">${eur?'CZK (taux achat)':'EUR (taux achat)'}</th></tr></thead><tbody>${dr}</tbody></table></div>
+      ${a.hasRent2?_reRent2Table(a):''}
+      ${a.hasRent3?_reRent3Table(a):''}
     </div>`;
   });
   cont.innerHTML = `<div style="display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--border);margin-bottom:18px">${tabs}</div>${summary}${panes}`;
@@ -4086,7 +4196,11 @@ const GS_KEYS = [
   'etf_comp_override','etf_comp_date',
   'direct_sector_overrides',
   'evo_history',
-  're_estimates'
+  're_estimates',
+  're_mortgage',
+  're_rental',
+  're_rental2',
+  're_rental3'
 ];
 
 // ==============================================================================
