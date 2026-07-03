@@ -1342,7 +1342,7 @@ function makeLegend(id, data, tot) {
 }
 
 // ── Sector icons & unified colors ─────────────────────────────────────────────
-const SECTOR_ICONS = {'Tech':'💻','Technologie':'💻','Industrie':'⚙️','Finance':'🏦','Luxe/Auto':'🚗','Conso. disc.':'🛍️','Conso. staple':'🛒','Énergie propre':'🌱','Énergie':'⚡','Semiconducteurs':'🔌','Espace/Tech':'🚀','Hydrogène':'💧','Dividendes':'💰','Biotech':'🧬','Santé':'🏥','Logistique':'📦','Défense/Aéro':'✈️','Télécom':'📡','Matériaux':'⛏️','Nucléaire':'☢️','Services publics':'💡','Immobilier':'🏢','Multi-sectoriel':'🌐','Autres':'📊'};
+const SECTOR_ICONS = {'Tech':'💻','Technologie':'💻','Industrie':'⚙️','Finance':'🏦','Luxe/Auto':'🚗','Conso. disc.':'🛍️','Conso. staple':'🛒','Énergie propre':'🌱','Énergie':'⚡','Semiconducteurs':'🔌','Espace/Tech':'🚀','Hydrogène':'💧','Dividendes':'💰','Biotech':'🧬','Santé':'🏥','Logistique':'📦','Défense/Aéro':'✈️','Télécom':'📡','Matériaux':'⛏️','Nucléaire':'☢️','Services publics':'💡','Immobilier':'🏢','Financier':'📈','Retraite':'🏦','Multi-sectoriel':'🌐','Autres':'📊'};
 const SECTOR_UNIFIED_COLORS = {'Tech':'#5a8dee','Technologie':'#5a8dee','Industrie':'#4caf82','Finance':'#f0956e','Luxe/Auto':'#e891b8','Conso. disc.':'#e891b8','Conso. staple':'#5ec9a4','Énergie propre':'#4caf82','Énergie':'#e8a838','Semiconducteurs':'#b8a8e0','Espace/Tech':'#9b87d4','Hydrogène':'#5bbfcc','Dividendes':'#d4a84b','Biotech':'#8ecf7a','Santé':'#e06c6c','Logistique':'#f0b87a','Défense/Aéro':'#7c7ed4','Télécom':'#9b87d4','Matériaux':'#a09890','Nucléaire':'#d4c44a','Services publics':'#5a8dee','Immobilier':'#b8a8e0','Multi-sectoriel':'#a8a49e','Autres':'#c8c4be','IT / Tech':'#5a8dee','Financières':'#f0956e','Utilities / EnR':'#5ec9a4','Comm. Services':'#9b87d4','Aérospatial/Défense':'#7c7ed4'};
 
 function makeTable(id, data, tot) {
@@ -1693,7 +1693,7 @@ function renderPatrimoine(){
   const kpi=(label,v,col,sub)=>`<div class="card" style="padding:18px 16px"><div class="kpi-label">${label}</div><div class="kpi-value" style="font-size:22px${col?';color:'+col:''}">${czk(v)}</div><div style="font-size:12px;color:var(--text2);margin-top:4px">${eur(czkToEur(v))}${sub?' · '+sub:''}</div></div>`;
 
   // Donut répartition
-  const cats = [ {l:'Financier', v:finVal, c:'#5a8dee'}, {l:'Immobilier', v:immoEstCzk, c:'#f0956e'}, {l:'Retraite', v:pensionCzk, c:'#4caf82'} ];
+  const cats = [ {l:'Financier', v:finVal, c:'#5a8dee'}, {l:'Immobilier', v:immoEstCzk, c:'#f0956e'}, {l:'Retraite', v:pensionCzk, c:'#4caf82'} ].sort((a,b)=>b.v-a.v);
   const tot = cats.reduce((s,x)=>s+x.v,0)||1;
   const legend = cats.map(x=>`<div style="display:flex;align-items:center;gap:8px;font-size:13px;margin:5px 0"><span style="width:12px;height:12px;border-radius:3px;background:${x.c};flex-shrink:0"></span><span style="flex:1">${x.l}</span><span style="font-family:'DM Mono',monospace">${czk(x.v)}</span><span style="color:var(--text2);width:44px;text-align:right">${(x.v/tot*100).toFixed(1)}%</span></div>`).join('');
 
@@ -1711,14 +1711,18 @@ function renderPatrimoine(){
   const dRent= revYears.map(y=>Math.round(yrs[y].rent));
   const dBond= revYears.map(y=>Math.round(yrs[y].bond));
   const dMonth=revYears.map(y=>Math.round((yrs[y].div+yrs[y].rent+yrs[y].bond)/12));
+  const _maxBar = Math.max(1, ...revYears.map((y,i)=>dDiv[i]+dRent[i]+dBond[i]));
+  const _maxMon = Math.max(1, ...dMonth);
+  const _y1max = _maxMon*1.15;
+  const _ymax = Math.max(_maxBar*1.1, _y1max*12.8);
 
   cont.innerHTML = `
     <h2 style="font-size:18px;font-weight:700;margin:0 0 4px">🏦 Patrimoine Total</h2>
     <p class="section-desc" style="margin-bottom:16px">Consolidation financier + immobilier + retraite — CZK (conversion € au taux courant ${(1/fx).toFixed(2)} CZK/€).</p>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:20px">
       ${kpi('Patrimoine brut', brutCzk, '', 'financier + immobilier + retraite')}
-      ${kpi('Dette (hypothèques)', detteCzk, '#e06c6c', 'capital restant dû')}
       ${kpi('Patrimoine net', netCzk, '#4caf82', 'brut − dette')}
+      ${kpi('Dette (hypothèques)', detteCzk, '#e06c6c', 'capital restant dû')}
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:22px">
       <div class="card" style="padding:18px">
@@ -1774,8 +1778,8 @@ function renderPatrimoine(){
             tooltip:{ callbacks:{ label:c=>c.dataset.label+' : '+czk(c.parsed.y) } } },
           scales:{
             x:{stacked:true, grid:{display:false}},
-            y:{stacked:true, beginAtZero:true, title:{display:true,text:'Kč / an',font:{size:10}}, ticks:{callback:v=>grp(v)}},
-            y1:{position:'right', beginAtZero:true, grid:{drawOnChartArea:false}, title:{display:true,text:'Kč / mois',font:{size:10}}, ticks:{callback:v=>grp(v)}}
+            y:{stacked:true, beginAtZero:true, max:_ymax, title:{display:true,text:'Kč / an',font:{size:10}}, ticks:{callback:v=>grp(v)}},
+            y1:{position:'right', beginAtZero:true, max:_y1max, grid:{drawOnChartArea:false}, title:{display:true,text:'Kč / mois',font:{size:10}}, ticks:{callback:v=>grp(v)}}
           } }
       });
     }
