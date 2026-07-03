@@ -608,6 +608,7 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
         <div id="ltFilterBtns" style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
           <button class="filter-btn active" onclick="filterLT('all',this)">Tous</button>
         </div>
+        <div id="ltChartTitle" style="font-size:15px;font-weight:700;color:var(--text);margin:2px 0 8px;display:none"></div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;font-size:11px" id="ltChartLegend"></div>
         <div id="ltChartWrap" style="position:relative;width:100%;height:3200px">
           <canvas id="ltChart" role="img"></canvas>
@@ -2611,6 +2612,14 @@ function renderLTChart(filter) {
   const leg  = document.getElementById('ltChartLegend');
   if (!wrap) return;
   renderLTFilters();
+  const _ltTitle = document.getElementById('ltChartTitle');
+  if (_ltTitle){
+    if (filter && filter !== 'all'){
+      const _tk = (typeof LT_SHORT_TO_TICKER!=='undefined' && LT_SHORT_TO_TICKER[filter]) || filter;
+      _ltTitle.textContent = (ETF_META[_tk] && ETF_META[_tk].name) || _tk;
+      _ltTitle.style.display = '';
+    } else { _ltTitle.textContent=''; _ltTitle.style.display='none'; }
+  }
 
   const hasComp = Object.keys(ETF_META).some(t => (ETF_COMP_OVERRIDE[t]?.positionsAll || ETF_META[t]?.positions || []).length > 0);
   const hasVal  = Object.keys(_compValMap).length > 0;
@@ -8218,6 +8227,7 @@ const ETF_LABELS = {
   'VGWE.DE':'Vanguard High Div','D5BI.DE':'Xtrackers MSCI Mexico ETF','NUKL.DE':'VanEck Uranium',
   'LSMC.DE':'Amundi Semis','MTPI.PA':'iShares ex-China',
   'Q8Y0.DE':'iShares Clean Energy Tr.','MWRE.DE':'Amundi Core World',
+  'XDWH.DE':'MSCI World Health Care',
 };
 const ETF_META = {
   'XDWD.DE': { name:'Xtrackers MSCI World',        short:'XDWD', ter:0.12, index:'MSCI World (1 300 titres)',     type:'Cœur large',   badge:'badge-blue',
@@ -9136,7 +9146,7 @@ function renderETFValues() {
 
   // ── Refresh ETF bar chart ────────────────────────────────────────────────────
   const etfChartData = rows.map(r => ({
-    l: ETF_LABELS[r.ticker] || r.ticker,
+    l: ETF_LABELS[r.ticker] || (ETF_META[r.ticker] && ETF_META[r.ticker].name) || r.name || r.ticker,
     v: r.valEur ?? r.costEur,
     c: ETF_COLORS[r.ticker] || '#5a8dee'
   })).sort((a, b) => b.v - a.v);
