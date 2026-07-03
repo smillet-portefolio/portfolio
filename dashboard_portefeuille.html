@@ -338,6 +338,7 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
 
   <!-- TABS -->
   <div class="tabs">
+    <button class="tab" onclick="sw('patrimoine',this)">🏦 Patrimoine Total</button>
     <button class="tab active" onclick="sw('dashboard',this)">📊 Dashboard</button>
     <button class="tab" onclick="sw('evolution',this)">📈 Évolution</button>
     <button class="tab" onclick="sw('actetf',this)">📉 Actions ETFs +/−</button>
@@ -355,6 +356,9 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
     <button class="tab" onclick="sw('conseq',this)">🏦 Conseq Retraite</button>
     <button class="tab" onclick="sw('immo',this)">🏠 Immobilier</button>
   </div>
+
+  <!-- ======== PATRIMOINE TOTAL ======== -->
+  <div id="patrimoine" class="section"></div>
 
   <!-- ======== PATRIMOINE IMMOBILIER ======== -->
   <div id="immo" class="section"></div>
@@ -1116,6 +1120,7 @@ function sw(id, btn) {
     setTimeout(restorePersistedPrices, 150);
   }, 50);
   if (id === 'clotures')     setTimeout(renderClosedPositions, 50);
+  if (id === 'patrimoine')   setTimeout(renderPatrimoine, 50);
   if (id === 'immo')         setTimeout(renderImmo, 50);
   if (id === 'dashboard') setTimeout(renderDashboard, 50);
   if (id === 'cash')         setTimeout(renderCashSection, 50);
@@ -1632,6 +1637,100 @@ async function autoUpdateNewTicker(row){
   }catch(e){ set('⚠️ '+String(e.message||e).slice(0,110)); }
 }
 
+let _patDonut = null;
+function renderPatrimoine(){
+  const cont = document.getElementById('patrimoine'); if(!cont) return;
+  if(!window._patFin && typeof renderDashboard==='function'){ try{ renderDashboard(); }catch(e){} }
+  if(typeof csqRecalc==='function'){ try{ csqRecalc(); }catch(e){} }
+  const fx = (typeof _reFxNow==='function') ? _reFxNow() : ((typeof FX_RATES!=='undefined'&&FX_RATES.CZK)?FX_RATES.CZK:(1/24.335));
+  const eurToCzk = e => e / fx, czkToEur = c => c * fx;
+  const grp = n => { n=Math.round(n||0); const s=Math.abs(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,' '); return (n<0?'-':'')+s; };
+  const czk = n => grp(n)+' Kč', eur = n => grp(n)+' €';
+  const gc = v => v>=0?'#4caf82':'#e06c6c';
+
+  // Financier (dashboard, EUR)
+  const fin = (window._patFin && window._patFin.types) ? window._patFin.types : [];
+  const finTotEur = (window._patFin && typeof window._patFin.totalEur==='number') ? window._patFin.totalEur : fin.reduce((s,t)=>s+(t.val||0),0);
+  const finTotCzk = eurToCzk(finTotEur);
+  const finPnlEur = fin.reduce((s,t)=>s+(t.pnl||0),0);
+
+  // Immobilier (CZK)
+  const RE = (typeof REAL_ESTATE!=='undefined') ? REAL_ESTATE : [];
+  let immoEstCzk=0, immoCostCzk=0, immoDetteCzk=0;
+  const immoRows = RE.map(a=>{
+    const est = (typeof _reEst==='function') ? _reEst(a) : a.sellEst;
+    const totC = (typeof _czkCost==='function') ? _czkCost(a,a.total) : a.total;
+    const estC = (typeof _czkEst==='function') ? _czkEst(a,est) : est;
+    const cap = a.hasLedger ? (6900000 - _reMortList(a.id).reduce((s,x)=>s+(+x.principal||0),0)) : 0;
+    const pv = estC - totC;
+    immoEstCzk += estC; immoCostCzk += totC; immoDetteCzk += cap;
+    return {name:a.name, desc:a.desc||'', totC, estC, cap, pv};
+  });
+  const immoPv = immoEstCzk - immoCostCzk;
+
+  // Pension (Conseq, CZK)
+  const funds = (typeof CONSEQ_DATA!=='undefined' && CONSEQ_DATA && CONSEQ_DATA.funds) ? CONSEQ_DATA.funds : [];
+  const pensionCzk = (typeof CONSEQ_DATA!=='undefined' && CONSEQ_DATA && CONSEQ_DATA.valueNow) ? CONSEQ_DATA.valueNow : funds.reduce((s,f)=>s+(f.total||0),0);
+  const pensionPnl = funds.reduce((s,f)=>s+((f.value||0)-(f.invested||0)),0);
+
+  // Band
+  const brutCzk = finTotCzk + pensionCzk + immoEstCzk;
+  const detteCzk = immoDetteCzk;
+  const netCzk = brutCzk - detteCzk;
+  const kpi=(label,v,col,sub)=>`<div class="card" style="padding:18px 16px"><div class="kpi-label">${label}</div><div class="kpi-value" style="font-size:22px${col?';color:'+col:''}">${czk(v)}</div><div style="font-size:12px;color:var(--text2);margin-top:4px">${eur(czkToEur(v))}${sub?' · '+sub:''}</div></div>`;
+
+  // Tables
+  const TH='padding:8px 12px;text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2);background:var(--bg2)';
+  let immoT=''; immoRows.forEach(r=>{ immoT+=`<tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 12px;font-weight:600">${r.name}</td><td style="padding:7px 12px;font-size:12px;color:var(--text2)">${r.desc}</td><td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${czk(r.totC)}</td><td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${czk(r.estC)}</td><td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:#f0956e">${r.cap?czk(r.cap):'—'}</td><td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:${gc(r.pv)}">${r.pv>=0?'+':''}${czk(r.pv)}</td></tr>`; });
+  let finT=''; fin.slice().sort((a,b)=>(b.val||0)-(a.val||0)).forEach(t=>{ finT+=`<tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 12px;font-weight:600">${t.label}</td><td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${eur(t.val||0)}</td><td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:${gc(t.pnl||0)}">${(t.pnl||0)>=0?'+':''}${eur(t.pnl||0)}</td></tr>`; });
+  let penT=''; funds.slice().sort((a,b)=>(b.total||0)-(a.total||0)).forEach(f=>{ const pv=(f.value||0)-(f.invested||0); penT+=`<tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 12px;font-weight:600">${f.name}</td><td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${czk(f.total||0)}</td><td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:${gc(pv)}">${pv>=0?'+':''}${czk(pv)}</td></tr>`; });
+
+  const cats = [
+    {l:'Financier', v:finTotCzk, c:'#5a8dee'},
+    {l:'Immobilier', v:immoEstCzk, c:'#f0956e'},
+    {l:'Retraite', v:pensionCzk, c:'#4caf82'},
+  ];
+  const tot = cats.reduce((s,x)=>s+x.v,0)||1;
+  const legend = cats.map(x=>`<div style="display:flex;align-items:center;gap:8px;font-size:13px;margin:5px 0"><span style="width:12px;height:12px;border-radius:3px;background:${x.c};flex-shrink:0"></span><span style="flex:1">${x.l}</span><span style="font-family:'DM Mono',monospace">${czk(x.v)}</span><span style="color:var(--text2);width:48px;text-align:right">${(x.v/tot*100).toFixed(1)}%</span></div>`).join('');
+
+  cont.innerHTML = `
+    <h2 style="font-size:18px;font-weight:700;margin:0 0 4px">🏦 Patrimoine Total</h2>
+    <p class="section-desc" style="margin-bottom:16px">Consolidation financier + immobilier + retraite — CZK (conversion € au taux courant ${(1/fx).toFixed(2)} CZK/€).</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:22px">
+      ${kpi('Patrimoine brut', brutCzk, '', 'financier + immobilier + retraite')}
+      ${kpi('Dette (hypothèques)', detteCzk, '#e06c6c', 'capital restant dû')}
+      ${kpi('Patrimoine net', netCzk, '#4caf82', 'brut − dette')}
+    </div>
+    <div class="card" style="padding:18px;margin-bottom:20px;display:grid;grid-template-columns:280px 1fr;gap:24px;align-items:center">
+      <div style="position:relative;height:230px"><canvas id="patDonut"></canvas></div>
+      <div><p style="font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 10px">Répartition du patrimoine brut</p>${legend}<div style="display:flex;align-items:center;gap:8px;font-size:13px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-weight:700"><span style="flex:1">Total brut</span><span style="font-family:'DM Mono',monospace">${czk(tot)}</span><span style="width:48px"></span></div></div>
+    </div>
+
+    <h3 style="font-size:15px;font-weight:700;margin:0 0 8px">🏠 Patrimoine immobilier</h3>
+    <div class="card" style="padding:0;overflow:auto;margin-bottom:20px"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr><th style="${TH};text-align:left">Bien</th><th style="${TH};text-align:left">Description</th><th style="${TH};text-align:right">Coût total</th><th style="${TH};text-align:right">Estimation vente</th><th style="${TH};text-align:right">Capital restant dû</th><th style="${TH};text-align:right">Plus-value</th></tr></thead><tbody>${immoT}</tbody><tfoot><tr style="border-top:2px solid var(--border2);font-weight:700"><td style="padding:8px 12px">TOTAL</td><td></td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">${czk(immoCostCzk)}</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">${czk(immoEstCzk)}</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:#f0956e">${czk(immoDetteCzk)}</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:${gc(immoPv)}">${immoPv>=0?'+':''}${czk(immoPv)}</td></tr></tfoot></table></div>
+
+    <h3 style="font-size:15px;font-weight:700;margin:0 0 8px">📈 Patrimoine financier</h3>
+    <div class="card" style="padding:0;overflow:auto;margin-bottom:20px"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr><th style="${TH};text-align:left">Type d'actif</th><th style="${TH};text-align:right">Valeur actuelle (€)</th><th style="${TH};text-align:right">Plus-value (€)</th></tr></thead><tbody>${finT}</tbody><tfoot><tr style="border-top:2px solid var(--border2);font-weight:700"><td style="padding:8px 12px">TOTAL</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">${eur(finTotEur)}</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:${gc(finPnlEur)}">${finPnlEur>=0?'+':''}${eur(finPnlEur)}</td></tr></tfoot></table></div>
+
+    <h3 style="font-size:15px;font-weight:700;margin:0 0 8px">🏦 Fonds de pension (Conseq retraite)</h3>
+    <div class="card" style="padding:0;overflow:auto;margin-bottom:20px"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr><th style="${TH};text-align:left">Fonds</th><th style="${TH};text-align:right">Valeur totale (Kč)</th><th style="${TH};text-align:right">Plus-value (Kč)</th></tr></thead><tbody>${penT}</tbody><tfoot><tr style="border-top:2px solid var(--border2);font-weight:700"><td style="padding:8px 12px">TOTAL</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">${czk(pensionCzk)}</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:${gc(pensionPnl)}">${pensionPnl>=0?'+':''}${czk(pensionPnl)}</td></tr></tfoot></table></div>
+  `;
+
+  // Donut
+  try{
+    if(_patDonut){ _patDonut.destroy(); _patDonut=null; }
+    const cv = document.getElementById('patDonut');
+    if(cv && typeof Chart!=='undefined'){
+      _patDonut = new Chart(cv.getContext('2d'), {
+        type:'doughnut',
+        data:{ labels:cats.map(x=>x.l), datasets:[{ data:cats.map(x=>Math.round(x.v)), backgroundColor:cats.map(x=>x.c), borderWidth:0 }] },
+        options:{ responsive:true, maintainAspectRatio:false, cutout:'62%',
+          plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:c=>c.label+' : '+czk(c.parsed)+' ('+(c.parsed/tot*100).toFixed(1)+'%)' } } } }
+      });
+    }
+  }catch(e){ console.warn('patDonut', e); }
+}
+
 function renderDashboard() {
   _registerPortfolioETFs();
   const today  = new Date().toISOString().slice(0,10);
@@ -2078,6 +2177,7 @@ function renderDashboard() {
     return { label: cat, inv, val, pnl: val - inv, perf: perf,
              ytd: periodPct(val, inv, catSuffixes(cat), YTD_CUT), mtd: periodPct(val, inv, catSuffixes(cat), MTD_CUT) };
   });
+  try{ window._patFin = { types: typeData.map(t=>({label:t.label,val:t.val,pnl:t.pnl})), totalEur: totalValue }; }catch(e){}
   // Par broker : regrouper "KB obligations" sous "KB"
   const _mergeBrk = b => (b === 'KB obligations') ? 'KB' : b;
   const _bInv = {}, _bVal = {};
