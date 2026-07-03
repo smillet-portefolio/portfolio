@@ -314,6 +314,24 @@ def tickers_portefeuille():
     return [(tk, nm) for tk, nm in seen.items()]
 
 
+_YS_SUFFIXES = ["", ".DE", ".MI", ".PA", ".AS", ".L", ".SW", ".F"]
+def resolve_yahoo(tick):
+    """Repli multi-place : pour un ticker sans suffixe (nouvel ETF/action europeen
+    ajoute au portefeuille), essaie les principales bourses et renvoie
+    (symbole, prix, devise) au premier resultat valide. Sinon (tick, None, None)."""
+    if any(c in tick for c in (".", "-", "=")):
+        p, c = prix_devise_yahoo(tick)
+        return tick, p, c
+    for suf in _YS_SUFFIXES:
+        sym = tick + suf
+        p, c = prix_devise_yahoo(sym)
+        if p and p > 0:
+            if suf:
+                print(f"    [resolve] {tick} -> {sym} ({c})")
+            return sym, p, c
+    return tick, None, None
+
+
 def collecter_prix():
     print("\n--- Taux CNB ---")
     cnb = taux_cnb()
@@ -354,8 +372,12 @@ def collecter_prix():
     else:
         print(f"\n--- Actions / ETFs du portefeuille ({len(dyn)} tickers, DYNAMIQUE) ---")
     for tick, nom in sorted(dyn, key=lambda x: x[0]):
-        ysym = YS_OVERRIDE.get(tick, tick)          # symbole Yahoo (suffixe .DE/.PA…)
-        prix, cur = prix_devise_yahoo(ysym)
+        ov = YS_OVERRIDE.get(tick)
+        if ov:
+            ysym = ov                               # override explicite (ex. Q8Y0 -> Q8Y0.DE)
+            prix, cur = prix_devise_yahoo(ysym)
+        else:
+            ysym, prix, cur = resolve_yahoo(tick)   # repli multi-place automatique
         if not cur:
             cur = "EUR"
         var = variations_yahoo(ysym)
