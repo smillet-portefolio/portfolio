@@ -1592,6 +1592,44 @@ async function runManualUpdate(){
   }catch(e){ set('❌ '+String(e.message||e).slice(0,140),'#e06c6c'); }
 }
 
+function _etfHasComp(tk){
+  try{ var o=window.ETF_COMP_OVERRIDE; if(!o) return false;
+    if(o.country && o.country[tk]) return true;
+    if(o.geo && o.geo[tk]) return true;
+    if(o[tk]) return true;
+  }catch(e){}
+  return false;
+}
+function _reRenderAllTabs(){
+  try{ if(typeof buildPosTable==='function'){ buildPosTable(true); updateTableRows(); refreshTotalFromRows(); } }catch(e){}
+  ['renderDashboard','renderPosChart','renderGeoCharts','renderSectCharts','renderActions','renderActEtf','renderETFValues','renderETFFiches','renderETFGeoTables','renderPortfolio'].forEach(function(fn){ try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} });
+}
+async function autoUpdateNewTicker(row){
+  const status=document.getElementById('fetchStatus');
+  const set=(t)=>{ if(status) status.innerHTML=t; };
+  const kind = (row.typeInv==='ETF') ? 'ETF' : 'titre';
+  // 1) pousser la nouvelle ligne vers Google Sheets pour que le serveur la voie
+  if (typeof _gsToken!=='undefined' && _gsToken && typeof gsSaveAll==='function'){ try{ await gsSaveAll({silent:true}); }catch(e){} }
+  // 2) declencher le workflow (mode evening = prix + geo/secteurs/top10)
+  let tok=''; try{ tok=localStorage.getItem('gh_token')||''; }catch(e){}
+  if(!tok){
+    set('🆕 Nouveau '+kind+' détecté ('+(row.name||row.ticker)+'). Clique « 🔄 Mise à jour manuelle » (onglet Dashboard) pour récupérer le prix'+(kind==='ETF'?' + la répartition géo/secteurs/top10':'')+'.');
+    return;
+  }
+  set('🆕 Nouveau '+kind+' détecté ('+(row.name||row.ticker)+') — mise à jour serveur lancée…');
+  try{
+    const r=await fetch('https://api.github.com/repos/smillet-portefolio/portfolio/actions/workflows/update-prices.yml/dispatches',{method:'POST',headers:{'Accept':'application/vnd.github+json','Authorization':'Bearer '+tok,'X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},body:JSON.stringify({ref:'main',inputs:{mode:'evening'}})});
+    if(r.status!==204){ if(r.status===401||r.status===403){ try{localStorage.removeItem('gh_token');}catch(e){} } set('⚠️ Déclenchement échoué ('+r.status+'). Utilise « 🔄 Mise à jour manuelle » (Dashboard).'); return; }
+    set('⏳ Mise à jour serveur en cours (prix'+(kind==='ETF'?' + géo/secteurs/top10':'')+') — rechargement auto dans ~3 min…');
+    setTimeout(async ()=>{
+      try{ if(typeof gsLoadPrices==='function') await gsLoadPrices(); }catch(e){}
+      try{ if(typeof gsLoadETFComp==='function') await gsLoadETFComp(); }catch(e){}
+      _reRenderAllTabs();
+      set('✅ Prix'+(kind==='ETF'?' & composition':'')+' à jour pour '+(row.name||row.ticker)+'.');
+    }, 190000);
+  }catch(e){ set('⚠️ '+String(e.message||e).slice(0,110)); }
+}
+
 function renderDashboard() {
   const today  = new Date().toISOString().slice(0,10);
   const fmtE   = function(n) { return n == null ? '—' : Math.round(n).toLocaleString('fr') + ' \u20ac'; };
@@ -3655,9 +3693,10 @@ function submitNewLine() {
   if (typeof renderGeoCharts === 'function') renderGeoCharts();   // MAJ onglet Géographie
   if (typeof renderSectCharts === 'function') renderSectCharts(); // MAJ onglet Secteurs
 
-  // ── Récupérer le prix du nouveau ticker s'il n'est pas encore chargé ───────
-  if (_gsToken && !CURRENT_PRICES[newRow.ticker]) {
-    setTimeout(() => { gsLoadPrices().then(() => { buildPosTable(true); updateTableRows(); refreshTotalFromRows(); }); }, 300);
+  // ── Nouveau titre/ETF : detecter et lancer prix + geo/secteurs/top10 + rafraichir ─
+  const _needsUpdate = !CURRENT_PRICES[newRow.ticker] || (newRow.typeInv==='ETF' && !_etfHasComp(newRow.ticker));
+  if (_needsUpdate) {
+    autoUpdateNewTicker(newRow);
   }
 
   // ── Close & confirm ───────────────────────────────────────────────────────
