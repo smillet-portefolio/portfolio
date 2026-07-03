@@ -1711,10 +1711,6 @@ function renderPatrimoine(){
   const dRent= revYears.map(y=>Math.round(yrs[y].rent));
   const dBond= revYears.map(y=>Math.round(yrs[y].bond));
   const dMonth=revYears.map(y=>Math.round((yrs[y].div+yrs[y].rent+yrs[y].bond)/12));
-  const _maxBar = Math.max(1, ...revYears.map((y,i)=>dDiv[i]+dRent[i]+dBond[i]));
-  const _maxMon = Math.max(1, ...dMonth);
-  const _y1max = _maxMon*1.15;
-  const _ymax = Math.max(_maxBar*1.1, _y1max*12.8);
 
   cont.innerHTML = `
     <h2 style="font-size:18px;font-weight:700;margin:0 0 4px">🏦 Patrimoine Total</h2>
@@ -1768,18 +1764,18 @@ function renderPatrimoine(){
     if(cv2 && typeof Chart!=='undefined'){
       _patRev = new Chart(cv2.getContext('2d'), {
         data:{ labels:revYears, datasets:[
-          {type:'bar', label:'Dividendes',       data:dDiv,  backgroundColor:'#4caf82', stack:'s', yAxisID:'y'},
-          {type:'bar', label:'Loyers',           data:dRent, backgroundColor:'#f0956e', stack:'s', yAxisID:'y'},
-          {type:'bar', label:'Intérêts oblig.',  data:dBond, backgroundColor:'#9b87d4', stack:'s', yAxisID:'y'},
-          {type:'line',label:'Moyenne mensuelle',data:dMonth,borderColor:'#5a8dee', backgroundColor:'#5a8dee', borderWidth:2, tension:.3, fill:false, yAxisID:'y1'}
+          {type:'bar', label:'Dividendes',       data:dDiv,  backgroundColor:'#4caf82', stack:'s', yAxisID:'y', order:2},
+          {type:'bar', label:'Loyers',           data:dRent, backgroundColor:'#f0956e', stack:'s', yAxisID:'y', order:2},
+          {type:'bar', label:'Intérêts oblig.',  data:dBond, backgroundColor:'#9b87d4', stack:'s', yAxisID:'y', order:2},
+          {type:'line',label:'Moyenne mensuelle',data:dMonth,borderColor:'#5a8dee', backgroundColor:'#5a8dee', borderWidth:2, tension:.3, fill:false, yAxisID:'y1', order:1}
         ]},
         options:{ responsive:true, maintainAspectRatio:false,
           plugins:{ legend:{position:'bottom', labels:{boxWidth:12, font:{size:11}}},
             tooltip:{ callbacks:{ label:c=>c.dataset.label+' : '+czk(c.parsed.y) } } },
           scales:{
             x:{stacked:true, grid:{display:false}},
-            y:{stacked:true, beginAtZero:true, max:_ymax, title:{display:true,text:'Kč / an',font:{size:10}}, ticks:{callback:v=>grp(v)}},
-            y1:{position:'right', beginAtZero:true, max:_y1max, grid:{drawOnChartArea:false}, title:{display:true,text:'Kč / mois',font:{size:10}}, ticks:{callback:v=>grp(v)}}
+            y:{stacked:true, beginAtZero:true, title:{display:true,text:'Kč / an',font:{size:10}}, ticks:{callback:v=>grp(v)}},
+            y1:{position:'right', beginAtZero:true, grid:{drawOnChartArea:false}, title:{display:true,text:'Kč / mois',font:{size:10}}, ticks:{callback:v=>grp(v)}}
           } }
       });
     }
