@@ -353,7 +353,11 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
     <button class="tab" onclick="sw('geo',this)">Géographie</button>
     <button class="tab" onclick="sw('sect',this)">Secteurs</button>
     <button class="tab" onclick="sw('conseq',this)">🏦 Conseq Retraite</button>
+    <button class="tab" onclick="sw('immo',this)">🏠 Immobilier</button>
   </div>
+
+  <!-- ======== PATRIMOINE IMMOBILIER ======== -->
+  <div id="immo" class="section"></div>
 
   <!-- ======== DASHBOARD ======== -->
   <div id="dashboard" class="section active">
@@ -870,6 +874,88 @@ let CURRENT_PRICES = {};
 let CURRENT_VARIATIONS = {};   // { ticker: {'1D':x,'1W':x,'1M':x,'3M':x,'6M':x,'1Y':x,'YTD':x} }
 
 const chartInited = {};
+// ══ PATRIMOINE IMMOBILIER ═══════════════════════════════════════════════════
+const REAL_ESTATE = [
+  { id:'nuselsky', name:'Nuselský Pivovar', loc:'Nusle · Prague', ccy:'CZK', m2:52,
+    initial:9468516, total:10781322, mortgage:6900000, income:444666, sellEst:10500000,
+    details:[['Appartement',8710500],['Garage',560000],['Cave',198016],['Cuisine / équipement',1104533],['Modification appart.',29403],['Volets roulants',62658],['Borne de recharge',66812],['Contribution voirie',1000],['Projet déco intérieure',48400]] },
+  { id:'raichlova', name:'Raichlova', loc:'Prague', ccy:'CZK', m2:null,
+    initial:5700000, total:11063913, mortgage:4760000, income:0, sellEst:11000000,
+    details:[["Prix d'achat",5700000],['Apport (cash)',940000],['Hypothèque empruntée',4760000],['Mensualités hypothèque (cumul)',2953080],['Remboursement capital (cumul)',2920956],['Assurance hypothèque',42633]] },
+  { id:'pec', name:'Peć', loc:'Pec pod Sněžkou', ccy:'CZK', m2:84.3,
+    initial:7407900, total:9966110, mortgage:null, income:1331553, sellEst:11000000,
+    details:[['Appartement',7095000],['Garage',289000],['Box',23900],['Apport / paiement initial',4410817],['Remboursement hypothèque (cumul)',4820711],['Assurance hypothèque',53568],['Assurance',77605],['Charges mensuelles (cumul)',603409]] },
+  { id:'tisno', name:'Tisno', loc:'Croatie (côte)', ccy:'EUR', m2:null, share:true,
+    initial:225672, total:225840, mortgage:89297, income:2305, sellEst:260000,
+    details:[['Part par famille (prix)',225672],['Apport (acompte)',21667],['Linxea',49799],['Seb Jito',11701],['Codevi Seb',21000],['Codevi Estelle',22090],['Hypothèque',89297],['Épargne CZ',10118]] },
+];
+function _reFx(){ return (typeof FX_RATES!=='undefined' && FX_RATES.CZK) ? FX_RATES.CZK : (1/24.5); }
+function _reEur(a,ccy){ return ccy==='EUR' ? a : a*_reFx(); }
+function _reLoadEst(){ try{ return JSON.parse(localStorage.getItem('re_estimates')||'{}'); }catch(e){ return {}; } }
+function _reEst(a){ const m=_reLoadEst(); return (m[a.id]!=null)? m[a.id] : a.sellEst; }
+function reSetEstimate(id,val){ const m=_reLoadEst(); const v=parseFloat(String(val).replace(/[^\d.,-]/g,'').replace(/\s/g,'').replace(',','.')); if(isFinite(v)) m[id]=v; try{ localStorage.setItem('re_estimates',JSON.stringify(m)); }catch(e){} renderImmo(); if(typeof _gsToken!=='undefined' && _gsToken && typeof gsSaveAll==='function') gsSaveAll({silent:true}); }
+function _reSwitch(id){ window._reActive=id; document.querySelectorAll('#immo .re-tab').forEach(t=>{ const on=t.dataset.re===id; t.style.background=on?'var(--card)':'var(--bg2)'; t.style.borderBottom=on?'2px solid var(--blue)':'2px solid transparent'; }); document.querySelectorAll('#immo .re-pane').forEach(p=>{ p.style.display=(p.dataset.re===id?'':'none'); }); }
+const _reE = n => Math.round(n).toLocaleString('fr')+' €';
+const _reN = (n,ccy) => Math.round(n).toLocaleString('fr')+' '+(ccy==='EUR'?'€':'Kč');
+function renderImmo(){
+  const cont=document.getElementById('immo'); if(!cont) return;
+  const act = window._reActive || 'summary';
+  const tabBtn = (id,label,on) => `<button class="re-tab" data-re="${id}" onclick="_reSwitch('${id}')" style="padding:8px 15px;border:none;border-bottom:2px solid ${on?'var(--blue)':'transparent'};border-radius:6px 6px 0 0;cursor:pointer;font-size:13px;font-weight:600;background:${on?'var(--card)':'var(--bg2)'};color:var(--text)">${label}</button>`;
+  let tabs = tabBtn('summary','Summary',act==='summary');
+  REAL_ESTATE.forEach(a=> tabs += tabBtn(a.id,a.name,act===a.id));
+
+  let totI=0,totT=0,totE=0, rows='';
+  REAL_ESTATE.forEach(a=>{
+    const iE=_reEur(a.initial,a.ccy), tE=_reEur(a.total,a.ccy), estNat=_reEst(a), eE=_reEur(estNat,a.ccy);
+    const pv=eE-tE, pvp=tE? pv/tE*100:0, pc = pv>=0?'#4caf82':'#e06c6c';
+    totI+=iE; totT+=tE; totE+=eE;
+    rows += `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:9px 12px"><strong>${a.name}</strong><div style="font-size:10px;color:var(--text2)">${a.loc}${a.share?' · part par famille':''}</div></td>
+      <td style="padding:9px 12px;text-align:right">${a.m2?a.m2+' m²':'—'}</td>
+      <td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace">${_reE(iE)}<div style="font-size:10px;color:var(--text2)">${_reN(a.initial,a.ccy)}</div></td>
+      <td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace">${_reE(tE)}<div style="font-size:10px;color:var(--text2)">${_reN(a.total,a.ccy)}</div></td>
+      <td style="padding:9px 12px;text-align:right"><input type="text" value="${Math.round(estNat).toLocaleString('fr')}" onchange="reSetEstimate('${a.id}',this.value)" style="width:105px;text-align:right;padding:5px 7px;background:var(--bg);border:1px solid var(--border2);border-radius:5px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px"> ${a.ccy==='EUR'?'€':'Kč'}<div style="font-size:10px;color:var(--text2)">${_reE(eE)}</div></td>
+      <td style="padding:9px 12px;text-align:right;font-weight:700;color:${pc}">${pv>=0?'+':''}${_reE(pv)}<div style="font-size:10px">${pv>=0?'+':''}${pvp.toFixed(1)}%</div></td></tr>`;
+  });
+  const totPv=totE-totT, totPvp=totT?totPv/totT*100:0, tpc=totPv>=0?'#4caf82':'#e06c6c';
+  const summary = `<div class="re-pane" data-re="summary" style="${act==='summary'?'':'display:none'}">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:18px">
+      <div class="card" style="padding:16px"><div class="kpi-label">Coût total</div><div class="kpi-value" style="font-size:20px">${_reE(totT)}</div></div>
+      <div class="card" style="padding:16px"><div class="kpi-label">Estimation de vente</div><div class="kpi-value" style="font-size:20px">${_reE(totE)}</div></div>
+      <div class="card" style="padding:16px"><div class="kpi-label">Plus-value estimée</div><div class="kpi-value" style="font-size:20px;color:${tpc}">${totPv>=0?'+':''}${_reE(totPv)}</div><div style="font-size:11px;color:${tpc}">${totPv>=0?'+':''}${totPvp.toFixed(1)}%</div></div>
+    </div>
+    <div class="card" style="padding:0;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead><tr style="background:var(--bg2);text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2)">
+        <th style="padding:9px 12px;text-align:left">Bien</th><th style="padding:9px 12px;text-align:right">Surface</th><th style="padding:9px 12px;text-align:right">Prix initial</th><th style="padding:9px 12px;text-align:right">Coût total</th><th style="padding:9px 12px;text-align:right">Estimation vente</th><th style="padding:9px 12px;text-align:right">Plus-value</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr style="border-top:2px solid var(--border2);font-weight:700"><td style="padding:9px 12px">TOTAL</td><td></td><td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace">${_reE(totI)}</td><td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace">${_reE(totT)}</td><td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace">${_reE(totE)}</td><td style="padding:9px 12px;text-align:right;color:${tpc}">${totPv>=0?'+':''}${_reE(totPv)}</td></tr></tfoot>
+    </table></div>
+    <p style="font-size:11px;color:var(--text2);margin-top:10px">💡 Conversion CZK→EUR au taux courant (${(1/_reFx()).toFixed(2)} CZK/€). Estimation de vente éditable (indicative — Prague ≈ 145–150k Kč/m² en 2026).</p>
+  </div>`;
+  let panes='';
+  REAL_ESTATE.forEach(a=>{
+    const iE=_reEur(a.initial,a.ccy), tE=_reEur(a.total,a.ccy), estNat=_reEst(a), eE=_reEur(estNat,a.ccy);
+    const pv=eE-tE, pc=pv>=0?'#4caf82':'#e06c6c';
+    let dr='';
+    a.details.forEach(d=>{ dr += `<tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 12px">${d[0]}</td><td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${_reN(d[1],a.ccy)}</td><td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${_reE(_reEur(d[1],a.ccy))}</td></tr>`; });
+    const kpi = (label,val,sub,col) => `<div class="card" style="padding:14px"><div class="kpi-label">${label}</div><div class="kpi-value" style="font-size:18px${col?';color:'+col:''}">${val}</div>${sub?`<div style="font-size:10px;color:var(--text2)">${sub}</div>`:''}</div>`;
+    panes += `<div class="re-pane" data-re="${a.id}" style="${act===a.id?'':'display:none'}">
+      <h3 style="margin:0 0 4px">${a.name}</h3><p style="font-size:12px;color:var(--text2);margin:0 0 16px">${a.loc}${a.m2?' · '+a.m2+' m²':''}${a.share?' · part par famille':''}</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px">
+        ${kpi('Prix initial',_reE(iE),_reN(a.initial,a.ccy))}
+        ${kpi('Coût total',_reE(tE),_reN(a.total,a.ccy))}
+        ${a.mortgage?kpi('Hypothèque',_reE(_reEur(a.mortgage,a.ccy)),_reN(a.mortgage,a.ccy)):''}
+        ${a.income?kpi('Revenus locatifs (cumul)',_reE(_reEur(a.income,a.ccy)),_reN(a.income,a.ccy),'#4caf82'):''}
+        ${kpi('Estimation vente',_reE(eE),'')}
+        ${kpi('Plus-value estimée',(pv>=0?'+':'')+_reE(pv),'',pc)}
+      </div>
+      <div class="card" style="padding:0;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:var(--bg2);text-transform:uppercase;font-size:10px;color:var(--text2)"><th style="padding:8px 12px;text-align:left">Poste</th><th style="padding:8px 12px;text-align:right">Montant</th><th style="padding:8px 12px;text-align:right">EUR</th></tr></thead><tbody>${dr}</tbody></table></div>
+    </div>`;
+  });
+  cont.innerHTML = `<div style="display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--border);margin-bottom:18px">${tabs}</div>${summary}${panes}`;
+}
+
+
 function sw(id, btn) {
   document.querySelectorAll('.tabs .tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
@@ -881,6 +967,7 @@ function sw(id, btn) {
     setTimeout(restorePersistedPrices, 150);
   }, 50);
   if (id === 'clotures')     setTimeout(renderClosedPositions, 50);
+  if (id === 'immo')         setTimeout(renderImmo, 50);
   if (id === 'dashboard') setTimeout(renderDashboard, 50);
   if (id === 'cash')         setTimeout(renderCashSection, 50);
   if (id === 'dividend')     setTimeout(renderDividendSection, 50);
