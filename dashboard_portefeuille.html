@@ -362,6 +362,12 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
   <!-- ======== DASHBOARD ======== -->
   <div id="dashboard" class="section active">
 
+    <!-- Mise à jour manuelle -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+      <button onclick="runManualUpdate()" title="Lance le workflow GitHub (prix + répartition ETF géo/secteurs/top10), comme à 18:00" style="padding:7px 16px;background:#9b87d4;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">🔄 Mise à jour manuelle (prix + ETF)</button>
+      <span id="manualUpdateMsg" style="font-size:12px;color:var(--text2)"></span>
+    </div>
+
     <!-- KPIs globaux -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:24px">
       <div class="card" style="padding:18px 16px">
@@ -1556,6 +1562,36 @@ let _geoCharts = {};
 // ══════════════════════════════════════════════════════════════════════════════
 // DASHBOARD
 // ══════════════════════════════════════════════════════════════════════════════
+async function runManualUpdate(){
+  const set=(t,c)=>{ const st=document.getElementById('manualUpdateMsg'); if(st){ st.textContent=t; st.style.color=c||'var(--text2)'; } };
+  let tok = '';
+  try { tok = localStorage.getItem('gh_token')||''; } catch(e){}
+  if(!tok){
+    tok = prompt('Token GitHub (fine-grained, permission « Actions: Read and write » sur le repo portfolio).\n\nLaisse vide pour ouvrir la page Actions et lancer manuellement.','');
+    if(tok===null) return;
+    tok=(tok||'').trim();
+    if(!tok){ window.open('https://github.com/smillet-portefolio/portfolio/actions/workflows/update-prices.yml','_blank'); return; }
+    try{ localStorage.setItem('gh_token',tok); }catch(e){}
+  }
+  set('⏳ Déclenchement de la mise à jour (prix + ETF)…','#60a5fa');
+  try{
+    const r = await fetch('https://api.github.com/repos/smillet-portefolio/portfolio/actions/workflows/update-prices.yml/dispatches',{
+      method:'POST',
+      headers:{'Accept':'application/vnd.github+json','Authorization':'Bearer '+tok,'X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},
+      body:JSON.stringify({ ref:'main', inputs:{ mode:'evening' } })
+    });
+    if(r.status===204){
+      set('✅ Mise à jour lancée. Dans ~2-3 min : 🔐 Connecter Google puis 📥 Charger pour récupérer prix + ETF.','#4caf82');
+    } else if(r.status===401 || r.status===403){
+      try{ localStorage.removeItem('gh_token'); }catch(e){}
+      set('❌ Token invalide ou droits insuffisants (Actions RW requis). Reclique pour ressaisir le token.','#e06c6c');
+    } else {
+      const t = await r.text();
+      set('❌ Erreur '+r.status+' : '+t.slice(0,140),'#e06c6c');
+    }
+  }catch(e){ set('❌ '+String(e.message||e).slice(0,140),'#e06c6c'); }
+}
+
 function renderDashboard() {
   const today  = new Date().toISOString().slice(0,10);
   const fmtE   = function(n) { return n == null ? '—' : Math.round(n).toLocaleString('fr') + ' \u20ac'; };
