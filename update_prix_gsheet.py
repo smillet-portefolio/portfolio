@@ -55,6 +55,7 @@ TICKERS = [
     ("JEDI.DE",  "VanEck Space Innovators",       "EUR", "JEDI.DE"),
     ("NUKL.DE",  "VanEck Uranium & Nuclear",      "EUR", "NUKL.DE"),
     ("XDWD.DE",  "Xtrackers MSCI World",          "EUR", "XDWD.DE"),
+    ("XDWH.DE",  "Xtrackers MSCI World Health Care", "EUR", "XDWH.DE"),
     ("MTPI.PA",  "iShares MSCI ex China",         "EUR", "MTPI.PA"),
     ("VGWE.DE",  "Vanguard All-World High Div",   "EUR", "VGWE.DE"),
     ("Q8Y0",     "iShares Global Clean Energy Transition", "EUR", "Q8Y0.DE"),
