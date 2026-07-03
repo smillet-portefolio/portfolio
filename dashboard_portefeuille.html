@@ -1601,6 +1601,7 @@ function _etfHasComp(tk){
   return false;
 }
 function _reRenderAllTabs(){
+  _registerPortfolioETFs();
   try{ if(typeof buildPosTable==='function'){ buildPosTable(true); updateTableRows(); refreshTotalFromRows(); } }catch(e){}
   ['renderDashboard','renderPosChart','renderGeoCharts','renderSectCharts','renderActions','renderActEtf','renderETFValues','renderETFFiches','renderETFGeoTables','renderPortfolio'].forEach(function(fn){ try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} });
 }
@@ -1631,6 +1632,7 @@ async function autoUpdateNewTicker(row){
 }
 
 function renderDashboard() {
+  _registerPortfolioETFs();
   const today  = new Date().toISOString().slice(0,10);
   const fmtE   = function(n) { return n == null ? '—' : Math.round(n).toLocaleString('fr') + ' \u20ac'; };
   const fmtP   = function(n) { return n == null ? '—' : (n >= 0 ? '+' : '') + n.toFixed(1).replace('.', ',') + '%'; };
@@ -2291,6 +2293,7 @@ function _renderEquityBanner(elId) {
     </div>`).join('');
 }
 function renderSectCharts() {
+  _registerPortfolioETFs();
   const msg = document.getElementById('secMsg');
   _renderEquityBanner('sect_kpis');
 
@@ -2369,6 +2372,7 @@ function renderSectCharts() {
 }
 
 function renderGeoCharts() {
+  _registerPortfolioETFs();
   const msg = document.getElementById('geoMsg');
   _renderEquityBanner('geo_kpis');
 
@@ -3669,6 +3673,7 @@ function submitNewLine() {
 
   // ── Add to BOOK2_ROWS and persist ────────────────────────────────────────
   BOOK2_ROWS.push(newRow);
+  if(newRow.typeInv==='ETF') _registerPortfolioETFs();
   // Persist new rows to localStorage
   try {
     const extra = JSON.parse(localStorage.getItem('book2_extra_rows') || '[]');
@@ -4688,6 +4693,7 @@ async function gsLoadPrices() {
 // ══════════════════════════════════════════════════════════════════════════════
 
 async function gsLoadETFComp() {
+  _registerPortfolioETFs();
   const status = document.getElementById('etfCompStatus');
 
   // Connecté + pas encore rechargé durant cette session -> aller chercher les données
@@ -7693,7 +7699,7 @@ function renderRisques() {
 // ══════════════════════════════════════════════════════════════════════════════
 // ACTIONS DIRECTES — dynamique depuis BOOK2_ROWS + CURRENT_PRICES
 // ══════════════════════════════════════════════════════════════════════════════
-const ETF_TICKERS = new Set(['EMXC.DE','IQQH.DE','HYDE.DE','LSMC.DE','I500.DE','NUKL.DE','D5BI.DE','XDWD.DE','JEDI.DE','VGWE.DE','MTPI.PA','Q8Y0.DE','MWRE.DE']);
+const ETF_TICKERS = new Set(['EMXC.DE','IQQH.DE','HYDE.DE','LSMC.DE','I500.DE','NUKL.DE','D5BI.DE','XDWD.DE','XDWH.DE','JEDI.DE','VGWE.DE','MTPI.PA','Q8Y0.DE','MWRE.DE']);
 
 const STOCK_SECTORS = {
   'ORCL':    'Technologie · Cloud & IA',
@@ -8266,6 +8272,10 @@ const ETF_META = {
     geo:[['🇺🇸 États-Unis',71.0],['🇯🇵 Japon',5.5],['🇬🇧 Royaume-Uni',3.4]],
     sectors:[['Technologie',26.0],['Finance',15.0],['Industrie',11.0]],
     positions:[['Apple',5.0],['NVIDIA Corp.',5.0],['Microsoft',4.0]] },
+  'XDWH.DE': { name:'Xtrackers MSCI World Health Care', short:'XDWH', isin:'IE00BM67HK77', ter:0.25, index:'MSCI World Health Care', type:'Thématique', badge:'badge-amber',
+    geo:[['🇺🇸 États-Unis',71.6],['🇨🇭 Suisse',6.0],['🇬🇧 Royaume-Uni',5.0],['🇩🇰 Danemark',4.5],['🇯🇵 Japon',3.5]],
+    sectors:[['Santé',100.0]],
+    positions:[['Eli Lilly',10.7],['Johnson & Johnson',6.1],['AbbVie',5.0]] },
 };
 
 // ── ETF Composition import from repartition_ETFs.xlsx ────────────────────────
@@ -8274,8 +8284,26 @@ const ETF_ISIN_MAP = {
   'LU2009202107':'EMXC.DE','LU1900066033':'LSMC.DE','IE00053WDH64':'HYDE.DE',
   'IE00B1XNHC34':'IQQH.DE','IE00BMG6Z448':'MTPI.PA','IE00BMTX1Y45':'I500.DE',
   'IE000YU9K6K2':'JEDI.DE','IE000M7V94E1':'NUKL.DE','IE00BK5BR626':'VGWE.DE',
-  'LU0476289466':'D5BI.DE','IE00BJ0KDQ92':'XDWD.DE',
+  'LU0476289466':'D5BI.DE','IE00BJ0KDQ92':'XDWD.DE','IE00BM67HK77':'XDWH.DE',
 };
+
+// Detection DYNAMIQUE : tout titre du portefeuille marque typeInv='ETF' est
+// automatiquement reconnu comme ETF (liste, geo, secteurs, look-through) et son
+// ISIN mappe vers son ticker pour rattacher la composition venant du Sheet.
+function _registerPortfolioETFs(){
+  try{
+    if(typeof BOOK2_ROWS==='undefined' || !Array.isArray(BOOK2_ROWS)) return;
+    BOOK2_ROWS.forEach(function(r){
+      if(!r || !r.ticker || r.typeInv!=='ETF') return;
+      ETF_TICKERS.add(r.ticker);
+      if(r.isin && !ETF_ISIN_MAP[r.isin]) ETF_ISIN_MAP[r.isin]=r.ticker;
+      if(!ETF_META[r.ticker]){
+        ETF_META[r.ticker]={ name:(r.name||r.ticker), short:(String(r.ticker).split('.')[0]||r.ticker),
+          isin:(r.isin||''), ter:null, index:'', type:'ETF', badge:'badge-blue', geo:[], sectors:[], positions:[] };
+      }
+    });
+  }catch(e){}
+}
 
 const COUNTRY_FR = {
   'United States':'🇺🇸 États-Unis','Canada':'🇨🇦 Canada','China':'🇨🇳 Chine',
@@ -8982,6 +9010,7 @@ function renderETFGeoTables() {
 }
 
 function renderETFValues() {
+  _registerPortfolioETFs();
   // ── Build ETF rows from BOOK2_ROWS + CURRENT_PRICES ───────────────────────
   const map = {};
   BOOK2_ROWS.forEach(r => {
