@@ -1,0 +1,37 @@
+name: Update Linxea (OneDrive)
+
+# À placer dans le repo sous : .github/workflows/update-linxea.yml
+# Déclencheurs :
+#   - workflow_dispatch : lancement manuel (bouton "Run workflow" ou API)
+#   - schedule (optionnel) : décommente le cron voulu (heure UTC)
+
+on:
+  workflow_dispatch:
+  # schedule:
+  #   - cron: '30 17 * * *'   # 17h30 UTC (~19h30 Prague été)
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests yfinance openpyxl pynacl
+
+      - name: Mise à jour Linxea (OneDrive)
+        env:
+          MS_CLIENT_ID:     ${{ secrets.MS_CLIENT_ID }}
+          MS_REFRESH_TOKEN: ${{ secrets.MS_REFRESH_TOKEN }}
+          # Optionnel : auto-renouvellement du refresh token (PAT avec droit secrets:write)
+          GH_PAT:  ${{ secrets.GH_PAT }}
+          GH_REPO: ${{ github.repository }}
+          # Optionnel : chemin dans OneDrive si différent
+          # ONEDRIVE_PATH: "Documents/banque/bourse/linxea.xlsx"
+        run: python update_linxea_cloud.py
