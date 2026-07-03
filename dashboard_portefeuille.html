@@ -882,15 +882,15 @@ const REAL_ESTATE = [
   { id:'nuselsky', name:'Nuselsky Pivovar', loc:'Nusle · Prague', desc:'Locatif', m2:52, acq:25.15, dateAchat:'Jan 2025', type:'2+KK',
     initial:10781322, total:11242464, mortgage:6900000, income:444666, sellEst:10500000, hasLedger:true, mortPay:54376,
     details:[['Appartement',8710500],['Garage',560000],['Cave',198016],['Cuisine / équipement',1104533],['Modification appart.',29403],['Volets roulants',62658],['Borne de recharge',66812],['Contribution voirie',1000],['Projet déco intérieure',48400]] },
-  { id:'raichlova', name:'Raichlova', loc:'Prague', desc:'Résidence principale', m2:94, m2txt:'94 m² + 25 m² terrasse', acq:25.5, dateAchat:'Mars 2011', type:'4+KK',
-    initial:5700000, total:11063913, mortgage:4760000, income:0, sellEst:11000000, detTitle:'Coût total',
-    details:[["Prix d'achat",5700000],['Reconstruction living room 2016',812067],['Bureau rénovation 2020',54412],['Pergola + terrasse 2022',446886],['Flat redesign 2023',2893879],['Assurance hypothèque',42633],['Coût hypothèque',1114036]] },
   { id:'pec', name:'Pec', loc:'Pec pod Snezkou', desc:'Secondaire + locatif', m2:84.3, acq:25.7, dateAchat:'Juillet 2018', type:'4+KK',
     initial:8944401, total:9285096, mortgage:null, income:1331553, sellEst:11000000, detTitle:'Coût total', hasRent2:true,
     details:[["Prix d'achat",8944401],['Assurance hypothèque',53568],['Coût hypothèque',287127]] },
   { id:'tisno', name:'Tisno', loc:'Croatie (côte)', desc:'Secondaire + locatif', m2:78, share:true, acq:24.87, cur:'EUR', dateAchat:'Novembre 2023', type:'3+KK',
     initial:225672, total:235372, mortgage:null, income:2267, sellEst:256132, detTitle:'Coût total', hasRent3:true,
     details:[['Prix initial',225672],["Frais d'acquisition",4000],['Climatisation',5700]] },
+  { id:'raichlova', name:'Raichlova', loc:'Prague', desc:'Résidence principale', m2:94, m2txt:'94 m² + 25 m² terrasse', acq:25.5, dateAchat:'Mars 2011', type:'4+KK',
+    initial:5700000, total:11063913, mortgage:4760000, income:0, sellEst:11000000, detTitle:'Coût total',
+    details:[["Prix d'achat",5700000],['Reconstruction living room 2016',812067],['Bureau rénovation 2020',54412],['Pergola + terrasse 2022',446886],['Flat redesign 2023',2893879],['Assurance hypothèque',42633],['Coût hypothèque',1114036]] },
 ];
 const RE_MORT_SEED = { nuselsky: [{"m":"2025-01","principal":28133,"interest":26243,"insur":2718},{"m":"2025-02","principal":26373,"interest":28003,"insur":2718},{"m":"2025-03","principal":26481,"interest":27895,"insur":2718},{"m":"2025-04","principal":26589,"interest":27787,"insur":2718},{"m":"2025-05","principal":26697,"interest":27679,"insur":2718},{"m":"2025-06","principal":26806,"interest":27570,"insur":2718},{"m":"2025-07","principal":26915,"interest":27461,"insur":2718},{"m":"2025-08","principal":27025,"interest":27351,"insur":2718},{"m":"2025-09","principal":27135,"interest":27241,"insur":2718},{"m":"2025-10","principal":27245,"interest":27131,"insur":2718},{"m":"2025-11","principal":27356,"interest":27020,"insur":2718},{"m":"2025-12","principal":27468,"interest":26908,"insur":2718},{"m":"2026-01","principal":27580,"interest":26796,"insur":2718},{"m":"2026-02","principal":27692,"interest":26684,"insur":2718},{"m":"2026-03","principal":27805,"interest":26571,"insur":2718},{"m":"2026-04","principal":27918,"interest":26458,"insur":0},{"m":"2026-05","principal":28032,"interest":26344,"insur":0}] };
 const RE_RENT_SEED = { nuselsky: [{"m":"2025-04","rev":71016,"elec":1500,"fees":3988,"ins":0},{"m":"2025-05","rev":32800,"elec":0,"fees":3988,"ins":0},{"m":"2025-06","rev":32800,"elec":0,"fees":3988,"ins":0},{"m":"2025-07","rev":32800,"elec":0,"fees":3988,"ins":0},{"m":"2025-08","rev":32800,"elec":0,"fees":3988,"ins":0},{"m":"2025-09","rev":32800,"elec":0,"fees":3550,"ins":0},{"m":"2025-10","rev":32800,"elec":0,"fees":3988,"ins":0},{"m":"2025-11","rev":32800,"elec":0,"fees":3988,"ins":0},{"m":"2025-12","rev":32800,"elec":0,"fees":3988,"ins":5397},{"m":"2026-01","rev":32800,"elec":0,"fees":4118,"ins":0},{"m":"2026-02","rev":32800,"elec":0,"fees":4118,"ins":0},{"m":"2026-03","rev":32800,"elec":0,"fees":4118,"ins":0},{"m":"2026-04","rev":34500,"elec":0,"fees":14757,"ins":0},{"m":"2026-05","rev":36350,"elec":0,"fees":4118,"ins":0}] };
@@ -1010,10 +1010,12 @@ function _reBandCards(o){
   h+=kpi('Prix initial',P(o.initial),o.initialSub);
   h+=kpi('Coût total',P(o.total),o.totalSub);
   if(o.capitalDue!=null && o.capitalDue!==false) h+=kpi('Capital restant dû',P(o.capitalDue),o.capitalSub||'','#f0956e');
-  h+=kpi('Revenus locatifs',P(o.rev||0),o.revSub||'cumul','#4caf82');
-  h+=kpi('Coûts locatifs',P(o.cost||0),o.costSub||'cumul','#e06c6c');
-  const net=o.net||0;
-  h+=kpi('Résultat locatif net',(net>=0?'+':'')+P(net),'revenus − coûts',net>=0?'#4caf82':'#e06c6c');
+  if(!o.hideRental){
+    h+=kpi('Revenus locatifs',P(o.rev||0),o.revSub||'cumul','#4caf82');
+    h+=kpi('Coûts locatifs',P(o.cost||0),o.costSub||'cumul','#e06c6c');
+    const net=o.net||0;
+    h+=kpi('Résultat locatif net',(net>=0?'+':'')+P(net),'revenus − coûts',net>=0?'#4caf82':'#e06c6c');
+  }
   h+=kpi('Estimation vente',P(o.est),o.estSub);
   h+=kpi('Plus-value estimée',(o.pv>=0?'+':'')+P(o.pv),o.pvSub,o.pv>=0?'#4caf82':'#e06c6c');
   return `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px">${h}</div>`;
@@ -1086,7 +1088,7 @@ function renderImmo(){
     const kpi = (label,val,sub,col) => `<div class="card" style="padding:14px"><div class="kpi-label">${label}</div><div class="kpi-value" style="font-size:18px${col?';color:'+col:''}">${val}</div>${sub?`<div style="font-size:10px;color:var(--text2)">${sub}</div>`:''}</div>`;
     panes += `<div class="re-pane" data-re="${a.id}" style="${act===a.id?'':'display:none'}">
       <h3 style="margin:0 0 4px">${a.name}</h3><p style="font-size:12px;color:var(--text2);margin:0 0 16px">${a.loc}${a.m2txt?' · '+a.m2txt:(a.m2?' · '+a.m2+' m²':'')}${a.share?' · part par famille':''} · taux d'achat ${a.acq} CZK/€</p>
-      ${_reBandCards({P:(n=>_reP(a,n)), initial:a.initial, total:a.total, capitalDue:null, rev:_rv, cost:_ct, net:_nt, est:est, pv:pvNat, initialSub:altI+' · taux achat', totalSub:altT+' · taux achat', estSub:altS+' · taux courant', pvSub:altPv+(eur?' · taux courant':'')})}
+      ${_reBandCards({P:(n=>_reP(a,n)), hideRental:!(a.hasRent2||a.hasRent3), initial:a.initial, total:a.total, capitalDue:null, rev:_rv, cost:_ct, net:_nt, est:est, pv:pvNat, initialSub:altI+' · taux achat', totalSub:altT+' · taux achat', estSub:altS+' · taux courant', pvSub:altPv+(eur?' · taux courant':'')})}
       ${a.detTitle?`<h4 style="margin:14px 0 8px">${a.detTitle}</h4>`:''}
       <div class="card" style="padding:0;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:var(--bg2);text-transform:uppercase;font-size:10px;color:var(--text2)"><th style="padding:8px 12px;text-align:left">Poste</th><th style="padding:8px 12px;text-align:right">Montant (${eur?'EUR':'CZK'})</th><th style="padding:8px 12px;text-align:right">${eur?'CZK (taux achat)':'EUR (taux achat)'}</th></tr></thead><tbody>${dr}</tbody><tfoot><tr style="border-top:2px solid var(--border2);font-weight:700"><td style="padding:8px 12px">TOTAL</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">${_reP(a,detTot)}</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${eur?_reCZK(detTot*a.acq):_reEUR(detTot/a.acq)}</td></tr></tfoot></table></div>
       ${a.hasRent2?_reRent2Table(a):''}
