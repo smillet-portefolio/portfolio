@@ -4336,12 +4336,13 @@ async function gsSaveAll(opts) {
     // grandes valeurs sur plusieurs colonnes (B, C, D, …) recollées au chargement.
     // Fusion evo_history : ne jamais perdre des jours ecrits cote serveur.
     // On lit l'historique du Sheet et on fusionne (union par date) avec le local.
+    let _remoteMap = {};
     try {
       const _cur = await gsRequest('GET', '/values/Data!A:Z');
       const _rws = (_cur && _cur.values) || [];
-      const _eh = _rws.find(r => r[0] === 'evo_history');
-      if (_eh) {
-        const _remote = JSON.parse(_eh.slice(1).join('') || '[]');
+      _rws.forEach(r => { if (r && r[0]) _remoteMap[r[0]] = r.slice(1).join(''); });
+      if (_remoteMap['evo_history']) {
+        const _remote = JSON.parse(_remoteMap['evo_history'] || '[]');
         const _local  = JSON.parse(localStorage.getItem('evo_history') || '[]');
         const _byd = {};
         (Array.isArray(_remote) ? _remote : []).forEach(r => { if (r && r.date) _byd[r.date] = r; });
@@ -4352,7 +4353,12 @@ async function gsSaveAll(opts) {
     } catch(_) {}
     const CHUNK = 45000;
     const values = GS_KEYS.map(k => {
-      const v = localStorage.getItem(k) || '';
+      let v = localStorage.getItem(k);
+      // Protection multi-ordinateurs : ne JAMAIS ecraser une valeur du Sheet par du
+      // vide. Si rien (ou vide) en local mais une donnee existe cote Sheet, on la
+      // conserve -> aucune perte de donnees (immobilier, positions, etc.).
+      if ((v == null || v.length <= 2) && _remoteMap[k] && _remoteMap[k].length > 2) v = _remoteMap[k];
+      v = v || '';
       const row = [k];
       if (v.length <= CHUNK) row.push(v);
       else for (let i = 0; i < v.length; i += CHUNK) row.push(v.slice(i, i + CHUNK));
