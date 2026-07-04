@@ -1710,7 +1710,8 @@ function renderPatrimoine(){
   const dDiv = revYears.map(y=>Math.round(yrs[y].div));
   const dRent= revYears.map(y=>Math.round(yrs[y].rent));
   const dBond= revYears.map(y=>Math.round(yrs[y].bond));
-  const dMonth=revYears.map(y=>Math.round((yrs[y].div+yrs[y].rent+yrs[y].bond)/12));
+  const _now=new Date(); const _curYear=String(_now.getFullYear()); const _finished=Math.max(1,_now.getMonth()); // mois deja finis (getMonth 0-11)
+  const dMonth=revYears.map(y=>{ const _tot=yrs[y].div+yrs[y].rent+yrs[y].bond; const _d=(y===_curYear)?_finished:12; return Math.round(_tot/_d); });
 
   cont.innerHTML = `
     <h2 style="font-size:18px;font-weight:700;margin:0 0 4px">🏦 Patrimoine Total</h2>
@@ -1729,7 +1730,7 @@ function renderPatrimoine(){
       <div class="card" style="padding:18px">
         <p style="font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 10px">Revenus récurrents (Kč / an)</p>
         <div style="height:300px;position:relative"><canvas id="patRevChart"></canvas></div>
-        <p style="font-size:11px;color:var(--text2);margin:8px 0 0">Barres empilées : dividendes + loyers + intérêts obligations. Ligne : moyenne mensuelle (total ÷ 12).</p>
+        <p style="font-size:11px;color:var(--text2);margin:8px 0 0">Barres empilées : dividendes + loyers + intérêts obligations. Ligne : moyenne mensuelle (total ÷ 12 ; année en cours ÷ mois écoulés).</p>
       </div>
     </div>
 
