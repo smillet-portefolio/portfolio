@@ -5665,6 +5665,7 @@ let _obligEditId = null;
     + '<option value="Immobilier">Immobilier</option>'
     + '<option value="Agriculture">Agriculture</option>'
     + '<option value="Financement entreprise">Financement d\'entreprise</option>'
+    + '<option value="Monetaire">Mon&#233;taire</option>'
     + '<option value="Autre">Autre</option></select></div>'
     + '<div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Date investissement</label>'
     + '<input id="ob_date" type="date" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none"></div>'
@@ -6926,7 +6927,7 @@ function renderObligCharts(data) {
   if (data.length === 0) { wrap.innerHTML = '<p style="color:var(--text2);font-size:12px;padding:20px">Aucun projet.</p>'; return; }
 
   var PALETTE = ['#5a8dee','#4caf82','#f97316','#a78bfa','#f59e0b','#ec4899','#14b8a6','#84cc16','#e06c6c','#60a5fa'];
-  var TYPE_COLORS = { 'Energie solaire':'#f59e0b','Energie eolienne':'#84cc16','Energie hydraulique':'#06b6d4','Biomasse / Biogaz':'#10b981','Renovation energetique':'#5a8dee','Immobilier':'#8b5cf6','Agriculture':'#d97706','Financement entreprise':'#f97316','Autre':'#6b7280' };
+  var TYPE_COLORS = { 'Energie solaire':'#f59e0b','Energie eolienne':'#84cc16','Energie hydraulique':'#06b6d4','Biomasse / Biogaz':'#10b981','Renovation energetique':'#5a8dee','Immobilier':'#8b5cf6','Agriculture':'#d97706','Financement entreprise':'#f97316','Monetaire':'#14b8a6','Autre':'#6b7280' };
 
   // Donut 2 — par type
   var typeMap = {};
