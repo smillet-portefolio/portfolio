@@ -141,7 +141,7 @@ CASH_BASE_DEPOSITS = [
     {"date": "2025-11-30", "broker": "TRADING 212", "amount": 9.82, "currency": "EUR", "type": "dépôt"},
     {"date": "2025-05-28", "broker": "XTB", "amount": 3000.0, "currency": "EUR", "type": "dépôt"},
     {"date": "2025-05-27", "broker": "XTB", "amount": 7000.0, "currency": "EUR", "type": "dépôt"},
-    {"date": "2025-05-07", "broker": "KB", "amount": 42117.93, "currency": "EUR", "type": "dépôt"},
+    {"date": "2025-05-07", "broker": "KB", "amount": 32290, "currency": "EUR", "type": "dépôt"},
     {"date": "2023-10-13", "broker": "LINXEA", "amount": 61500.0, "currency": "EUR", "type": "retrait"},
     {"date": "2023-03-10", "broker": "LINXEA", "amount": 1000.0, "currency": "EUR", "type": "dépôt"},
     {"date": "2023-02-13", "broker": "LINXEA", "amount": 1000.0, "currency": "EUR", "type": "dépôt"},
