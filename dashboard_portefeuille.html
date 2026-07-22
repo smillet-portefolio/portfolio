@@ -6495,7 +6495,7 @@ function renderConseqSection(){
   }
   var pb=document.getElementById('csq_perf_body');
   if(pb){
-    var cum=0,prevVal=0,html='';
+    var cum=0,prevVal=0,_rowsHtml=[];
     var _csqFlows=(function(){var bd={};(CONSEQ_DATA.tx||[]).forEach(function(t){if(t&&t.date&&t.amount)bd[t.date]=(bd[t.date]||0)+t.amount;});return Object.keys(bd).map(function(d){return {date:d,amt:bd[d]};}).sort(function(a,b){return a.date.localeCompare(b.date);});})();
     var col=function(n){return n==null?'var(--text2)':(n>=0?'#4caf82':'#e06c6c');};
     years.forEach(function(y,i){
@@ -6520,17 +6520,17 @@ function renderConseqSection(){
       }
       var _xcCell='<td class="mono" style="text-align:right;color:'+col(_xc)+'">'+(_xc!=null?((_xc>=0?'+':'')+_xc.toFixed(1).replace('.',',')+'%'):'—')+'</td>';
       var lbl=(i===years.length-1)?(y.year+' (actuel)'):String(y.year);
-      html+='<tr><td><strong>'+lbl+'</strong></td>'+
+      _rowsHtml.push('<tr><td><strong>'+lbl+'</strong></td>'+
         '<td class="mono" style="text-align:right">'+fmt(y.invested||0)+'</td>'+
         '<td class="mono" style="text-align:right">'+fmt(cum)+'</td>'+
         '<td class="mono" style="text-align:right">'+(v!=null?fmt(v):'—')+'</td>'+
         '<td class="mono" style="text-align:right;color:'+col(pvAnnual)+'">'+(pvAnnual!=null?((pvAnnual>=0?'+':'')+fmt(pvAnnual)):'—')+'</td>'+
         '<td class="mono" style="text-align:right;color:'+col(gainC)+'">'+(gainC!=null?((gainC>=0?'+':'')+fmt(gainC)):'—')+'</td>'+
         '<td class="mono" style="text-align:right;color:'+col(perfC)+'">'+(perfC!=null?((perfC>=0?'+':'')+perfC.toFixed(1).replace('.',',')+'%'):'—')+'</td>'+
-        '<td class="mono" style="text-align:right;color:'+col(annual)+'">'+(annual!=null?((annual>=0?'+':'')+annual.toFixed(1).replace('.',',')+'%'):'—')+'</td>'+_xcCell+'</tr>';
+        '<td class="mono" style="text-align:right;color:'+col(annual)+'">'+(annual!=null?((annual>=0?'+':'')+annual.toFixed(1).replace('.',',')+'%'):'—')+'</td>'+_xcCell+'</tr>');
       if(v!=null) prevVal=v;
     });
-    pb.innerHTML=html;
+    pb.innerHTML=_rowsHtml.slice().reverse().join('');
   }
   csqFundsChart();
   csqEvoChart();
