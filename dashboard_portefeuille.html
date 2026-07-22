@@ -1134,7 +1134,7 @@ function sw(id, btn) {
       var data2 = OBLIG_DATA.map(function(p) {
         var recuInt = (p.echeancier||[]).filter(function(e){return e.date<=new Date().toISOString().slice(0,10);}).reduce(function(s,e){return s+(e.interet||0);},0);
         var recuCap = (p.echeancier||[]).filter(function(e){return e.date<=new Date().toISOString().slice(0,10);}).reduce(function(s,e){return s+(e.capital||0);},0);
-        return Object.assign({}, p, { recuInt:recuInt, capRest:(p.montant||0)-recuCap, montantInvesti:(p.montant||0)-recuInt-recuCap });
+        return Object.assign({}, p, { recuInt:recuInt, capRest:obCapRestEur(p), montantInvesti:(p.montant||0)-recuInt-recuCap });
       });
       renderObligCharts(data2);
     }, 100);
@@ -1872,8 +1872,7 @@ function renderDashboard() {
   let obligCapRest = 0;
   const obligByPlat = {};
   (typeof OBLIG_DATA !== 'undefined' ? OBLIG_DATA : []).forEach(p => {
-    const recuCap = (p.echeancier || []).filter(e => e.date <= today).reduce((s, e) => s + echCapEur(p, e), 0);
-    const cap = (p.montant || 0) - recuCap;
+    const cap = obCapRestEur(p, today);
     obligCapRest += cap;
     const b = p.plateforme || '—';
     if (!obligByPlat[b]) obligByPlat[b] = 0;
@@ -4031,7 +4030,6 @@ function deleteLine(i) {
                (r.qty != null ? r.qty : '?') + ' titres';
   if (!confirm('Supprimer définitivement cette ligne du portefeuille ?\n\n' + info +
                '\n\nElle ne sera PAS ajoutée aux positions clôturées.')) return;
-  // Blacklist pour qu'elle ne revienne pas depuis les données statiques
   try {
     const sold = JSON.parse(localStorage.getItem('sold_rows') || '[]');
     sold.push({ ticker: r.ticker, date: r.date, qty: r.qty, broker: r.broker });
@@ -5118,8 +5116,7 @@ function getTodayEvoRow() {
     pfByBroker[bn] = (pfByBroker[bn] || 0) + cashEur;
   });
   (typeof OBLIG_DATA !== 'undefined' ? OBLIG_DATA : []).forEach(p => {
-    const recuCap = (p.echeancier || []).filter(e => e.date <= today).reduce((s,e) => s + echCapEur(p, e), 0);
-    const cap = (p.montant || 0) - recuCap;
+    const cap = obCapRestEur(p, today);
     const b = normBroker(p.plateforme || '—');   // KB obligations -> KB (capital restant)
     pfByBroker[b] = (pfByBroker[b] || 0) + cap;
   });
@@ -6591,6 +6588,19 @@ function echCapEur(p, e) {
   if (e.capEur != null) return e.capEur;
   return (e.capital || 0) * obFx(p);
 }
+// Capital restant (EUR) : principal non encore rembourse, valorise au FX DU JOUR.
+// Le montant INITIAL investi reste fige au FX du jour de l'investissement (p.montant),
+// mais la valeur actuelle du capital restant suit le FX courant (FX_RATES).
+function obCapRestEur(p, today) {
+  if (!p) return 0;
+  today = today || new Date().toISOString().slice(0,10);
+  var reimbCap = (p.echeancier || []).filter(function(e){ return e.date <= today; })
+                   .reduce(function(s, e){ return s + (e.capital || 0); }, 0);
+  if (!p.currency || p.currency === 'EUR') return (p.montant || 0) - reimbCap;
+  var mOrig = (p.montantOrig != null) ? p.montantOrig : (p.fxRate ? (p.montant || 0) / p.fxRate : (p.montant || 0));
+  var fxNow = (typeof FX_RATES !== 'undefined' && FX_RATES[p.currency]) ? FX_RATES[p.currency] : (p.fxRate || 1);
+  return (mOrig - reimbCap) * fxNow;
+}
 function obligLockPastFx() {
   const today = new Date().toISOString().slice(0,10);
   let changed = false;
@@ -6813,7 +6823,7 @@ function renderObligSection() {
   var data = OBLIG_DATA.map(function(p) {
     var recuInt = (p.echeancier||[]).filter(function(e){return e.date<=today;}).reduce(function(s,e){return s+echIntEur(p,e);},0);
     var recuCap = (p.echeancier||[]).filter(function(e){return e.date<=today;}).reduce(function(s,e){return s+echCapEur(p,e);},0);
-    var capRest = (p.montant||0) - recuCap;
+    var capRest = obCapRestEur(p, today);
     var montantInvesti = (p.montant||0) - recuInt - recuCap;  // capital encore engagé net (EUR)
     var intByYear = {}, dateByYear = {};
     (p.echeancier||[]).forEach(function(e) {
