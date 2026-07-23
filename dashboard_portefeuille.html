@@ -2004,9 +2004,40 @@ function renderDashboard() {
     }).join(''); }
   }
 
-  // Donut par type
-  var typeEntries = CATS.map(function(c) { return [c, valueByCat[c] || 0]; }).filter(function(e) { return e[1] > 0; });
-  makeDonut('db_donut_type', 'db_donut_type_leg', typeEntries, CATS.map(function(c) { return CAT_COLORS[c] || '#6b7280'; }));
+  // Donut par type — la catégorie 'Actions & ETFs' est séparée en 'Actions' et 'ETFs'
+  var _etfVal = 0, _actVal = 0;
+  BOOK2_ROWS.forEach(function(r) {
+    var _c = 'Actions & ETFs';
+    if (r.typeInv === 'Crypto') _c = 'Crypto';
+    else if (r.typeInv === 'Produit structuré' || r.typeInv === 'Produit structure' || r.typeInv === 'Épargne' || r.typeInv === 'Epargne') _c = 'Produits structurés & Épargne';
+    else if (r.typeInv && r.typeInv.toLowerCase().includes('obligation')) _c = 'Obligations non cotées';
+    if (_c !== 'Actions & ETFs') return;
+    var _info = CURRENT_PRICES[r.ticker];
+    var _cost = r.costEur != null ? r.costEur : (toEur(r.cost, r.currency) || 0);
+    var _val  = _info && _info.price ? (toEur(r.qty * _info.price, _info.currency || r.currency) || _cost) : _cost;
+    if (r.typeInv === 'ETF') _etfVal += _val; else _actVal += _val;
+  });
+  var _aeTot = valueByCat['Actions & ETFs'] || 0;   // valeur catégorie (instruments + cash brokers actions)
+  var _instr = _etfVal + _actVal;
+  var typeEntries = [];
+  CATS.forEach(function(c) {
+    if (c === 'Actions & ETFs') {
+      if (_instr > 0) {
+        // le cash éventuel des brokers actions est réparti au prorata Actions/ETFs
+        typeEntries.push(['ETFs',    _aeTot * _etfVal / _instr]);
+        typeEntries.push(['Actions', _aeTot * _actVal / _instr]);
+      } else if (_aeTot > 0) {
+        typeEntries.push(['Actions', _aeTot]);
+      }
+    } else if ((valueByCat[c] || 0) > 0) {
+      typeEntries.push([c, valueByCat[c]]);
+    }
+  });
+  typeEntries = typeEntries.filter(function(e) { return e[1] > 0; });
+  // Couleurs stables par libellé (Actions bleu, ETFs bleu ciel) ; tri par valeur pour aligner la palette
+  var _typeCol = { 'Actions':'#5a8dee', 'ETFs':'#38bdf8', 'Crypto':'#f59e0b', 'Produits structurés & Épargne':'#a78bfa', 'Obligations non cotées':'#4caf82' };
+  typeEntries.sort(function(a,b) { return b[1]-a[1]; });
+  makeDonut('db_donut_type', 'db_donut_type_leg', typeEntries, typeEntries.map(function(e) { return _typeCol[e[0]] || '#6b7280'; }));
 
   // Donut par broker
   var _pfBrokerMerged = {};
