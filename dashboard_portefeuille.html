@@ -2333,6 +2333,15 @@ function isActiveInv(r) {
 
 function buildGeoExposure() {
   const payMap = {};  // { pays: valEur (float, arrondi à la fin) }
+  // Harmonisation des libellés pays : les compositions du Sheet et les actions
+  // directes utilisent les noms anglais ('United States'), tandis que le fallback
+  // ETF_META utilise le français + drapeau ('🇺🇸 États-Unis'). On ramène tout à un
+  // libellé canonique unique (anglais) en inversant COUNTRY_FR, pour éviter les doublons.
+  if (!window._COUNTRY_CANON) {
+    window._COUNTRY_CANON = {};
+    try { Object.entries(COUNTRY_FR).forEach(([en, fr]) => { window._COUNTRY_CANON[fr] = en; }); } catch(e){}
+  }
+  const _canonPays = p => (window._COUNTRY_CANON[p] || p);
 
   // ── ETFs : itérer sur ETF_META avec fallback ETF_COMP_OVERRIDE ─────────────
   Object.keys(ETF_META).forEach(ticker => {
@@ -2341,7 +2350,8 @@ function buildGeoExposure() {
     const ov = ETF_COMP_OVERRIDE[ticker]?.geoAll || [];
     const geoAll = ov.length > 0 ? ov : (ETF_META[ticker]?.geo || []);
     geoAll.forEach(([pays, pct]) => {
-      payMap[pays] = (payMap[pays] || 0) + (valEur * pct / 100);
+      const k = _canonPays(pays);
+      payMap[k] = (payMap[k] || 0) + (valEur * pct / 100);
     });
   });
 
@@ -2355,7 +2365,8 @@ function buildGeoExposure() {
     if (!info?.price) return;
     const valEur = toEur(r.qty * info.price, info.currency || r.currency);
     if (!valEur || valEur <= 0) return;
-    payMap[pays] = (payMap[pays] || 0) + valEur;
+    const _k = _canonPays(pays);
+    payMap[_k] = (payMap[_k] || 0) + valEur;
   });
 
   // Arrondir à la fin (même comportement que la colonne Total de renderCompTables)
