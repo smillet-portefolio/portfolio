@@ -2247,8 +2247,7 @@ function renderDashboard() {
     return ((valNow - invNow) - (base.act - base.inv)) / base.act * 100;
   };
 
-  const typeData = CATS.map(cat => {
-    const inv = investedByCat[cat] || 0, val = valueByCat[cat] || 0;
+  const _catPerf = (cat, inv, val) => {
     let perf = inv > 0 ? (val - inv) / inv * 100 : null;
     if (cat === 'Obligations non cotées' && typeof OBLIG_DATA !== 'undefined') {
       // Obligations : performance = intérêts reçus à ce jour / montant initialement investi
@@ -2256,10 +2255,48 @@ function renderDashboard() {
       OBLIG_DATA.forEach(p => { _oi += (p.montant||0); (p.echeancier||[]).forEach(e => { if (e.date <= _t) _on += (typeof echIntEur === 'function') ? echIntEur(p,e) : (e.interet||0); }); });
       perf = _oi > 0 ? _on / _oi * 100 : null;
     }
-    return { label: cat, inv, val, pnl: val - inv, perf: perf,
+    return perf;
+  };
+  // Base par catégorie (4 cats) — conservée pour l'onglet Patrimoine
+  const typeDataBase = CATS.map(cat => {
+    const inv = investedByCat[cat] || 0, val = valueByCat[cat] || 0;
+    return { label: cat, inv, val, pnl: val - inv, perf: _catPerf(cat, inv, val),
              ytd: periodPct(val, inv, catSuffixes(cat), YTD_CUT), mtd: periodPct(val, inv, catSuffixes(cat), MTD_CUT) };
   });
-  try{ window._patFin = { types: typeData.map(t=>({label:t.label,val:t.val,pnl:t.pnl})), totalEur: totalValue }; }catch(e){}
+  try{ window._patFin = { types: typeDataBase.map(t=>({label:t.label,val:t.val,pnl:t.pnl})), totalEur: totalValue }; }catch(e){}
+
+  // Tableau affiché : 'Actions & ETFs' séparé en 'ETFs' et 'Actions' (totaux préservés).
+  // Investi réparti au prorata du coût, valeur au prorata de la valeur (cash des brokers
+  // actions réparti proportionnellement). YTD/MTD restent au niveau Actions+ETFs car
+  // l'historique de l'onglet Évolution est par broker, non par instrument.
+  let _etfCost = 0, _etfV = 0, _actCost = 0, _actV = 0;
+  BOOK2_ROWS.forEach(r => {
+    let cat = 'Actions & ETFs';
+    if (r.typeInv === 'Crypto') cat = 'Crypto';
+    else if (r.typeInv === 'Produit structuré' || r.typeInv === 'Produit structure' || r.typeInv === 'Épargne' || r.typeInv === 'Epargne') cat = 'Produits structurés & Épargne';
+    else if (r.typeInv && r.typeInv.toLowerCase().includes('obligation')) cat = 'Obligations non cotées';
+    if (cat !== 'Actions & ETFs') return;
+    const info = CURRENT_PRICES[r.ticker];
+    const costEur = r.costEur != null ? r.costEur : (toEur(r.cost, r.currency) || 0);
+    const val = info?.price ? (toEur(r.qty * info.price, info.currency || r.currency) || costEur) : costEur;
+    if (r.typeInv === 'ETF') { _etfCost += costEur; _etfV += val; }
+    else { _actCost += costEur; _actV += val; }
+  });
+  const typeData = [];
+  typeDataBase.forEach(row => {
+    if (row.label !== 'Actions & ETFs') { typeData.push(row); return; }
+    const aeInv = row.inv, aeVal = row.val;
+    const tCost = _etfCost + _actCost, tVal = _etfV + _actV;
+    const mk = (label, cShare, vShare) => {
+      const cs = tCost > 0 ? cShare / tCost : (tVal > 0 ? vShare / tVal : 0);
+      const vs = tVal  > 0 ? vShare / tVal  : (tCost > 0 ? cShare / tCost : 0);
+      const inv = aeInv * cs, val = aeVal * vs;
+      return { label, inv, val, pnl: val - inv, perf: inv > 0 ? (val - inv) / inv * 100 : null,
+               ytd: row.ytd, mtd: row.mtd };
+    };
+    typeData.push(mk('ETFs', _etfCost, _etfV));
+    typeData.push(mk('Actions', _actCost, _actV));
+  });
   // Par broker : regrouper "KB obligations" sous "KB"
   const _mergeBrk = b => (b === 'KB obligations') ? 'KB' : b;
   const _bInv = {}, _bVal = {};
