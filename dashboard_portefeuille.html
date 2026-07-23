@@ -7900,7 +7900,7 @@ function renderRisques() {
 // ══════════════════════════════════════════════════════════════════════════════
 // ACTIONS DIRECTES — dynamique depuis BOOK2_ROWS + CURRENT_PRICES
 // ══════════════════════════════════════════════════════════════════════════════
-const ETF_TICKERS = new Set(['EMXC.DE','IQQH.DE','HYDE.DE','LSMC.DE','I500.DE','NUKL.DE','D5BI.DE','XDWD.DE','XDWH.DE','JEDI.DE','VGWE.DE','MTPI.PA','Q8Y0.DE','MWRE.DE']);
+const ETF_TICKERS = new Set(['EMXC.DE','IQQH.DE','HYDE.DE','LSMC.DE','I500.DE','NUKL.DE','D5BI.DE','XDWD.DE','XDWH.DE','JEDI.DE','VGWE.DE','MTPI.PA','Q8Y0.DE','MWRE.DE','GRE.PA','LEER.DE']);
 
 const STOCK_SECTORS = {
   'ORCL':    'Technologie · Cloud & IA',
@@ -8420,6 +8420,7 @@ const ETF_LABELS = {
   'LSMC.DE':'Amundi Semis','MTPI.PA':'iShares ex-China',
   'Q8Y0.DE':'iShares Clean Energy Tr.','MWRE.DE':'Amundi Core World',
   'XDWH.DE':'MSCI World Health Care',
+  'GRE.PA':'MSCI Greece','LEER.DE':'Europe Est ex Russie',
 };
 const ETF_META = {
   'XDWD.DE': { name:'Xtrackers MSCI World',        short:'XDWD', ter:0.12, index:'MSCI World (1 300 titres)',     type:'Cœur large',   badge:'badge-blue',
@@ -8478,6 +8479,14 @@ const ETF_META = {
     geo:[['🇺🇸 États-Unis',71.6],['🇨🇭 Suisse',6.0],['🇬🇧 Royaume-Uni',5.0],['🇩🇰 Danemark',4.5],['🇯🇵 Japon',3.5]],
     sectors:[['Santé',100.0]],
     positions:[['Eli Lilly',10.7],['Johnson & Johnson',6.1],['AbbVie',5.0]] },
+  'GRE.PA': { name:'Amundi MSCI Greece', short:'GRE', isin:'FR0010405431', ter:0.55, index:'MSCI Greece IMI', type:'Pays', badge:'badge-amber',
+    geo:[['🇬🇷 Grèce',100.0]],
+    sectors:[['Finance',48.0],['Services publics',12.0],['Énergie',9.0]],
+    positions:[['Eurobank Ergasias',14.0],['Nat. Bank of Greece',13.0],['Alpha Services',8.0]] },
+  'LEER.DE': { name:'Amundi MSCI Europe Est ex Russie', short:'LEER', isin:'LU1900066462', ter:0.50, index:'MSCI EM Europe Est ex Russie', type:'Pays', badge:'badge-amber',
+    geo:[['🇵🇱 Pologne',55.0],['🇬🇷 Grèce',22.0],['🇭🇺 Hongrie',12.0],['🇨🇿 Rép. tchèque',11.0]],
+    sectors:[['Finance',45.0],['Énergie',15.0],['Services publics',10.0]],
+    positions:[['PKO Bank Polski',10.0],['PZU',7.0],['Bank Pekao',6.0]] },
 };
 
 // ── ETF Composition import from repartition_ETFs.xlsx ────────────────────────
@@ -8487,6 +8496,7 @@ const ETF_ISIN_MAP = {
   'IE00B1XNHC34':'IQQH.DE','IE00BMG6Z448':'MTPI.PA','IE00BMTX1Y45':'I500.DE',
   'IE000YU9K6K2':'JEDI.DE','IE000M7V94E1':'NUKL.DE','IE00BK5BR626':'VGWE.DE',
   'LU0476289466':'D5BI.DE','IE00BJ0KDQ92':'XDWD.DE','IE00BM67HK77':'XDWH.DE',
+  'FR0010405431':'GRE.PA','LU1900066462':'LEER.DE',
 };
 
 // Detection DYNAMIQUE : tout titre du portefeuille marque typeInv='ETF' est
@@ -9306,7 +9316,7 @@ function renderETFValues() {
           ${r.valEur==null?'<span style="font-size:9px;color:var(--text2);display:block">coût achat</span>':''}
         </td>
         <td><strong>${pctPF}%</strong></td>
-        <td>${meta.ter.toFixed(2)}%</td>
+        <td>${meta.ter!=null?meta.ter.toFixed(2)+'%':'—'}</td>
         <td style="font-size:11px;color:var(--text2)">${meta.index}</td>
         <td><span class="badge ${meta.badge}">${meta.type}</span></td>
       </tr>`;
@@ -9324,12 +9334,12 @@ function renderETFValues() {
     }).map(r => {
       const meta  = ETF_META[r.ticker] || { name:r.ticker, short:r.ticker, ter:0 };
       const val   = r.valEur ?? r.costEur;
-      const cost  = Math.round(val * meta.ter / 100);
-      const [rat, badge] = terRatings(meta.ter);
+      const cost  = Math.round(val * (meta.ter||0) / 100);
+      const [rat, badge] = terRatings(meta.ter||0);
       return `<tr>
         <td>${meta.name} (${meta.short})</td>
         <td style="font-family:'DM Mono',monospace">${fmt(val)} €${r.valEur==null?'<span style="font-size:9px;color:var(--text2)"> achat</span>':''}</td>
-        <td>${meta.ter.toFixed(2)}%</td>
+        <td>${meta.ter!=null?meta.ter.toFixed(2)+'%':'—'}</td>
         <td style="font-family:'DM Mono',monospace">${cost} €/an</td>
         <td><span class="badge ${badge}">${rat}</span></td>
       </tr>`;
@@ -9357,23 +9367,23 @@ function renderETFValues() {
     const totV  = terRows.reduce((s,r)=>s+(r.valEur??r.costEur),0);
     const waTER = totV>0 ? terRows.reduce((s,r)=>{
       const meta=ETF_META[r.ticker]; if(!meta) return s;
-      return s + meta.ter*(r.valEur??r.costEur)/totV;
+      return s + (meta.ter||0)*(r.valEur??r.costEur)/totV;
     },0) : 0;
     const totCost_ter = terRows.reduce((s,r)=>{
       const meta=ETF_META[r.ticker]; if(!meta) return s;
-      return s + Math.round((r.valEur??r.costEur)*meta.ter/100);
+      return s + Math.round((r.valEur??r.costEur)*(meta.ter||0)/100);
     },0);
 
     const rows_html = terRows.map(r => {
       const meta = ETF_META[r.ticker]||{name:r.ticker,short:r.ticker,ter:0};
       const val  = r.valEur??r.costEur;
-      const cost = Math.round(val*meta.ter/100);
-      const [rat,badge] = terRatings(meta.ter);
+      const cost = Math.round(val*(meta.ter||0)/100);
+      const [rat,badge] = terRatings(meta.ter||0);
       const srcNote = r.valEur==null ? '<span style="font-size:9px;color:var(--text2);display:block">coût achat</span>' : '';
       return `<tr>
         <td>${meta.name} (${meta.short})</td>
         <td style="font-family:'DM Mono',monospace">${fmt(val)} €${srcNote}</td>
-        <td>${meta.ter.toFixed(2)}%</td>
+        <td>${meta.ter!=null?meta.ter.toFixed(2)+'%':'—'}</td>
         <td style="font-family:'DM Mono',monospace">${cost} €/an</td>
         <td><span class="badge ${badge}">${rat}</span></td>
       </tr>`;
