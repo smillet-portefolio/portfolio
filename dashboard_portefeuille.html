@@ -1559,6 +1559,7 @@ const DIRECT_COUNTRY = {
   'VIE.PA':'France',
   'IBE.MC':'Spain',          // Iberdrola
   'VRT':'United States',     // Vertiv Holdings
+  'C7A0.DE':'China',         // CATL (Contemporary Amperex)
 };
 let _geoCharts = {};
 
@@ -2387,6 +2388,7 @@ const DIRECT_SECTOR = {
   'VIE.PA':'Industrie',
   'IBE.MC':'Services publics', // Iberdrola (utility)
   'VRT':'Industrie',           // Vertiv Holdings
+  'C7A0.DE':'Industrie',       // CATL (batteries)
 };
 
 // Palette secteurs — utilise SECTOR_UNIFIED_COLORS déjà déclaré (noms FR)
@@ -7942,7 +7944,7 @@ function renderRisques() {
 // ══════════════════════════════════════════════════════════════════════════════
 // ACTIONS DIRECTES — dynamique depuis BOOK2_ROWS + CURRENT_PRICES
 // ══════════════════════════════════════════════════════════════════════════════
-const ETF_TICKERS = new Set(['EMXC.DE','IQQH.DE','HYDE.DE','LSMC.DE','I500.DE','NUKL.DE','D5BI.DE','XDWD.DE','XDWH.DE','JEDI.DE','VGWE.DE','MTPI.PA','Q8Y0.DE','MWRE.DE','GRE.PA','LEER.DE']);
+const ETF_TICKERS = new Set(['EMXC.DE','IQQH.DE','HYDE.DE','LSMC.DE','I500.DE','NUKL.DE','D5BI.DE','XDWD.DE','XDWH.DE','JEDI.DE','VGWE.DE','MTPI.PA','Q8Y0.DE','MWRE.DE','GRE.PA','LEER.DE','XMBR.DE']);
 
 const STOCK_SECTORS = {
   'ORCL':    'Technologie · Cloud & IA',
@@ -8463,6 +8465,7 @@ const ETF_LABELS = {
   'Q8Y0.DE':'iShares Clean Energy Tr.','MWRE.DE':'Amundi Core World',
   'XDWH.DE':'MSCI World Health Care',
   'GRE.PA':'MSCI Greece','LEER.DE':'Europe Est ex Russie',
+  'XMBR.DE':'MSCI Brazil',
 };
 const ETF_META = {
   'XDWD.DE': { name:'Xtrackers MSCI World',        short:'XDWD', ter:0.12, index:'MSCI World (1 300 titres)',     type:'Cœur large',   badge:'badge-blue',
@@ -8529,6 +8532,10 @@ const ETF_META = {
     geo:[['🇵🇱 Pologne',66.0],['🇭🇺 Hongrie',24.5],['🇨🇿 Rép. tchèque',9.5]],
     sectors:[['Finance',54.0],['Énergie',14.5],['Conso. disc.',10.0],['Matériaux',7.0],['Services publics',4.5]],
     positions:[['OTP Bank',17.95],['PKO Bank Polski',13.46],['PKN Orlen',10.96],['KGHM Polska',6.92],['Bank Pekao',6.04],['PZU',5.49],['Allegro',5.36],['CEZ',4.06],['Erste Bank Polska',3.93],['LPP',3.04]] },
+  'XMBR.DE': { name:'Xtrackers MSCI Brazil', short:'XMBR', isin:'LU0292109344', ter:0.25, index:'MSCI Brazil', type:'Pays', badge:'badge-amber',
+    geo:[['🇧🇷 Brésil',100.0]],
+    sectors:[['Finance',28.75],['Matériaux',18.25],['Conso. staple',17.1],['Énergie',14.88],['Services publics',5.07],['Industrie',4.79],['Conso. disc.',4.77]],
+    positions:[['Vale',11.65],['Nu Holdings (Nubank)',8.84],['Itau Unibanco',8.59],['Petrobras PN',7.38],['Petrobras ON',6.78],['B3',3.62],['Banco Bradesco',3.37],['Ambev',3.24],['WEG',3.08],['Sabesp',2.90]] },
 };
 
 // ── ETF Composition import from repartition_ETFs.xlsx ────────────────────────
@@ -8539,6 +8546,7 @@ const ETF_ISIN_MAP = {
   'IE000YU9K6K2':'JEDI.DE','IE000M7V94E1':'NUKL.DE','IE00BK5BR626':'VGWE.DE',
   'LU0476289466':'D5BI.DE','IE00BJ0KDQ92':'XDWD.DE','IE00BM67HK77':'XDWH.DE',
   'FR0010405431':'GRE.PA','LU1900066462':'LEER.DE',
+  'LU0292109344':'XMBR.DE',
 };
 
 // Detection DYNAMIQUE : tout titre du portefeuille marque typeInv='ETF' est
