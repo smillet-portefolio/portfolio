@@ -9450,10 +9450,16 @@ function renderETFValues() {
     terTbody2.innerHTML = rows_html + footer_html;
   }
 
-  // ── Refresh TER chart ─────────────────────────────────────────────────────
+  // ── Refresh TER chart (reconstruit dynamiquement depuis TOUS les ETFs) ──────
   if (window._terCChart) {
     const terRows = [...rows].sort((a,b)=>(ETF_META[a.ticker]?.ter||0)-(ETF_META[b.ticker]?.ter||0));
-    window._terCChart._etfVals = terRows.map(r=>r.valEur??r.costEur);
+    const _tv  = r => (ETF_META[r.ticker]?.ter ?? 0);
+    const _lbl = r => { const m = ETF_META[r.ticker] || {}; return (ETF_LABELS[r.ticker] || m.name || r.ticker) + ' (' + (m.short || r.ticker) + ')'; };
+    window._terCChart.data.labels = terRows.map(_lbl);
+    window._terCChart.data.datasets[0].data = terRows.map(_tv);
+    window._terCChart.data.datasets[0].backgroundColor = terRows.map(r => { const t = _tv(r); return t <= 0.20 ? '#4caf82' : t <= 0.40 ? '#f59e0b' : '#e06c6c'; });
+    window._terCChart._etfVals = terRows.map(r => r.valEur ?? r.costEur);
+    window._terCChart.options.plugins.tooltip.callbacks.label = (ctx) => `TER: ${ctx.parsed.y.toFixed(2)}% — Coût/an: ~${Math.round((ctx.chart._etfVals?.[ctx.dataIndex] || 0) * ctx.parsed.y / 100)}€`;
     window._terCChart.update();
   }
 
