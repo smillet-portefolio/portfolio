@@ -60,7 +60,7 @@ TICKERS = [
     ("VGWE.DE",  "Vanguard All-World High Div",   "EUR", "VGWE.DE"),
     ("Q8Y0",     "iShares Global Clean Energy Transition", "EUR", "Q8Y0.DE"),
     ("MWRE",     "Amundi Core MSCI World",        "EUR", "MWRE.DE"),
-    ("C7A0.DE",  "CATL",                          "EUR", "C7A0.DE"),
+    ("C7A0.DE",  "CATL",                          "EUR", "C7A0.MU"),
     ("XMBR.DE",  "Xtrackers MSCI Brazil",         "EUR", "XMBR.DE"),
     ("BTC/EUR",  "Bitcoin",                       "EUR", "BTC-EUR"),
     ("ETH/EUR",  "Ethereum",                      "EUR", "ETH-EUR"),
