@@ -4547,6 +4547,7 @@ const GS_KEYS = [
   'etf_comp_override','etf_comp_date',
   'direct_sector_overrides',
   'evo_history',
+  'kids_hold','kids_closed',
   're_estimates',
   're_mortgage',
   're_rental',
@@ -10279,6 +10280,8 @@ window.addEventListener('load', () => {
   function kidsSave(){ try{ localStorage.setItem('kids_hold', JSON.stringify(KIDS_HOLD)); localStorage.setItem('kids_closed', JSON.stringify(KIDS_CLOSED)); }catch(e){} }
   // exposer pour la sync GSheets
   window.KIDS_HOLD = KIDS_HOLD; window.KIDS_CLOSED = KIDS_CLOSED; window.kidsSave = kidsSave;
+  // Persister d'emblée (défauts ou données chargées) pour que gsSaveAll les synchronise
+  try{ if(!localStorage.getItem('kids_hold')) kidsSave(); }catch(e){}
 
   // ---- Helpers ------------------------------------------------------------
   const COL = {Corentin:'#5a8dee', 'Léandre':'#4caf82', Estelle:'#9b87d4'};
