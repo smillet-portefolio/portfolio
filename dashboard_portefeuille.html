@@ -335,6 +335,7 @@
     <button class="tab" onclick="sw('sect',this)">Secteurs</button>
     <button class="tab" onclick="sw('conseq',this)">🏦 Conseq Retraite</button>
     <button class="tab" onclick="sw('immo',this)">🏠 Immobilier</button>
+    <button class="tab" onclick="sw('enfants',this)">👶 Investissements enfants</button>
   </div>
 
   <!-- ======== PATRIMOINE TOTAL ======== -->
@@ -342,6 +343,9 @@
 
   <!-- ======== PATRIMOINE IMMOBILIER ======== -->
   <div id="immo" class="section"></div>
+
+  <!-- ======== INVESTISSEMENTS ENFANTS ======== -->
+  <div id="enfants" class="section"></div>
 
   <!-- ======== DASHBOARD ======== -->
   <div id="dashboard" class="section active">
@@ -1110,6 +1114,7 @@ function sw(id, btn) {
   if (id === 'clotures')     setTimeout(renderClosedPositions, 50);
   if (id === 'patrimoine')   setTimeout(renderPatrimoine, 50);
   if (id === 'immo')         setTimeout(renderImmo, 50);
+  if (id === 'enfants')      setTimeout(renderEnfants, 50);
   if (id === 'dashboard') setTimeout(renderDashboard, 50);
   if (id === 'cash')         setTimeout(renderCashSection, 50);
   if (id === 'dividend')     setTimeout(renderDividendSection, 50);
@@ -10184,6 +10189,408 @@ window.addEventListener('load', () => {
     </div>
   </div>
 </div>
+
+<script>
+/* =========================================================================
+   INVESTISSEMENTS ENFANTS — module autonome (données isolées)
+   Corentin · Léandre · Estelle. Linxea (assurance-vie) + SAXO (Estelle).
+   ========================================================================= */
+(function(){
+  const KIDS = ['Corentin','Léandre','Estelle'];
+
+  // ---- Holdings détenus (une ligne par fonds/position) --------------------
+  // Linxea : valeur seule (pas de coût par fonds). SAXO : valeur + coût.
+  const KIDS_HOLD_DEFAULT = [
+    // Corentin — Linxea (total 30 831 €)
+    {e:'Corentin', c:'Linxea', nom:'Amundi Euro Stoxx 50',       isin:'', t:'ETF',      val:9858},
+    {e:'Corentin', c:'Linxea', nom:'iShares MSCI EM ex-China',   isin:'', t:'ETF',      val:7692},
+    {e:'Corentin', c:'Linxea', nom:'Vanguard US Opportunities',  isin:'', t:'Fonds',    val:7201},
+    {e:'Corentin', c:'Linxea', nom:'ENGIE',                      isin:'', t:'Action',   val:2005},
+    {e:'Corentin', c:'Linxea', nom:'Netissima (fonds €)',        isin:'', t:'Fonds €',  val:3974},
+    {e:'Corentin', c:'Linxea', nom:'Eurossima (fonds €)',        isin:'', t:'Fonds €',  val:101},
+    // Léandre — Linxea (total 17 342 €)
+    {e:'Léandre',  c:'Linxea', nom:'iShares MSCI ex-China',      isin:'', t:'ETF',      val:3810},
+    {e:'Léandre',  c:'Linxea', nom:'Vanguard US Opportunities',  isin:'', t:'Fonds',    val:3667},
+    {e:'Léandre',  c:'Linxea', nom:'Xtrackers DAX',              isin:'', t:'ETF',      val:3639},
+    {e:'Léandre',  c:'Linxea', nom:'Amundi Euro Stoxx 50',       isin:'', t:'ETF',      val:2288},
+    {e:'Léandre',  c:'Linxea', nom:'ENGIE',                      isin:'', t:'Action',   val:1396},
+    {e:'Léandre',  c:'Linxea', nom:'SPIE',                       isin:'', t:'Action',   val:1112},
+    {e:'Léandre',  c:'Linxea', nom:'Netissima (fonds €)',        isin:'', t:'Fonds €',  val:1430},
+    {e:'Léandre',  c:'Linxea', nom:'Eurossima (fonds €)',        isin:'', t:'Fonds €',  val:0},
+    // Estelle — SAXO (total ≈ 36 572 €, coût ≈ 34 091 €)
+    {e:'Estelle',  c:'SAXO', nom:'Amundi Core MSCI World',       isin:'IE000BI8OT95', t:'ETF',      val:8687, cout:8059, qty:55,  vl:157.94},
+    {e:'Estelle',  c:'SAXO', nom:'Amundi MSCI Emerging Ex China',isin:'LU2009202107', t:'ETF',      val:7369, cout:6486, qty:184, vl:40.05},
+    {e:'Estelle',  c:'SAXO', nom:'iShares EUR Cash',             isin:'IE000JJPY166', t:'Monétaire', val:5444, cout:5383, qty:350, vl:15.5548},
+    {e:'Estelle',  c:'SAXO', nom:'Amundi MSCI Eastern Europe',   isin:'LU1900066462', t:'ETF',      val:3904, cout:3397, qty:86,  vl:45.4},
+    {e:'Estelle',  c:'SAXO', nom:'iShares Global Clean Energy',  isin:'IE00B1XNHC34', t:'ETF',      val:3860, cout:3779, qty:413, vl:9.346},
+    {e:'Estelle',  c:'SAXO', nom:'iShares MSCI ACWI',            isin:'IE00B6R52259', t:'ETF',      val:3599, cout:3343, qty:34,  vl:105.84},
+    {e:'Estelle',  c:'SAXO', nom:'Microsoft (USD)',              isin:'US5949181045', t:'Action',   val:3484, cout:3419, qty:10,  vl:397.75},
+    {e:'Estelle',  c:'SAXO', nom:'Cash',                         isin:'', t:'Cash',     val:225,  cout:225}
+  ];
+
+  // ---- Positions clôturées -----------------------------------------------
+  const KIDS_CLOSED_DEFAULT = [
+    {e:'Estelle', c:'Linxea', nom:'Linxea assurance-vie (clôturé)',           isin:'',            pnl:6646},
+    {e:'Estelle', c:'SAXO',   nom:'Amundi STOXX Europe 600 Energy ESG',       isin:'LU1834988278', pnl:481},
+    {e:'Estelle', c:'SAXO',   nom:'iShares S&P 500 Utilities Sector',         isin:'IE00B4KBBD01', pnl:14},
+    {e:'Estelle', c:'SAXO',   nom:'iShares STOXX Global Select Dividend',     isin:'DE000A0F5UH1', pnl:13},
+    {e:'Estelle', c:'SAXO',   nom:'Amundi STOXX Europe 600 Industrials',      isin:'LU1834987890', pnl:-198},
+    {e:'Estelle', c:'SAXO',   nom:'iShares MSCI Mexico capped',               isin:'IE00B5WHFQ43', pnl:-215}
+  ];
+
+  // ---- Linxea : versements / retraits par enfant --------------------------
+  const KIDS_LINXEA = {
+    'Corentin': {investi:15475, retrait:-3372,  valeur:30831.32, closed:false},
+    'Léandre':  {investi:19847, retrait:-11500, valeur:17342.28, closed:false},
+    'Estelle':  {investi:0,     retrait:0,      valeur:0, realise:6646, closed:true}
+  };
+  // SAXO Estelle : versements
+  const KIDS_SAXO_DEP = [
+    {date:'2026-01-05', montant:149},
+    {date:'2026-02-17', montant:17000},
+    {date:'2026-02-19', montant:16855}
+  ];
+  const ESTELLE_SAXO_INVESTI = 34004;
+
+  // ---- Historique annuel (Linxea) ----------------------------------------
+  const KIDS_YEARS = [2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023,2024,2025,2026];
+  const KIDS_VERS = {
+    'Corentin':[875,1200,950,850,1200,1200,1200,1200,700,700,1200,1200,1200,1200,-2772,0,0,0,0,0],
+    'Léandre' :[875,1200,950,850,1200,1200,1200,1200,1200,1200,1200,1200,-10300,1200,3972,0,0,0,0,0],
+    'Estelle' :[0,1300,1025,900,900,900,900,900,900,900,900,900,1125,1200,1200,2700,3600,3600,3600,0]
+  };
+  const KIDS_VALHIST = {
+    'Corentin':[867,1949,3058,4272,5242,6716,8039,10169,12623,13455,16081,16098,21781,26576,25839,20746,22893,25503,24508,30831],
+    'Léandre' :[867,1949,3058,4269,5240,6714,8036,10166,12004,13119,15605,15986,7228,9306,14245,11270,12809,14712,14363,17342],
+    'Estelle' :[null,1329,2431,3638,4553,5751,6702,8353,9781,10616,12612,12791,16250,19966,22015,19559,24881,31077,33539,36572]
+  };
+  const KIDS_PERF = {
+    'Corentin':[-2.8,-7.9,6.4,10.8,-4.7,4.7,1.7,10.8,16.4,1.0,10.1,-7.1,26.9,16.0,7.9,-19.7,10.3,11.4,-3.9,89.6],
+    'Léandre' :[-2.8,-7.9,6.4,10.7,-4.7,4.7,1.7,10.8,5.9,-0.7,9.4,-5.0,18.3,11.2,8.8,-20.9,13.7,14.8,-2.4,46.2],
+    'Estelle' :[null,3.8,4.1,10.6,0.3,5.9,0.8,10.5,6.0,-0.6,9.9,-5.5,17.5,14.9,4.1,-20.7,8.1,9.7,-3.5,1.6]
+  };
+
+  // ---- État persistant ----------------------------------------------------
+  let KIDS_HOLD, KIDS_CLOSED;
+  try { KIDS_HOLD = JSON.parse(localStorage.getItem('kids_hold')) || null; } catch(e){ KIDS_HOLD=null; }
+  if(!Array.isArray(KIDS_HOLD) || !KIDS_HOLD.length) KIDS_HOLD = JSON.parse(JSON.stringify(KIDS_HOLD_DEFAULT));
+  try { KIDS_CLOSED = JSON.parse(localStorage.getItem('kids_closed')) || null; } catch(e){ KIDS_CLOSED=null; }
+  if(!Array.isArray(KIDS_CLOSED) || !KIDS_CLOSED.length) KIDS_CLOSED = JSON.parse(JSON.stringify(KIDS_CLOSED_DEFAULT));
+  function kidsSave(){ try{ localStorage.setItem('kids_hold', JSON.stringify(KIDS_HOLD)); localStorage.setItem('kids_closed', JSON.stringify(KIDS_CLOSED)); }catch(e){} }
+  // exposer pour la sync GSheets
+  window.KIDS_HOLD = KIDS_HOLD; window.KIDS_CLOSED = KIDS_CLOSED; window.kidsSave = kidsSave;
+
+  // ---- Helpers ------------------------------------------------------------
+  const COL = {Corentin:'#5a8dee', 'Léandre':'#4caf82', Estelle:'#9b87d4'};
+  const COLC = {Linxea:'#5a8dee', SAXO:'#f0956e'};
+  const PAL = ['#5a8dee','#4caf82','#9b87d4','#f0956e','#e8a838','#e06c6c','#38bdf8','#4caf82','#c084fc','#94a3b8'];
+  function fmt(v){ if(v==null||isNaN(v)) return '—'; return Math.round(v).toLocaleString('fr-FR')+' €'; }
+  function fmts(v){ if(v==null||isNaN(v)) return '—'; return (v>=0?'+':'')+Math.round(v).toLocaleString('fr-FR')+' €'; }
+  function pct(v){ if(v==null||isNaN(v)) return '—'; return (v>=0?'+':'')+v.toFixed(1).replace('.',',')+' %'; }
+  function col(v){ return v>=0 ? 'var(--green)' : 'var(--red)'; }
+  let _kidCharts=[];
+  function destroyCharts(){ _kidCharts.forEach(c=>{try{c.destroy();}catch(e){}}); _kidCharts=[]; }
+
+  function sel(){ return window._kidSel || 'Tous'; }
+  function holdSel(){ const s=sel(); return KIDS_HOLD.filter(h=>s==='Tous'||h.e===s); }
+
+  // Agrégats par enfant (valeur détenue, investi, gain)
+  function agg(child){
+    const hold = KIDS_HOLD.filter(h=>h.e===child);
+    const valeur = hold.reduce((s,h)=>s+(+h.val||0),0);
+    let investi;
+    if(child==='Estelle') investi = ESTELLE_SAXO_INVESTI;
+    else investi = KIDS_LINXEA[child].investi + KIDS_LINXEA[child].retrait; // net
+    return { valeur, investi, gain: valeur-investi, pct: investi? (valeur-investi)/investi*100 : null };
+  }
+
+  // ---- Rendu principal ----------------------------------------------------
+  window.renderEnfants = function(){
+    const root=document.getElementById('enfants'); if(!root) return;
+    if(window._kidSel==null) window._kidSel='Tous';
+    if(window._kidSub==null) window._kidSub='synth';
+    const s=sel(), sub=window._kidSub;
+    const chip=(label,active,onclick,c)=>`<button onclick="${onclick}" style="padding:6px 15px;border-radius:16px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid ${active?(c||'var(--blue)'):'var(--border2)'};background:${active?(c||'var(--blue)'):'var(--bg2)'};color:${active?'#fff':'var(--text2)'}">${label}</button>`;
+    const subBtn=(label,id)=>`<button class="sub-tab${sub===id?' active':''}" onclick="kidSub('${id}')">${label}</button>`;
+    root.innerHTML =
+      `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+         <span style="font-size:13px;color:var(--text2);font-weight:600">Enfant :</span>
+         ${chip('Tous', s==='Tous', "kidSelect('Tous')", '#2c2a26')}
+         ${chip('Corentin', s==='Corentin', "kidSelect('Corentin')", COL.Corentin)}
+         ${chip('Léandre', s==='Léandre', "kidSelect('Léandre')", COL['Léandre'])}
+         ${chip('Estelle', s==='Estelle', "kidSelect('Estelle')", COL.Estelle)}
+       </div>
+       <div class="sub-tabs">
+         ${subBtn('📊 Synthèse','synth')}
+         ${subBtn('💼 Portefeuille','pf')}
+         ${subBtn('📉 Actions ETFs +/−','ae')}
+         ${subBtn('💰 Dépôts & Cash','cash')}
+         ${subBtn('📤 Clôturées','clot')}
+         ${subBtn('📈 Évolution','evo')}
+         ${subBtn('✏️ Éditer','edit')}
+       </div>
+       <div id="kid_body"></div>`;
+    renderKidBody();
+  };
+  window.kidSelect=function(c){ window._kidSel=c; window.renderEnfants(); };
+  window.kidSub=function(s){ window._kidSub=s; window.renderEnfants(); };
+
+  function renderKidBody(){
+    destroyCharts();
+    const b=document.getElementById('kid_body'); if(!b) return;
+    switch(window._kidSub){
+      case 'synth': kidSynthese(b); break;
+      case 'pf':    kidPortefeuille(b); break;
+      case 'ae':    kidActEtf(b); break;
+      case 'cash':  kidCash(b); break;
+      case 'clot':  kidClotures(b); break;
+      case 'evo':   kidEvolution(b); break;
+      case 'edit':  kidEditer(b); break;
+    }
+  }
+
+  // ---- 1) SYNTHÈSE --------------------------------------------------------
+  function kidSynthese(b){
+    const s=sel();
+    const list = s==='Tous' ? KIDS : [s];
+    const A={}; KIDS.forEach(c=>A[c]=agg(c));
+    const totVal = list.reduce((t,c)=>t+A[c].valeur,0);
+    const totInv = list.reduce((t,c)=>t+A[c].investi,0);
+    const totGain= totVal-totInv;
+    // KPI globaux
+    let html = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px">
+        ${kpi('Valeur actuelle', fmt(totVal), 'var(--text)')}
+        ${kpi('Investi net', fmt(totInv), 'var(--text)')}
+        ${kpi('Plus-value', fmts(totGain), col(totGain))}
+        ${kpi('Performance', pct(totInv?totGain/totInv*100:null), col(totGain))}
+      </div>`;
+    // Cartes par enfant
+    html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-bottom:22px">`;
+    list.forEach(c=>{
+      const a=A[c];
+      html += `<div class="card" style="border-left:3px solid ${COL[c]}">
+          <div style="font-weight:700;font-size:14px;margin-bottom:8px">${c}</div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin:3px 0"><span style="color:var(--text2)">Valeur</span><b>${fmt(a.valeur)}</b></div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin:3px 0"><span style="color:var(--text2)">Investi net</span><span>${fmt(a.investi)}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin:3px 0"><span style="color:var(--text2)">+/-</span><b style="color:${col(a.gain)}">${fmts(a.gain)} (${pct(a.pct)})</b></div>
+        </div>`;
+    });
+    html += `</div>`;
+    // Graphiques
+    html += `<div class="grid-2" style="grid-template-columns:1fr 1fr">
+        <div class="card"><h3>Valeur par enfant</h3><div class="sub">Répartition du patrimoine des enfants</div><div class="chart-wrap" style="height:260px"><canvas id="kidDonutChild"></canvas></div></div>
+        <div class="card"><h3>Valeur par compte</h3><div class="sub">Linxea (assurance-vie) vs SAXO</div><div class="chart-wrap" style="height:260px"><canvas id="kidDonutCompte"></canvas></div></div>
+      </div>
+      <div class="card" style="margin-top:14px"><h3>Investi vs valeur actuelle</h3><div class="sub">Par enfant</div><div class="chart-wrap" style="height:260px"><canvas id="kidBarInvVal"></canvas></div></div>`;
+    b.innerHTML=html;
+    // Donut par enfant
+    _kidCharts.push(new Chart(document.getElementById('kidDonutChild'),{type:'doughnut',
+      data:{labels:list, datasets:[{data:list.map(c=>A[c].valeur), backgroundColor:list.map(c=>COL[c]), borderWidth:0}]},
+      options:donutOpts()}));
+    // Donut par compte
+    const byC={}; holdSel().forEach(h=>{byC[h.c]=(byC[h.c]||0)+(+h.val||0);});
+    const clabels=Object.keys(byC);
+    _kidCharts.push(new Chart(document.getElementById('kidDonutCompte'),{type:'doughnut',
+      data:{labels:clabels, datasets:[{data:clabels.map(k=>byC[k]), backgroundColor:clabels.map(k=>COLC[k]||'#94a3b8'), borderWidth:0}]},
+      options:donutOpts()}));
+    // Bar investi vs valeur
+    _kidCharts.push(new Chart(document.getElementById('kidBarInvVal'),{type:'bar',
+      data:{labels:list, datasets:[
+        {label:'Investi net', data:list.map(c=>A[c].investi), backgroundColor:'#c9c2b6'},
+        {label:'Valeur', data:list.map(c=>A[c].valeur), backgroundColor:list.map(c=>COL[c])}
+      ]},
+      options:barOpts()}));
+  }
+
+  // ---- 2) PORTEFEUILLE ----------------------------------------------------
+  function kidPortefeuille(b){
+    const rows = holdSel().slice().sort((a,b2)=>(b2.val||0)-(a.val||0));
+    const tot = rows.reduce((s,h)=>s+(+h.val||0),0);
+    let html=`<div class="card"><table><thead><tr>
+        <th>Enfant</th><th>Compte</th><th>Fonds / position</th><th>Type</th>
+        <th style="text-align:right">Qté</th><th style="text-align:right">Valeur</th>
+        <th style="text-align:right">Coût</th><th style="text-align:right">+/-</th><th style="text-align:right">%</th><th style="text-align:right">Poids</th></tr></thead><tbody>`;
+    rows.forEach(h=>{
+      const g = (h.cout!=null) ? (h.val-h.cout) : null;
+      const p = (h.cout) ? g/h.cout*100 : null;
+      html+=`<tr>
+        <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COL[h.e]};margin-right:6px"></span>${h.e}</td>
+        <td>${h.c}</td><td>${h.nom}${h.isin?` <span style="color:var(--text3);font-size:10px">${h.isin}</span>`:''}</td>
+        <td><span style="font-size:10px;padding:2px 7px;border-radius:8px;background:var(--bg3);color:var(--text2)">${h.t||''}</span></td>
+        <td style="text-align:right">${h.qty!=null?h.qty.toLocaleString('fr-FR'):'—'}</td>
+        <td style="text-align:right;font-weight:600">${fmt(h.val)}</td>
+        <td style="text-align:right;color:var(--text2)">${h.cout!=null?fmt(h.cout):'—'}</td>
+        <td style="text-align:right;color:${g!=null?col(g):'var(--text3)'}">${g!=null?fmts(g):'—'}</td>
+        <td style="text-align:right;color:${p!=null?col(p):'var(--text3)'}">${p!=null?pct(p):'—'}</td>
+        <td style="text-align:right;color:var(--text2)">${tot?(h.val/tot*100).toFixed(1).replace('.',',')+' %':'—'}</td></tr>`;
+    });
+    html+=`<tr style="border-top:2px solid var(--border2);font-weight:700"><td colspan="5">TOTAL${sel()!=='Tous'?' — '+sel():''}</td><td style="text-align:right">${fmt(tot)}</td><td colspan="4"></td></tr>`;
+    html+=`</tbody></table></div>
+      <p style="font-size:11px;color:var(--text2);margin-top:8px">Linxea : valeur par fonds (coût suivi au niveau du contrat, cf. Synthèse). SAXO : coût et +/- par position.</p>`;
+    b.innerHTML=html;
+  }
+
+  // ---- 3) ACTIONS ETFs +/- (SAXO Estelle, avec ticker/prix) ---------------
+  function kidActEtf(b){
+    const rows = KIDS_HOLD.filter(h=>h.c==='SAXO' && h.cout!=null && h.t!=='Cash')
+                          .filter(h=>sel()==='Tous'||h.e===sel())
+                          .map(h=>({...h, g:h.val-h.cout, p:h.cout?(h.val-h.cout)/h.cout*100:0}))
+                          .sort((a,b2)=>b2.p-a.p);
+    if(!rows.length){ b.innerHTML=`<div class="card" style="color:var(--text2)">Aucune position cotée (ETF/action) pour cette sélection.<br>Ce sous-onglet concerne le compte SAXO d'Estelle (positions avec cotation).</div>`; return; }
+    let html=`<div class="card" style="margin-bottom:14px"><table><thead><tr>
+        <th>Position</th><th>ISIN</th><th style="text-align:right">Qté</th><th style="text-align:right">VL</th>
+        <th style="text-align:right">Valeur</th><th style="text-align:right">Coût</th><th style="text-align:right">+/-</th><th style="text-align:right">%</th></tr></thead><tbody>`;
+    rows.forEach(h=>{
+      html+=`<tr><td>${h.nom}</td><td style="color:var(--text3);font-size:10px">${h.isin||''}</td>
+        <td style="text-align:right">${h.qty!=null?h.qty:'—'}</td><td style="text-align:right">${h.vl!=null?h.vl:'—'}</td>
+        <td style="text-align:right;font-weight:600">${fmt(h.val)}</td><td style="text-align:right;color:var(--text2)">${fmt(h.cout)}</td>
+        <td style="text-align:right;color:${col(h.g)}">${fmts(h.g)}</td><td style="text-align:right;color:${col(h.p)};font-weight:600">${pct(h.p)}</td></tr>`;
+    });
+    html+=`</tbody></table></div>
+      <div class="card"><h3>+/- par position (%)</h3><div class="chart-wrap" style="height:300px"><canvas id="kidAeBar"></canvas></div></div>`;
+    b.innerHTML=html;
+    _kidCharts.push(new Chart(document.getElementById('kidAeBar'),{type:'bar',
+      data:{labels:rows.map(h=>h.nom.length>22?h.nom.slice(0,22)+'…':h.nom),
+        datasets:[{data:rows.map(h=>+h.p.toFixed(2)), backgroundColor:rows.map(h=>h.p>=0?'#4caf82':'#e06c6c')}]},
+      options:{indexAxis:'y', responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>pct(c.parsed.x)}}},
+        scales:{x:{ticks:{callback:v=>v+' %'},grid:{color:'rgba(0,0,0,0.05)'}}, y:{grid:{display:false}}}}}));
+  }
+
+  // ---- 4) DÉPÔTS & CASH ---------------------------------------------------
+  function kidCash(b){
+    const s=sel(); const list = s==='Tous'?KIDS:[s];
+    let html='';
+    // Tableau récap versements/retraits par enfant
+    html+=`<div class="card" style="margin-bottom:14px"><h3>Versements & retraits — Linxea</h3><div class="sub">Cumul depuis 2007</div>
+      <table style="margin-top:8px"><thead><tr><th>Enfant</th><th style="text-align:right">Versé (brut)</th><th style="text-align:right">Retiré</th><th style="text-align:right">Investi net</th><th style="text-align:right">Valeur actuelle</th></tr></thead><tbody>`;
+    list.forEach(c=>{
+      const L=KIDS_LINXEA[c]; const net=L.investi+L.retrait;
+      const vlin = KIDS_HOLD.filter(h=>h.e===c&&h.c==='Linxea').reduce((t,h)=>t+(+h.val||0),0);
+      html+=`<tr><td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COL[c]};margin-right:6px"></span>${c}</td>
+        <td style="text-align:right">${fmt(L.investi)}</td><td style="text-align:right;color:var(--red)">${L.retrait?fmt(L.retrait):'—'}</td>
+        <td style="text-align:right;font-weight:600">${fmt(net)}</td>
+        <td style="text-align:right">${L.closed?'<span style="color:var(--text2)">clôturé</span>':fmt(vlin)}</td></tr>`;
+    });
+    html+=`</tbody></table></div>`;
+    // Estelle SAXO versements + cash
+    if(s==='Tous'||s==='Estelle'){
+      html+=`<div class="card" style="margin-bottom:14px"><h3>Versements SAXO — Estelle</h3><div class="sub">Alimenté par le rachat Linxea</div>
+        <table style="margin-top:8px"><thead><tr><th>Date</th><th style="text-align:right">Montant</th></tr></thead><tbody>`;
+      KIDS_SAXO_DEP.forEach(d=>{ html+=`<tr><td>${d.date}</td><td style="text-align:right">${fmt(d.montant)}</td></tr>`; });
+      html+=`<tr style="border-top:1px solid var(--border2);font-weight:700"><td>Total versé</td><td style="text-align:right">${fmt(ESTELLE_SAXO_INVESTI)}</td></tr>`;
+      const cash=KIDS_HOLD.filter(h=>h.e==='Estelle'&&h.t==='Cash').reduce((t,h)=>t+(+h.val||0),0);
+      html+=`<tr><td>Cash disponible</td><td style="text-align:right">${fmt(cash)}</td></tr></tbody></table></div>`;
+    }
+    // Graphe versements annuels
+    html+=`<div class="card"><h3>Versements nets par an — Linxea</h3><div class="chart-wrap" style="height:260px"><canvas id="kidVersChart"></canvas></div></div>`;
+    b.innerHTML=html;
+    _kidCharts.push(new Chart(document.getElementById('kidVersChart'),{type:'bar',
+      data:{labels:KIDS_YEARS, datasets:list.map(c=>({label:c, data:KIDS_VERS[c], backgroundColor:COL[c]}))},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:list.length>1}},
+        scales:{x:{stacked:list.length>1,grid:{display:false}},y:{stacked:list.length>1,ticks:{callback:v=>v.toLocaleString('fr-FR')},grid:{color:'rgba(0,0,0,0.05)'}}}}}));
+  }
+
+  // ---- 5) CLÔTURÉES -------------------------------------------------------
+  function kidClotures(b){
+    const rows = KIDS_CLOSED.filter(h=>sel()==='Tous'||h.e===sel());
+    const tot = rows.reduce((s,h)=>s+(+h.pnl||0),0);
+    let html=`<div class="card"><table><thead><tr><th>Enfant</th><th>Compte</th><th>Position</th><th>ISIN</th><th style="text-align:right">P&L réalisé</th></tr></thead><tbody>`;
+    rows.forEach(h=>{
+      html+=`<tr><td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COL[h.e]};margin-right:6px"></span>${h.e}</td>
+        <td>${h.c}</td><td>${h.nom}</td><td style="color:var(--text3);font-size:10px">${h.isin||''}</td>
+        <td style="text-align:right;font-weight:600;color:${col(h.pnl)}">${fmts(h.pnl)}</td></tr>`;
+    });
+    html+=`<tr style="border-top:2px solid var(--border2);font-weight:700"><td colspan="4">TOTAL réalisé</td><td style="text-align:right;color:${col(tot)}">${fmts(tot)}</td></tr>`;
+    html+=`</tbody></table></div>`;
+    b.innerHTML=html;
+  }
+
+  // ---- 6) ÉVOLUTION (perf annuelle / valeur cumulée) ----------------------
+  function kidEvolution(b){
+    const s=sel(); const list = s==='Tous'?KIDS:[s];
+    let html=`<div style="display:flex;gap:8px;margin-bottom:12px">
+        <button id="kidEvoValBtn" class="sub-tab active" onclick="kidEvoMode('val')">Valeur cumulée (€)</button>
+        <button id="kidEvoPctBtn" class="sub-tab" onclick="kidEvoMode('pct')">Performance annuelle (%)</button></div>
+      <div class="card"><div class="chart-wrap" style="height:340px"><canvas id="kidEvoChart"></canvas></div></div>
+      <p style="font-size:11px;color:var(--text2);margin-top:8px">Historique Linxea depuis 2007 (assurance-vie). Le point 2026 reflète la valeur actuelle.</p>`;
+    b.innerHTML=html;
+    drawKidEvo(list);
+  }
+  window.kidEvoMode=function(m){ window._kidEvoMode=m;
+    document.getElementById('kidEvoValBtn').classList.toggle('active',m==='val');
+    document.getElementById('kidEvoPctBtn').classList.toggle('active',m==='pct');
+    const s=sel(); drawKidEvo(s==='Tous'?KIDS:[s]); };
+  function drawKidEvo(list){
+    destroyCharts();
+    const m=window._kidEvoMode||'val';
+    const src = m==='pct'?KIDS_PERF:KIDS_VALHIST;
+    const ds = list.map(c=>({label:c, data:src[c], borderColor:COL[c], backgroundColor:'transparent', tension:0.25, spanGaps:true, pointRadius:2, borderWidth:2}));
+    const cvs=document.getElementById('kidEvoChart'); if(!cvs) return;
+    _kidCharts.push(new Chart(cvs,{type:'line', data:{labels:KIDS_YEARS, datasets:ds},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:list.length>1,position:'top'},
+          tooltip:{callbacks:{label:c=>c.dataset.label+': '+(m==='pct'?pct(c.parsed.y):fmt(c.parsed.y))}}},
+        scales:{x:{grid:{display:false}},
+          y:{ticks:{callback:v=>m==='pct'?v+' %':v.toLocaleString('fr-FR')},
+             grid:{color:c=>(c.tick&&c.tick.value===0)?'rgba(60,58,54,0.6)':'rgba(0,0,0,0.05)'}}}}}));
+  }
+
+  // ---- 7) ÉDITER ----------------------------------------------------------
+  function kidEditer(b){
+    const rows = holdSel();
+    let html=`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <button onclick="kidAddRow()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">+ Ajouter une ligne</button>
+        <button onclick="kidSaveEdit()" style="padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">💾 Enregistrer</button>
+        <span id="kidEditMsg" style="font-size:12px;color:var(--text2);align-self:center"></span></div>
+      <div class="card"><table id="kidEditTable"><thead><tr>
+        <th>Enfant</th><th>Compte</th><th>Nom</th><th>Type</th><th>ISIN</th>
+        <th style="text-align:right">Qté</th><th style="text-align:right">Valeur €</th><th style="text-align:right">Coût €</th><th></th></tr></thead><tbody>`;
+    KIDS_HOLD.forEach((h,i)=>{
+      if(!(sel()==='Tous'||h.e===sel())) return;
+      html+=`<tr data-i="${i}">
+        <td><select data-f="e" style="${selCss()}">${KIDS.map(k=>`<option ${h.e===k?'selected':''}>${k}</option>`).join('')}</select></td>
+        <td><select data-f="c" style="${selCss()}"><option ${h.c==='Linxea'?'selected':''}>Linxea</option><option ${h.c==='SAXO'?'selected':''}>SAXO</option></select></td>
+        <td><input data-f="nom" value="${(h.nom||'').replace(/"/g,'&quot;')}" style="${inpCss(160)}"></td>
+        <td><input data-f="t" value="${h.t||''}" style="${inpCss(70)}"></td>
+        <td><input data-f="isin" value="${h.isin||''}" style="${inpCss(110)}"></td>
+        <td><input data-f="qty" type="number" step="any" value="${h.qty!=null?h.qty:''}" style="${inpCss(70,'right')}"></td>
+        <td><input data-f="val" type="number" step="any" value="${h.val!=null?h.val:''}" style="${inpCss(90,'right')}"></td>
+        <td><input data-f="cout" type="number" step="any" value="${h.cout!=null?h.cout:''}" style="${inpCss(90,'right')}"></td>
+        <td><button onclick="kidDelRow(${i})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px">✕</button></td></tr>`;
+    });
+    html+=`</tbody></table></div>
+      <p style="font-size:11px;color:var(--text2);margin-top:8px">Modifie les valeurs puis « Enregistrer ». Les données sont sauvegardées localement (et synchronisables via Google Sheets).</p>`;
+    b.innerHTML=html;
+  }
+  function selCss(){ return 'background:var(--bg2);border:1px solid var(--border2);border-radius:4px;padding:3px 5px;font-size:11px;color:var(--text)'; }
+  function inpCss(w,al){ return `width:${w}px;background:var(--bg2);border:1px solid var(--border2);border-radius:4px;padding:3px 6px;font-size:11px;color:var(--text)${al==='right'?';text-align:right':''}`; }
+  window.kidAddRow=function(){ KIDS_HOLD.push({e:sel()==='Tous'?'Corentin':sel(), c:'Linxea', nom:'Nouveau fonds', t:'ETF', isin:'', val:0}); window._kidSub='edit'; window.renderEnfants(); };
+  window.kidDelRow=function(i){ KIDS_HOLD.splice(i,1); window.KIDS_HOLD=KIDS_HOLD; window.renderEnfants(); };
+  window.kidSaveEdit=function(){
+    document.querySelectorAll('#kidEditTable tbody tr').forEach(tr=>{
+      const i=+tr.getAttribute('data-i'); if(isNaN(i)||!KIDS_HOLD[i]) return;
+      tr.querySelectorAll('[data-f]').forEach(el=>{
+        const f=el.getAttribute('data-f'); let v=el.value;
+        if(['val','cout','qty'].includes(f)) v = (v===''?null:parseFloat(String(v).replace(',','.')));
+        KIDS_HOLD[i][f]=v;
+      });
+    });
+    window.KIDS_HOLD=KIDS_HOLD; kidsSave();
+    const m=document.getElementById('kidEditMsg'); if(m){ m.textContent='✓ Enregistré'; setTimeout(()=>{m.textContent='';},2000); }
+    window.renderEnfants();
+  };
+
+  // ---- petits helpers UI --------------------------------------------------
+  function kpi(label,val,c){ return `<div class="card" style="padding:14px 16px"><div class="kpi-label">${label}</div><div class="kpi-value" style="font-size:20px;color:${c}">${val}</div></div>`; }
+  function donutOpts(){ return {responsive:true,maintainAspectRatio:false,cutout:'60%',
+    plugins:{legend:{position:'bottom',labels:{font:{size:11},color:'#2c2a26',boxWidth:12}},
+      tooltip:{callbacks:{label:c=>c.label+': '+fmt(c.parsed)}}}}; }
+  function barOpts(){ return {responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{position:'top'},tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmt(c.parsed.y)}}},
+    scales:{x:{grid:{display:false}},y:{ticks:{callback:v=>v.toLocaleString('fr-FR')},grid:{color:'rgba(0,0,0,0.05)'}}}}; }
+})();
+</script>
 
 <script>
 // Charger Google GSI dynamiquement
