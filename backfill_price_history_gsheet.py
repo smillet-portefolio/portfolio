@@ -29,6 +29,10 @@ import update_prix_gsheet as up
 from googleapiclient.discovery import build
 
 CRYPTO_BROKERS = {"ledger", "binance"}
+# Crypto suivis (prix quotidien disponible via Binance/Yahoo). Les positions
+# du dashboard utilisent le ticker "BTC/EUR" / "ETH/EUR" (identique a l'onglet
+# Prices) ; on accepte aussi "BTC" / "ETH" par securite.
+CRYPTO_TICKS   = {"BTC", "ETH", "BTC/EUR", "ETH/EUR"}
 DEFAULT_START  = "2015-01-01"   # borne basse si une ligne n'a pas de date d'achat
 
 
@@ -43,15 +47,21 @@ def portefeuille_info():
         if not isinstance(r, dict):
             continue
         tk = (r.get("ticker") or "").strip()
-        if not tk or tk in up.STATIC_TICKS or tk.upper() in up.SKIP_TICKS:
+        if not tk or tk.upper() in up.SKIP_TICKS:
             continue
         br = (r.get("broker") or "").strip().lower()
         ty = (r.get("typeInv") or "").strip().lower()
-        # Inclure le crypto BTC / ETH ; exclure tout autre crypto non price
-        if (br in CRYPTO_BROKERS or "crypto" in ty) and tk not in ("BTC", "ETH"):
-            continue
-        if re.search(r"structur|épargn|epargn|livret|obligation", ty):
-            continue
+        is_crypto = (br in CRYPTO_BROKERS or "crypto" in ty)
+        if is_crypto:
+            # Ne garder que le crypto suivi (BTC / ETH). Leur ticker (BTC/EUR...)
+            # figure dans STATIC_TICKS mais on l'inclut volontairement ici.
+            if tk not in CRYPTO_TICKS:
+                continue
+        else:
+            if tk in up.STATIC_TICKS:      # paires FX (EUR/CZK...) : pas d'historique
+                continue
+            if re.search(r"structur|épargn|epargn|livret|obligation", ty):
+                continue
         d   = (str(r.get("date") or r.get("dateAchat") or "")).strip()[:10]
         cur = (r.get("currency") or "EUR").strip()
         nm  = r.get("name") or tk
@@ -106,7 +116,8 @@ def to_eur(close, cur, dstr, eurusd, eurgbp):
 
 
 # ── 3. Symbole Yahoo pour un ticker du portefeuille ───────────────────────────
-CRYPTO_YAHOO = {"BTC": "BTC-EUR", "ETH": "ETH-EUR"}
+CRYPTO_YAHOO = {"BTC": "BTC-EUR", "ETH": "ETH-EUR",
+                "BTC/EUR": "BTC-EUR", "ETH/EUR": "ETH-EUR"}
 def yahoo_symbol(tick, cur_hint):
     if tick in CRYPTO_YAHOO:
         return CRYPTO_YAHOO[tick]

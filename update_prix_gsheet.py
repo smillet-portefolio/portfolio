@@ -349,9 +349,10 @@ def collecter_prix():
     eth = prix_binance("ETHEUR") or prix_yahoo("ETH-EUR")
     print(f"  {'OK' if btc else 'KO'} Bitcoin  -> {btc}")
     print(f"  {'OK' if eth else 'KO'} Ethereum -> {eth}")
-    # Historique quotidien : stocker aussi le close EUR du BTC / ETH (deja en EUR)
-    if btc and btc > 0: PORTFOLIO_EUR_CLOSES["BTC"] = round(float(btc), 4)
-    if eth and eth > 0: PORTFOLIO_EUR_CLOSES["ETH"] = round(float(eth), 4)
+    # Historique quotidien : stocker aussi le close EUR du BTC / ETH (deja en EUR).
+    # Cle = ticker des positions du dashboard ("BTC/EUR" / "ETH/EUR", cf onglet Prices).
+    if btc and btc > 0: PORTFOLIO_EUR_CLOSES["BTC/EUR"] = round(float(btc), 4)
+    if eth and eth > 0: PORTFOLIO_EUR_CLOSES["ETH/EUR"] = round(float(eth), 4)
 
     maintenant = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     header = ["Ticker", "Nom", "price last closure", "currency", "Last Update"] + VAR_KEYS
