@@ -8158,7 +8158,16 @@ function renderActEtf() {
     return `<td style="padding:2px 6px"><input type="text" placeholder="≥ %"${val} oninput="aeFilter('${k}',this.value)" style="${inputStyle};text-align:right"></td>`;
   }).join('');
 
+  const _sub = window._aeSubTab || 'table';
+  const _stB = 'padding:7px 16px;border:1px solid var(--border2);border-radius:8px;font-size:13px;cursor:pointer;font-weight:600';
+  const _stOn = ';background:var(--blue);color:#fff;border-color:var(--blue)';
+  const _stOff = ';background:var(--bg2);color:var(--text2)';
   sec.innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button id="aeSub_table_btn" onclick="aeSubTab('table')" style="${_stB}${_sub==='table'?_stOn:_stOff}">📋 Tableau</button>
+      <button id="aeSub_chart_btn" onclick="aeSubTab('chart')" style="${_stB}${_sub==='chart'?_stOn:_stOff}">📈 Évolution P&amp;L</button>
+    </div>
+    <div id="ae_sub_table" style="display:${_sub==='table'?'':'none'}">
     <div class="card" style="padding:22px 24px">
       <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px">
         <h2 style="font-size:18px;font-weight:700;margin:0">📉 Actions &amp; ETFs — Performance &amp; variations</h2>
@@ -8182,7 +8191,9 @@ function renderActEtf() {
         </table>
       </div>
     </div>
-    <div class="card" style="padding:22px 24px;margin-top:20px">
+    </div>
+    <div id="ae_sub_chart" style="display:${_sub==='chart'?'':'none'}">
+    <div class="card" style="padding:22px 24px">
       <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px">
         <h2 style="font-size:18px;font-weight:700;margin:0">📈 Évolution du P&amp;L par titre</h2>
         <div style="display:flex;gap:6px">
@@ -8193,10 +8204,11 @@ function renderActEtf() {
       <div id="ae_pnl_note" style="font-size:12px;color:var(--text2);margin-bottom:10px"></div>
       <div id="ae_pnl_toolbar" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
       <div style="position:relative;height:420px"><canvas id="aePnlChart"></canvas></div>
+    </div>
     </div>`;
 
   _aeRenderRows();
-  try { renderAePnlChart(); } catch(e) { console.error('renderAePnlChart', e); }
+  if (_sub === 'chart') { try { renderAePnlChart(); } catch(e) { console.error('renderAePnlChart', e); } }
 }
 
 // Remplit le corps du tableau (tri + filtre) sans reconstruire les champs de saisie
@@ -8309,9 +8321,19 @@ function aeFilter(col, val) {
 
 // ── Graphique évolution du P&L par titre (onglet Actions & ETFs) ────────────
 function aePnlSetMode(m){ window._aePnlMode = m; renderAePnlChart(); }
-function aePnlToggle(t){ if(!window._aePnlSel) window._aePnlSel = new Set(); if(window._aePnlSel.has(t)) window._aePnlSel.delete(t); else window._aePnlSel.add(t); renderAePnlChart(); }
+function aePnlToggle(t){ if(window._aePnlSel == null) window._aePnlSel = new Set(window._aePnlTickers||[]); if(window._aePnlSel.has(t)) window._aePnlSel.delete(t); else window._aePnlSel.add(t); renderAePnlChart(); }
 function aePnlAll(){ window._aePnlSel = null; renderAePnlChart(); }
 function aePnlNone(){ window._aePnlSel = new Set(); renderAePnlChart(); }
+function aeSubTab(which){
+  window._aeSubTab = which;
+  const t=document.getElementById('ae_sub_table'), c=document.getElementById('ae_sub_chart');
+  if(t) t.style.display = which==='table' ? '' : 'none';
+  if(c) c.style.display = which==='chart' ? '' : 'none';
+  const sb=(el,on)=>{ if(!el) return; el.style.background=on?'var(--blue)':'var(--bg2)'; el.style.color=on?'#fff':'var(--text2)'; el.style.borderColor=on?'var(--blue)':'var(--border2)'; };
+  sb(document.getElementById('aeSub_table_btn'), which==='table');
+  sb(document.getElementById('aeSub_chart_btn'), which==='chart');
+  if(which==='chart'){ try{ renderAePnlChart(); }catch(e){ console.error('renderAePnlChart', e); } }
+}
 const _AE_PNL_PAL = ['#5a8dee','#4caf82','#f59e0b','#a78bfa','#e06c6c','#14b8a6','#f97316','#ec4899','#84cc16','#60a5fa','#34d399','#fb923c','#c084fc','#f43f5e','#22d3ee','#a3e635','#eab308','#fb7185','#2dd4bf','#818cf8'];
 function renderAePnlChart(){
   const cv = document.getElementById('aePnlChart'); if(!cv) return;
@@ -8333,9 +8355,9 @@ function renderAePnlChart(){
     if(toolbar) toolbar.innerHTML='';
     return;
   }
-  if(!window._aePnlSel) window._aePnlSel = new Set(tickers);
+  window._aePnlTickers = tickers;
+  if(window._aePnlSel == null) window._aePnlSel = new Set(tickers);
   window._aePnlSel = new Set([...window._aePnlSel].filter(t=>tickers.indexOf(t)>=0));
-  if(!window._aePnlSel.size) window._aePnlSel = new Set(tickers);
   const mode = window._aePnlMode || 'eur';
   const be=document.getElementById('ae_pnl_eur'), bp=document.getElementById('ae_pnl_pct');
   const setBtn=(el,on)=>{ if(!el) return; el.style.background=on?'var(--blue)':'var(--bg3)'; el.style.color=on?'#fff':'var(--text)'; el.style.borderColor=on?'var(--blue)':'var(--border2)'; };
