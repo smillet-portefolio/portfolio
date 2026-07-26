@@ -4547,7 +4547,7 @@ const GS_KEYS = [
   'etf_comp_override','etf_comp_date',
   'direct_sector_overrides',
   'evo_history',
-  'kids_hold','kids_closed','kids_deposits',
+  'kids_hold','kids_closed','kids_deposits','kids_cash',
   're_estimates',
   're_mortgage',
   're_rental',
@@ -10261,6 +10261,21 @@ window.addEventListener('load', () => {
   if(!Array.isArray(KIDS_DEP)) KIDS_DEP=[];
   function kidsDepSave(){ try{ localStorage.setItem('kids_deposits', JSON.stringify(KIDS_DEP)); }catch(e){} }
   window.KIDS_DEP = KIDS_DEP; window.kidsDepSave = kidsDepSave;
+  // Cash disponible par compte (broker)
+  let KIDS_CASH;
+  try { KIDS_CASH = JSON.parse(localStorage.getItem('kids_cash')) || null; } catch(e){ KIDS_CASH=null; }
+  if(!KIDS_CASH || typeof KIDS_CASH!=='object') KIDS_CASH = {'SAXO Estelle':{EUR:225}};
+  function kidsCashSave(){ try{ localStorage.setItem('kids_cash', JSON.stringify(KIDS_CASH)); }catch(e){} }
+  window.KIDS_CASH = KIDS_CASH; window.kidsCashSave = kidsCashSave;
+  function te(a,c){ return (typeof toEur==='function' && c) ? (toEur(a,c)||a) : a; }
+  function kidAllDeps(){
+    const base = KIDS_DEP_BASE.map(d=>({date:d.d, broker:d.c, enfant:d.e, type:(d.m>=0?'dépôt':'retrait'), amount:Math.abs(d.m), currency:'EUR', amountEur:Math.abs(d.m), _i:null}));
+    const man  = KIDS_DEP.map((d,i)=>{
+      if(d && d.m!==undefined) return {date:d.d, broker:d.c, enfant:d.e, type:(d.m>=0?'dépôt':'retrait'), amount:Math.abs(d.m), currency:'EUR', amountEur:Math.abs(d.m), _i:i};
+      return {date:d.date, broker:d.broker, enfant:d.enfant, type:d.type, amount:d.amount, currency:d.currency, amountEur:d.amountEur, _i:i};
+    });
+    return base.concat(man);
+  }
   function compteEnfant(c){ if(/Corentin/.test(c)) return 'Corentin'; if(/L[ée]andre/.test(c)) return 'Léandre'; return 'Estelle'; }
   function allDeps(){
     const base = KIDS_DEP_BASE.map(d=>({d:d.d,c:d.c,e:d.e,m:d.m,_i:null}));
@@ -10487,62 +10502,201 @@ window.addEventListener('load', () => {
         scales:{x:{ticks:{callback:v=>v+' %'},grid:{color:'rgba(0,0,0,0.05)'}}, y:{grid:{display:false}}}}}));
   }
 
-  // ---- 4) DÉPÔTS & CASH (dépôt/retrait, synthèse par compte, historique) ---
+  // ---- 4) DÉPÔTS & CASH (layout identique à l'onglet principal) ----------
   function kidCash(b){
-    const s=sel();
-    const all = allDeps().filter(d=> s==='Tous' || d.e===s);
-    const comptes = [...new Set(all.map(d=>d.c))].sort();
-    const compteOpts = KID_COMPTES.filter(c=> s==='Tous' || compteEnfant(c)===s).map(c=>`<option>${c}</option>`).join('');
-    // Formulaire ajout
-    let html = `<div class="card" style="margin-bottom:14px"><h3>Ajouter un dépôt / retrait</h3>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:10px">
-          <div><label style="${labCss()}">Date</label><input id="kidDepDate" type="date" value="${new Date().toISOString().slice(0,10)}" style="${inpCss(140)}"></div>
-          <div><label style="${labCss()}">Compte</label><select id="kidDepCompte" style="${inpCss(160)}">${compteOpts}</select></div>
-          <div><label style="${labCss()}">Type</label><select id="kidDepType" style="${inpCss(110)}"><option value="dépôt">Dépôt</option><option value="retrait">Retrait</option></select></div>
-          <div><label style="${labCss()}">Montant (€)</label><input id="kidDepMontant" type="number" step="any" placeholder="0" style="${inpCss(120,'right')}"></div>
-          <button onclick="kidAddDep()" style="padding:7px 16px;background:var(--green);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">+ Ajouter</button>
-        </div></div>`;
-    // Synthèse par compte (broker)
-    html += `<div class="card" style="margin-bottom:14px"><h3>Synthèse par compte</h3>
-        <table style="margin-top:8px"><thead><tr><th>Compte</th><th style="text-align:right">Dépôts</th><th style="text-align:right">Retraits</th><th style="text-align:right">Investi net</th><th style="text-align:right">Nb op.</th></tr></thead><tbody>`;
-    let tD=0,tW=0;
-    comptes.forEach(c=>{
-      const dep=all.filter(d=>d.c===c&&d.m>=0).reduce((t,d)=>t+d.m,0);
-      const wit=all.filter(d=>d.c===c&&d.m<0).reduce((t,d)=>t-d.m,0);
-      const nb =all.filter(d=>d.c===c).length;
-      tD+=dep; tW+=wit;
-      html+=`<tr><td style="font-weight:600">${c}</td><td style="text-align:right;color:var(--green)">${fmt(dep)}</td><td style="text-align:right;color:var(--red)">${wit?fmt(wit):'—'}</td><td style="text-align:right;font-weight:700">${fmt(dep-wit)}</td><td style="text-align:right;color:var(--text2)">${nb}</td></tr>`;
-    });
-    html+=`<tr style="border-top:2px solid var(--border2);font-weight:700"><td>Total</td><td style="text-align:right;color:var(--green)">${fmt(tD)}</td><td style="text-align:right;color:var(--red)">${fmt(tW)}</td><td style="text-align:right">${fmt(tD-tW)}</td><td style="text-align:right;color:var(--text2)">${all.length}</td></tr>`;
-    html+=`</tbody></table></div>`;
-    // Graphe versements nets par an (données réelles)
-    html += `<div class="card" style="margin-bottom:14px"><h3>Versements nets par an</h3><div class="chart-wrap" style="height:240px"><canvas id="kidVersChart"></canvas></div></div>`;
-    // Historique complet
-    const sorted = all.slice().sort((a,b2)=> b2.d.localeCompare(a.d));
-    html += `<div class="card"><h3>Historique des versements / retraits</h3><div class="sub">${sorted.length} opérations — les lignes « fichier » proviennent de l'historique importé, les ajouts manuels sont annulables.</div>
-        <div style="max-height:480px;overflow:auto;margin-top:8px"><table><thead><tr><th>Date</th><th>Compte</th><th>Enfant</th><th>Type</th><th style="text-align:right">Montant</th><th style="text-align:center">Action</th></tr></thead><tbody>`;
-    sorted.forEach(d=>{
-      const isDep=d.m>=0; const cc=isDep?'var(--green)':'var(--red)';
-      const del = d._i!=null
-        ? `<button onclick="kidDelDep(${d._i})" title="Annuler cette ligne" style="padding:2px 8px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;color:var(--text2);cursor:pointer;font-size:11px">✕ annuler</button>`
-        : `<span style="font-size:10px;color:var(--text3);padding:2px 7px">fichier</span>`;
-      html+=`<tr style="border-bottom:1px solid var(--border)"><td style="color:var(--text2)">${d.d}</td><td>${d.c}</td>
-          <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COL[d.e]};margin-right:5px"></span>${d.e}</td>
-          <td><span style="padding:2px 8px;border-radius:4px;font-size:11px;background:${cc}22;color:${cc}">${isDep?'dépôt':'retrait'}</span></td>
-          <td style="text-align:right;font-weight:600;font-family:'DM Mono',monospace;color:${cc}">${isDep?'+':'−'}${Math.abs(d.m).toLocaleString('fr-FR')} €</td>
-          <td style="text-align:center">${del}</td></tr>`;
-    });
-    html+=`</tbody></table></div></div>`;
-    b.innerHTML=html;
-    // Chart : net par an et par enfant (depuis les données réelles)
-    const cl = s==='Tous'?KIDS:[s];
-    const yrs = KIDS_YEARS;
-    const ds = cl.map(c=>({label:c, data:yrs.map(y=> all.filter(d=>d.e===c && (+d.d.slice(0,4))===y).reduce((t,d)=>t+d.m,0)), backgroundColor:COL[c]}));
-    _kidCharts.push(new Chart(document.getElementById('kidVersChart'),{type:'bar',
-      data:{labels:yrs, datasets:ds},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:cl.length>1}},
-        scales:{x:{stacked:cl.length>1,grid:{display:false}},y:{stacked:cl.length>1,ticks:{callback:v=>v.toLocaleString('fr-FR')},grid:{color:'rgba(0,0,0,0.05)'}}}}}));
+    const sfl=sel();
+    const comptes = KID_COMPTES.filter(c=> sfl==='Tous' || compteEnfant(c)===sfl);
+    const opt = comptes.map(c=>`<option value="${c}">${c}</option>`).join('');
+    const today=new Date().toISOString().slice(0,10);
+    const lc="font-size:11px;color:var(--text2);display:block;margin-bottom:4px";
+    const fc="width:100%;box-sizing:border-box;padding:7px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px";
+    const stk="position:sticky;top:0;background:var(--bg3);z-index:2";
+    b.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:28px">
+        <div class="card" style="padding:20px">
+          <h3 style="font-size:14px;font-weight:700;margin:0 0 16px">➕ Dépôt / Retrait</h3>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div><label style="${lc}">Broker</label><select id="kdep_broker" style="${fc}">${opt}</select></div>
+              <div><label style="${lc}">Devise</label><select id="kdep_currency" onchange="kidDepCurrencyChange()" style="${fc}"><option>EUR</option><option>USD</option><option>GBP</option><option>CZK</option></select></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div><label style="${lc}">Montant</label><input id="kdep_amount" type="number" step="0.01" placeholder="ex: 5000" oninput="kidDepCalcEur()" style="${fc}"></div>
+              <div><label style="${lc}">Date</label><input id="kdep_date" type="date" value="${today}" style="${fc}"></div>
+            </div>
+            <div id="kdep_fx_row" style="display:none;grid-template-columns:1fr 1fr;gap:10px;background:var(--bg3);padding:10px;border-radius:6px;border:1px solid var(--border2)">
+              <div><label style="${lc}">Taux de change (1 <span id="kdep_fx_ccy">USD</span> = ? EUR)</label><input id="kdep_fx" type="number" step="0.000001" placeholder="ex: 0.9215" oninput="kidDepCalcEur()" style="${fc}"></div>
+              <div><label style="${lc}">Équivalent EUR</label><div id="kdep_eur_preview" style="padding:7px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:6px;font-size:13px;font-weight:700;color:#4caf82;font-family:'DM Mono',monospace;min-height:34px">—</div></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <button onclick="kidCashAdd(1)" style="padding:9px;background:#16a34a22;border:1px solid #22c55e66;border-radius:6px;color:#4caf82;font-weight:700;font-size:13px;cursor:pointer">➕ Dépôt</button>
+              <button onclick="kidCashAdd(-1)" style="padding:9px;background:#7f1d1d22;border:1px solid #ef444466;border-radius:6px;color:#e06c6c;font-weight:700;font-size:13px;cursor:pointer">➖ Retrait</button>
+            </div>
+            <div id="kdep_msg" style="font-size:12px;min-height:18px"></div>
+          </div>
+        </div>
+        <div class="card" style="padding:20px">
+          <h3 style="font-size:14px;font-weight:700;margin:0 0 16px">💵 Cash disponible</h3>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div><label style="${lc}">Broker</label><select id="kcash_broker" style="${fc}">${opt}</select></div>
+              <div><label style="${lc}">Devise</label><select id="kcash_currency" style="${fc}"><option>EUR</option><option>USD</option><option>GBP</option><option>CZK</option></select></div>
+            </div>
+            <div><label style="${lc}">Montant cash actuel</label><input id="kcash_amount" type="number" step="0.01" placeholder="ex: 2340.50" style="${fc}"></div>
+            <button onclick="kidCashUpdate()" style="padding:9px;background:#2563eb22;border:1px solid #3b82f666;border-radius:6px;color:#60a5fa;font-weight:700;font-size:13px;cursor:pointer">💾 Mettre à jour</button>
+            <div id="kcash_msg" style="font-size:12px;min-height:18px"></div>
+          </div>
+        </div>
+      </div>
+      <h3 style="font-size:14px;font-weight:700;margin:0 0 12px">📊 Synthèse par broker</h3>
+      <div style="overflow-x:auto;margin-bottom:28px">
+        <table style="font-size:12px;width:100%;border-collapse:collapse">
+          <thead><tr style="background:var(--bg3);text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2)">
+            <th style="padding:8px 14px;text-align:left">Broker</th>
+            <th style="padding:8px 14px;text-align:right">Total déposé</th>
+            <th style="padding:8px 14px;text-align:right">Total retiré</th>
+            <th style="padding:8px 14px;text-align:right">Net déposé</th>
+            <th style="padding:8px 14px;text-align:right">Cash CZK</th>
+            <th style="padding:8px 14px;text-align:right">Cash USD</th>
+            <th style="padding:8px 14px;text-align:right">Cash EUR</th>
+            <th style="padding:8px 14px;text-align:right;color:#60a5fa">Total Cash (€)</th>
+            <th style="padding:8px 10px"></th>
+          </tr></thead>
+          <tbody id="kidCashSummaryBody"></tbody>
+          <tfoot id="kidCashSummaryFoot"></tfoot>
+        </table>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <h3 style="font-size:14px;font-weight:700;margin:0">📋 Historique dépôts / retraits</h3>
+        <button onclick="kidCashClear()" style="font-size:11px;padding:4px 10px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text2);cursor:pointer">🗑 Effacer historique (manuel)</button>
+      </div>
+      <div style="max-height:70vh;overflow:auto">
+        <table style="font-size:12px;width:100%;border-collapse:collapse">
+          <thead><tr style="text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2)">
+            <th style="padding:7px 14px;text-align:left;${stk}">Date</th>
+            <th style="padding:7px 14px;text-align:left;${stk}">Broker</th>
+            <th style="padding:7px 14px;text-align:left;${stk}">Enfant</th>
+            <th style="padding:7px 14px;text-align:left;${stk}">Type</th>
+            <th style="padding:7px 14px;text-align:right;${stk}">Montant</th>
+            <th style="padding:7px 14px;text-align:left;${stk}">Devise</th>
+            <th style="padding:7px 14px;text-align:center;${stk}"></th>
+          </tr></thead>
+          <tbody id="kidCashHistBody"></tbody>
+        </table>
+        <p id="kidCashHistEmpty" style="text-align:center;color:var(--text2);padding:30px;display:none">Aucune opération enregistrée.</p>
+      </div>`;
+    kidCashRender();
   }
+
+  function kidCashRender(){
+    const sfl=sel();
+    const all = kidAllDeps().filter(d=> sfl==='Tous' || d.enfant===sfl);
+    // Historique
+    const hb=document.getElementById('kidCashHistBody');
+    const he=document.getElementById('kidCashHistEmpty');
+    if(hb){
+      const sorted=all.slice().sort((a,b2)=> b2.date.localeCompare(a.date));
+      if(!sorted.length){ hb.innerHTML=''; if(he) he.style.display=''; }
+      else { if(he) he.style.display='none';
+        hb.innerHTML = sorted.map(d=>{
+          const isDep=d.type==='dépôt'; const cc=isDep?'#4caf82':'#e06c6c'; const sign=isDep?'+':'−';
+          const del = d._i!=null
+            ? `<button onclick="kidCashDelDep(${d._i})" title="Annuler" style="padding:2px 8px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;color:var(--text2);cursor:pointer;font-size:11px">✕</button>`
+            : `<span style="font-size:10px;color:var(--text3);padding:2px 7px">fichier</span>`;
+          const eq = (d.currency!=='EUR' && d.amountEur!=null) ? ` <span style="font-size:10px;color:var(--text2)">= ${Math.round(d.amountEur).toLocaleString('fr')} €</span>` : '';
+          return `<tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:7px 14px;color:var(--text2)">${d.date}</td>
+            <td style="padding:7px 14px;font-weight:600">${d.broker}</td>
+            <td style="padding:7px 14px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COL[d.enfant]};margin-right:5px"></span>${d.enfant}</td>
+            <td style="padding:7px 14px"><span style="padding:2px 8px;border-radius:4px;font-size:11px;background:${cc}22;color:${cc}">${d.type}</span></td>
+            <td style="padding:7px 14px;text-align:right;font-family:'DM Mono',monospace;font-weight:600;color:${cc}">${sign}${d.amount.toLocaleString('fr')} ${d.currency}${eq}</td>
+            <td style="padding:7px 14px;color:var(--text2)">${d.currency}</td>
+            <td style="padding:7px 14px;text-align:center">${del}</td></tr>`;
+        }).join('');
+      }
+    }
+    // Synthèse par broker
+    const sb=document.getElementById('kidCashSummaryBody'); const sf=document.getElementById('kidCashSummaryFoot');
+    if(!sb) return;
+    let brokers=[...new Set([...KID_COMPTES, ...all.map(d=>d.broker), ...Object.keys(KIDS_CASH)])].filter(bk=> sfl==='Tous' || compteEnfant(bk)===sfl);
+    let tD=0,tW=0,tCash=0;
+    sb.innerHTML = brokers.map((bk,i)=>{
+      const dep=all.filter(d=>d.broker===bk&&d.type==='dépôt').reduce((s2,d)=>s2+(d.amountEur!=null?d.amountEur:d.amount),0);
+      const wit=all.filter(d=>d.broker===bk&&d.type==='retrait').reduce((s2,d)=>s2+(d.amountEur!=null?d.amountEur:d.amount),0);
+      const cczk=(KIDS_CASH[bk]&&KIDS_CASH[bk].CZK!=null)?KIDS_CASH[bk].CZK:null;
+      const cusd=(KIDS_CASH[bk]&&KIDS_CASH[bk].USD!=null)?KIDS_CASH[bk].USD:null;
+      const ceur=(KIDS_CASH[bk]&&KIDS_CASH[bk].EUR!=null)?KIDS_CASH[bk].EUR:null;
+      const totalEur=Math.round((cczk!=null?te(cczk,'CZK'):0)+(cusd!=null?te(cusd,'USD'):0)+(ceur!=null?ceur:0));
+      const hasCash=cczk!=null||cusd!=null||ceur!=null;
+      tD+=dep; tW+=wit; if(hasCash) tCash+=totalEur;
+      const bg=i%2===0?'var(--bg)':'var(--bg2)';
+      const fE=n=> n==null?'<span style="color:var(--text3)">—</span>':Math.round(n).toLocaleString('fr')+' €';
+      const fC=(n,sym)=> n==null?'<span style="color:var(--text3)">—</span>':n.toLocaleString('fr')+' '+sym;
+      return `<tr style="background:${bg};border-bottom:1px solid var(--border)">
+        <td style="padding:8px 14px;font-weight:700">${bk}</td>
+        <td style="padding:8px 14px;text-align:right;font-family:'DM Mono',monospace;color:#4caf82">${fE(dep)}</td>
+        <td style="padding:8px 14px;text-align:right;font-family:'DM Mono',monospace;color:#e06c6c">${fE(wit)}</td>
+        <td style="padding:8px 14px;text-align:right;font-family:'DM Mono',monospace;font-weight:600">${fE(dep-wit)}</td>
+        <td style="padding:8px 14px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${fC(cczk,'Kč')}</td>
+        <td style="padding:8px 14px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${fC(cusd,'$')}</td>
+        <td style="padding:8px 14px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${fC(ceur,'€')}</td>
+        <td style="padding:8px 14px;text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:#60a5fa">${hasCash?totalEur.toLocaleString('fr')+' €':'<span style=\"color:var(--text3)\">—</span>'}</td>
+        <td style="padding:6px 10px;white-space:nowrap">
+          <button onclick="kidCashResetDR('${bk}')" title="Réinitialiser dépôts/retraits manuels ${bk}" style="padding:3px 8px;font-size:10px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;color:var(--text2);cursor:pointer;margin-right:4px">↺ D/R</button>
+          <button onclick="kidCashResetCash('${bk}')" title="Réinitialiser cash ${bk}" style="padding:3px 8px;font-size:10px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;color:#60a5fa;cursor:pointer">↺ Cash</button>
+        </td></tr>`;
+    }).join('');
+    sf.innerHTML = `<tr class="tfoot" style="border-top:2px solid var(--border2)">
+      <td style="padding:8px 14px;font-weight:700">Total</td>
+      <td style="padding:8px 14px;text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:#4caf82">${Math.round(tD).toLocaleString('fr')} €</td>
+      <td style="padding:8px 14px;text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:#e06c6c">${Math.round(tW).toLocaleString('fr')} €</td>
+      <td style="padding:8px 14px;text-align:right;font-family:'DM Mono',monospace;font-weight:700">${Math.round(tD-tW).toLocaleString('fr')} €</td>
+      <td></td><td></td><td></td>
+      <td style="padding:8px 14px;text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:#60a5fa">${Math.round(tCash).toLocaleString('fr')} €</td><td></td></tr>`;
+  }
+
+  // Helpers formulaire (FX, ajout, cash, reset)
+  function kdV(id){ const el=document.getElementById(id); return el?el.value:''; }
+  function kdMsg(id,t,c){ const el=document.getElementById(id); if(el){ el.textContent=t; el.style.color=c; setTimeout(()=>{ if(el) el.textContent=''; },2500);} }
+  window.kidDepCurrencyChange=function(){
+    const cur=kdV('kdep_currency'); const row=document.getElementById('kdep_fx_row');
+    const lab=document.getElementById('kdep_fx_ccy');
+    if(cur!=='EUR'){ if(row) row.style.display='grid'; if(lab) lab.textContent=cur; } else { if(row) row.style.display='none'; }
+    window.kidDepCalcEur();
+  };
+  window.kidDepCalcEur=function(){
+    const cur=kdV('kdep_currency'); const amt=parseFloat(String(kdV('kdep_amount')).replace(',','.'));
+    const pv=document.getElementById('kdep_eur_preview'); if(!pv) return;
+    if(cur==='EUR'||isNaN(amt)){ pv.textContent='—'; return; }
+    const fx=parseFloat(String(kdV('kdep_fx')).replace(',','.'));
+    pv.textContent = (!isNaN(fx)&&fx>0) ? Math.round(amt*fx).toLocaleString('fr')+' €' : '—';
+  };
+  window.kidCashAdd=function(sign){
+    const broker=kdV('kdep_broker'), cur=kdV('kdep_currency'), date=kdV('kdep_date');
+    let amount=parseFloat(String(kdV('kdep_amount')).replace(',','.'));
+    if(!broker||!date||isNaN(amount)||amount<=0){ kdMsg('kdep_msg','Renseigne broker, montant et date.','#e06c6c'); return; }
+    let amountEur=amount;
+    if(cur!=='EUR'){ const fx=parseFloat(String(kdV('kdep_fx')).replace(',','.')); if(isNaN(fx)||fx<=0){ kdMsg('kdep_msg','Renseigne le taux de change.','#e06c6c'); return;} amountEur=amount*fx; }
+    KIDS_DEP.push({date:date,broker:broker,enfant:compteEnfant(broker),type:(sign>0?'dépôt':'retrait'),amount:Math.round(amount*100)/100,currency:cur,amountEur:Math.round(amountEur*100)/100});
+    kidsDepSave(); window.KIDS_DEP=KIDS_DEP;
+    const am=document.getElementById('kdep_amount'); if(am) am.value='';
+    kdMsg('kdep_msg',(sign>0?'Dépôt':'Retrait')+' ajouté ✓','#4caf82');
+    kidCashRender();
+  };
+  window.kidCashUpdate=function(){
+    const broker=kdV('kcash_broker'), cur=kdV('kcash_currency');
+    let amount=parseFloat(String(kdV('kcash_amount')).replace(',','.'));
+    if(!broker||isNaN(amount)){ kdMsg('kcash_msg','Renseigne broker et montant.','#e06c6c'); return; }
+    if(!KIDS_CASH[broker]) KIDS_CASH[broker]={};
+    KIDS_CASH[broker][cur]=Math.round(amount*100)/100;
+    kidsCashSave(); window.KIDS_CASH=KIDS_CASH;
+    kdMsg('kcash_msg','Cash mis à jour ✓','#60a5fa');
+    kidCashRender();
+  };
+  window.kidCashDelDep=function(i){ if(i==null||!KIDS_DEP[i])return; KIDS_DEP.splice(i,1); kidsDepSave(); window.KIDS_DEP=KIDS_DEP; kidCashRender(); };
+  window.kidCashClear=function(){ if(!KIDS_DEP.length){ return; } if(!confirm('Effacer tous les dépôts/retraits ajoutés manuellement ?\n(L\'historique du fichier est conservé.)')) return; KIDS_DEP.length=0; kidsDepSave(); window.KIDS_DEP=KIDS_DEP; kidCashRender(); };
+  window.kidCashResetDR=function(bk){ const before=KIDS_DEP.length; for(let i=KIDS_DEP.length-1;i>=0;i--){ const d=KIDS_DEP[i]; const brk=(d.broker!==undefined?d.broker:d.c); if(brk===bk) KIDS_DEP.splice(i,1); } if(KIDS_DEP.length!==before){ kidsDepSave(); window.KIDS_DEP=KIDS_DEP; kidCashRender(); } };
+  window.kidCashResetCash=function(bk){ if(KIDS_CASH[bk]){ delete KIDS_CASH[bk]; kidsCashSave(); window.KIDS_CASH=KIDS_CASH; kidCashRender(); } };
 
   // ---- 5) CLÔTURÉES -------------------------------------------------------
   function kidClotures(b){
