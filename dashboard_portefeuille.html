@@ -869,6 +869,8 @@ var EVO_DELTA_CHART_INSTANCE = null;
 let FX_RATES = { USD: null, GBP: null, CZK: null };
 let CURRENT_PRICES = {};
 let CURRENT_VARIATIONS = {};   // { ticker: {'1D':x,'1W':x,'1M':x,'3M':x,'6M':x,'1Y':x,'YTD':x} }
+let PRICE_HISTORY = {};        // { ticker: { 'YYYY-MM-DD': closeEur } } — onglet Historique_Prix
+try { const _ph = localStorage.getItem('price_history'); if (_ph) PRICE_HISTORY = JSON.parse(_ph) || {}; } catch(e){}
 
 const chartInited = {};
 // ══ PATRIMOINE IMMOBILIER ═══════════════════════════════════════════════════
@@ -1618,6 +1620,7 @@ async function autoUpdateNewTicker(row){
     setTimeout(async ()=>{
       try{ if(typeof gsLoadPrices==='function') await gsLoadPrices(); }catch(e){}
       try{ if(typeof gsLoadETFComp==='function') await gsLoadETFComp(); }catch(e){}
+      try{ if(typeof gsLoadPriceHistory==='function') await gsLoadPriceHistory(); }catch(e){}
       _reRenderAllTabs();
       set('✅ Prix'+(kind==='ETF'?' & composition':'')+' à jour pour '+(row.name||row.ticker)+'.');
     }, 190000);
@@ -4727,7 +4730,7 @@ async function gsLoadAll() {
 // -- Synchronisation descendante automatique a la connexion --------------------
 async function gsAutoLoadOnConnect() {
   if (sessionStorage.getItem('_gs_autoloaded') === '1') {
-    gsLoadPrices(); gsLoadETFComp();
+    gsLoadPrices(); gsLoadETFComp(); gsLoadPriceHistory();
     return;
   }
   if (localStorage.getItem('_gs_pending_changes') === '1') {
@@ -4735,7 +4738,7 @@ async function gsAutoLoadOnConnect() {
       'Des modifications locales n\'ont pas encore ete sauvegardees sur Google Sheets.\n\n' +
       'OK = charger les donnees de Google Sheets (remplace les modifications locales)\n' +
       'Annuler = garder les donnees locales (pensez ensuite a 💾 Sauvegarder)');
-    if (!ok) { try { sessionStorage.setItem('_gs_autoloaded', '1'); } catch(_){} gsLoadPrices(); gsLoadETFComp(); return; }
+    if (!ok) { try { sessionStorage.setItem('_gs_autoloaded', '1'); } catch(_){} gsLoadPrices(); gsLoadETFComp(); gsLoadPriceHistory(); return; }
   }
   gsSetMsg('📥 Synchronisation des données depuis Google Sheets...', '#60a5fa');
   try {
@@ -4743,7 +4746,7 @@ async function gsAutoLoadOnConnect() {
     const rows = res.values || [];
     if (rows.length < 3) {
       try { sessionStorage.setItem('_gs_autoloaded', '1'); } catch(_){}
-      gsLoadPrices(); gsLoadETFComp();
+      gsLoadPrices(); gsLoadETFComp(); gsLoadPriceHistory();
       return;
     }
     _gsLoading = true;
@@ -4763,11 +4766,11 @@ async function gsAutoLoadOnConnect() {
       setTimeout(() => location.reload(), 1200);
       return;
     }
-    gsLoadPrices(); gsLoadETFComp();
+    gsLoadPrices(); gsLoadETFComp(); gsLoadPriceHistory();
   } catch(e) {
     _gsLoading = false;
     gsSetMsg('⚠️ Synchro auto échouée — chargement des prix seuls', '#f59e0b');
-    gsLoadPrices(); gsLoadETFComp();
+    gsLoadPrices(); gsLoadETFComp(); gsLoadPriceHistory();
   }
 }
 
@@ -4783,6 +4786,32 @@ function gsApplyConseqNav(){
     if (typeof csqRecalc === 'function') csqRecalc();
     if (typeof renderConseqSection === 'function' && document.getElementById('conseq')) renderConseqSection();
   }
+}
+async function gsLoadPriceHistory() {
+  if (!_gsToken) return;
+  try {
+    const res  = await gsRequest('GET', '/values/Historique_Prix!A:C');
+    const rows = res.values || [];
+    if (rows.length < 2) return;
+    let start = 0;
+    const h0 = (rows[0] && rows[0][0] ? String(rows[0][0]) : '').toLowerCase();
+    if (h0.includes('date')) start = 1;
+    const hist = {};
+    for (let i = start; i < rows.length; i++) {
+      const r = rows[i]; if (!r) continue;
+      const d  = (r[0] || '').toString().trim();
+      const tk = (r[1] || '').toString().trim();
+      const v  = parseFloat(String(r[2]).replace(',', '.'));
+      if (!d || !tk || !(v > 0)) continue;
+      (hist[tk] = hist[tk] || {})[d] = v;
+    }
+    if (Object.keys(hist).length) {
+      PRICE_HISTORY = hist;
+      try { localStorage.setItem('price_history', JSON.stringify(hist)); localStorage.setItem('price_history_date', new Date().toISOString()); } catch(e){}
+      const sec = document.getElementById('actetf');
+      if (sec && sec.classList.contains('active') && typeof renderActEtf === 'function') renderActEtf();
+    }
+  } catch(e) { console.error('gsLoadPriceHistory:', e); }
 }
 async function gsLoadPrices() {
   const status = document.getElementById('fetchStatus');
@@ -8149,9 +8178,22 @@ function renderActEtf() {
           <tbody id="ae_tbody"></tbody>
         </table>
       </div>
+    </div>
+    <div class="card" style="padding:22px 24px;margin-top:20px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px">
+        <h2 style="font-size:18px;font-weight:700;margin:0">📈 Évolution du P&amp;L par titre</h2>
+        <div style="display:flex;gap:6px">
+          <button id="ae_pnl_eur" onclick="aePnlSetMode(&#39;eur&#39;)" style="padding:4px 12px;border:1px solid var(--border2);border-radius:8px;font-size:12px;cursor:pointer;font-weight:600">€</button>
+          <button id="ae_pnl_pct" onclick="aePnlSetMode(&#39;pct&#39;)" style="padding:4px 12px;border:1px solid var(--border2);border-radius:8px;font-size:12px;cursor:pointer;font-weight:600">%</button>
+        </div>
+      </div>
+      <div id="ae_pnl_note" style="font-size:12px;color:var(--text2);margin-bottom:10px"></div>
+      <div id="ae_pnl_toolbar" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
+      <div style="position:relative;height:420px"><canvas id="aePnlChart"></canvas></div>
     </div>`;
 
   _aeRenderRows();
+  try { renderAePnlChart(); } catch(e) { console.error('renderAePnlChart', e); }
 }
 
 // Remplit le corps du tableau (tri + filtre) sans reconstruire les champs de saisie
@@ -8260,6 +8302,87 @@ function aeFilter(col, val) {
   if (val.trim() === '') delete _aeFilter[col];
   else _aeFilter[col] = val.trim().toLowerCase();
   _aeRenderRows();
+}
+
+// ── Graphique évolution du P&L par titre (onglet Actions & ETFs) ────────────
+function aePnlSetMode(m){ window._aePnlMode = m; renderAePnlChart(); }
+function aePnlToggle(t){ if(!window._aePnlSel) window._aePnlSel = new Set(); if(window._aePnlSel.has(t)) window._aePnlSel.delete(t); else window._aePnlSel.add(t); renderAePnlChart(); }
+function aePnlAll(){ window._aePnlSel = null; renderAePnlChart(); }
+function aePnlNone(){ window._aePnlSel = new Set(); renderAePnlChart(); }
+const _AE_PNL_PAL = ['#5a8dee','#4caf82','#f59e0b','#a78bfa','#e06c6c','#14b8a6','#f97316','#ec4899','#84cc16','#60a5fa','#34d399','#fb923c','#c084fc','#f43f5e','#22d3ee','#a3e635','#eab308','#fb7185','#2dd4bf','#818cf8'];
+function renderAePnlChart(){
+  const cv = document.getElementById('aePnlChart'); if(!cv) return;
+  const note = document.getElementById('ae_pnl_note');
+  const toolbar = document.getElementById('ae_pnl_toolbar');
+  const lotsMap = {};
+  BOOK2_ROWS.forEach(r=>{
+    const ty=(r.typeInv||'').toLowerCase();
+    if(!(ty===''||ty==='action'||ty==='etf')) return;
+    if(!r.ticker || !r.date) return;
+    const ce = r.costEur!=null ? r.costEur : (toEur(r.cost, r.currency)||0);
+    if(!lotsMap[r.ticker]) lotsMap[r.ticker] = { name:(r.name||r.ticker), lots:[] };
+    lotsMap[r.ticker].lots.push({ date:String(r.date).slice(0,10), qty:(r.qty||0), costEur:ce });
+  });
+  const tickers = Object.keys(lotsMap).filter(t=>PRICE_HISTORY[t] && Object.keys(PRICE_HISTORY[t]).length).sort();
+  if(window._aePnlChartInst){ try{window._aePnlChartInst.destroy();}catch(e){} window._aePnlChartInst=null; }
+  if(!tickers.length){
+    if(note) note.innerHTML = '<span style="color:#f59e0b">⚠️ Historique des cours indisponible — lancez <code>backfill_price_history_gsheet.py</code> une fois, puis 🔐 Connecter Google / 📥 Charger.</span>';
+    if(toolbar) toolbar.innerHTML='';
+    return;
+  }
+  if(!window._aePnlSel) window._aePnlSel = new Set(tickers);
+  window._aePnlSel = new Set([...window._aePnlSel].filter(t=>tickers.indexOf(t)>=0));
+  if(!window._aePnlSel.size) window._aePnlSel = new Set(tickers);
+  const mode = window._aePnlMode || 'eur';
+  const be=document.getElementById('ae_pnl_eur'), bp=document.getElementById('ae_pnl_pct');
+  const setBtn=(el,on)=>{ if(!el) return; el.style.background=on?'var(--blue)':'var(--bg3)'; el.style.color=on?'#fff':'var(--text)'; el.style.borderColor=on?'var(--blue)':'var(--border2)'; };
+  setBtn(be, mode==='eur'); setBtn(bp, mode==='pct');
+  const colorOf = t => _AE_PNL_PAL[tickers.indexOf(t) % _AE_PNL_PAL.length];
+  if(toolbar){
+    const chip='padding:3px 10px;border-radius:12px;font-size:11px;cursor:pointer;border:1px solid var(--border2);background:var(--bg3);color:var(--text)';
+    let html = '<button onclick="aePnlAll()" style="'+chip+'">Tout</button><button onclick="aePnlNone()" style="'+chip+'">Aucun</button>';
+    tickers.forEach(t=>{
+      const on = window._aePnlSel.has(t); const c=colorOf(t);
+      const short = (typeof ETF_META!=='undefined' && ETF_META[t] && ETF_META[t].short) ? ETF_META[t].short : t;
+      const oc = 'aePnlToggle(' + "'" + t + "'" + ')';
+      const nm = String(lotsMap[t].name||t).replace(/"/g,'&quot;');
+      html += '<button onclick="'+oc+'" title="'+nm+'" style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:12px;font-size:11px;cursor:pointer;border:1px solid '+(on?c:'var(--border2)')+';background:'+(on?c:'var(--bg3)')+';color:'+(on?'#fff':'var(--text2)')+'"><span style="width:8px;height:8px;border-radius:50%;background:'+c+';display:inline-block"></span>'+short+'</button>';
+    });
+    toolbar.innerHTML = html;
+  }
+  const dset = new Set();
+  tickers.forEach(t=>Object.keys(PRICE_HISTORY[t]).forEach(d=>dset.add(d)));
+  const dates = [...dset].sort();
+  const datasets = [];
+  tickers.forEach(t=>{
+    if(!window._aePnlSel.has(t)) return;
+    const lots = lotsMap[t].lots.slice().sort((a,b)=>a.date.localeCompare(b.date));
+    const hist = PRICE_HISTORY[t];
+    const data = dates.map(d=>{
+      const close = hist[d]; if(close==null) return null;
+      let cq=0, cc=0;
+      for(let j=0;j<lots.length;j++){ if(lots[j].date<=d){ cq+=lots[j].qty; cc+=lots[j].costEur; } }
+      if(cq<=0) return null;
+      const val = cq*close;
+      return mode==='pct' ? (cc>0 ? (val-cc)/cc*100 : null) : (val-cc);
+    });
+    const c=colorOf(t);
+    const short = (typeof ETF_META!=='undefined' && ETF_META[t] && ETF_META[t].short) ? ETF_META[t].short : t;
+    datasets.push({ label:(lotsMap[t].name||t)+' ('+short+')', data:data, borderColor:c, backgroundColor:'transparent', borderWidth:1.6, pointRadius:0, tension:0.25, spanGaps:true });
+  });
+  if(note) note.textContent = window._aePnlSel.size+' / '+tickers.length+' titres affichés · '+(mode==='pct'?'P&L en %':'P&L en €')+' · cumul depuis le 1er achat';
+  if(typeof Chart==='undefined') return;
+  window._aePnlChartInst = new Chart(cv, { type:'line', data:{ labels:dates, datasets:datasets }, options:{
+    responsive:true, maintainAspectRatio:false, interaction:{ mode:'nearest', intersect:false },
+    plugins:{
+      legend:{ display: datasets.length<=12, labels:{ color:'var(--text2)', font:{size:10}, boxWidth:10 } },
+      tooltip:{ callbacks:{ label:ctx=>{ const y=ctx.parsed.y; if(y==null) return ctx.dataset.label+': —'; return ctx.dataset.label+': '+(mode==='pct' ? ((y>=0?'+':'')+y.toFixed(1)+'%') : ((y>=0?'+':'')+Math.round(y).toLocaleString('fr')+' €')); } } }
+    },
+    scales:{
+      x:{ ticks:{ color:'var(--text2)', maxTicksLimit:10 }, grid:{ color:'rgba(0,0,0,0.05)' } },
+      y:{ ticks:{ color:'var(--text2)', callback:v=> mode==='pct' ? v.toFixed(0)+'%' : Math.round(v).toLocaleString('fr')+' €' }, grid:{ color:'rgba(0,0,0,0.05)' } }
+    }
+  }});
 }
 
 window._actSort = window._actSort || { col: 'valeur', dir: -1 };
