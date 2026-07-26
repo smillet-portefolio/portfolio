@@ -4718,6 +4718,9 @@ async function gsLoadAll() {
     if (loaded === 0) { gsSetMsg('⚠️ Aucune donnée valide trouvée — annulé', '#f59e0b'); return; }
     try { localStorage.removeItem('_gs_pending_changes'); } catch(_){}
     try { sessionStorage.setItem('_gs_autoloaded', '1'); } catch(_){}
+    // Historique des cours : onglet séparé (hors Data) -> le récupérer MAINTENANT,
+    // tant que le token est valide, et le mettre en cache (le reload perd le token).
+    try { await gsLoadPriceHistory(); } catch(e){ console.warn('gsLoadPriceHistory (charger):', e); }
     gsSetMsg('✅ ' + loaded + ' clés chargées — rechargement...', '#4caf82');
     setTimeout(() => location.reload(), 1500);
   } catch(e) { gsSetMsg('❌ ' + e.message.slice(0,60), '#e06c6c'); }
