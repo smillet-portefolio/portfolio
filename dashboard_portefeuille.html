@@ -8332,6 +8332,7 @@ function _aeApplyFilter(){
   window._aePnlSel = new Set(tks.filter(t=>{
     if(tf==='action' && types[t]!=='Action') return false;
     if(tf==='etf' && types[t]!=='ETF') return false;
+    if(tf==='crypto' && types[t]!=='Crypto') return false;
     if(sf==='gain' && !(pnl[t]!=null && pnl[t]>=0)) return false;
     if(sf==='loss' && !(pnl[t]!=null && pnl[t]<0)) return false;
     return true;
@@ -8358,11 +8359,13 @@ function renderAePnlChart(){
   const lotsMap = {};
   BOOK2_ROWS.forEach(r=>{
     const ty=(r.typeInv||'').toLowerCase();
-    if(!(ty===''||ty==='action'||ty==='etf')) return;
-    if(!r.ticker || !r.date) return;
+    if(!(ty===''||ty==='action'||ty==='etf'||ty==='crypto')) return;
+    const _d = String(r.date || r.dateAchat || '').slice(0,10);
+    if(!r.ticker || !_d) return;
     const ce = r.costEur!=null ? r.costEur : (toEur(r.cost, r.currency)||0);
-    if(!lotsMap[r.ticker]) lotsMap[r.ticker] = { name:(r.name||r.ticker), type:((ty==='etf'||(typeof ETF_TICKERS!=='undefined'&&ETF_TICKERS.has(r.ticker)))?'ETF':'Action'), lots:[] };
-    lotsMap[r.ticker].lots.push({ date:String(r.date).slice(0,10), qty:(r.qty||0), costEur:ce });
+    const _tp = (ty==='crypto') ? 'Crypto' : ((ty==='etf'||(typeof ETF_TICKERS!=='undefined'&&ETF_TICKERS.has(r.ticker)))?'ETF':'Action');
+    if(!lotsMap[r.ticker]) lotsMap[r.ticker] = { name:(r.name||r.ticker), type:_tp, lots:[] };
+    lotsMap[r.ticker].lots.push({ date:_d, qty:(r.qty||0), costEur:ce });
   });
   const tickers = Object.keys(lotsMap).filter(t=>PRICE_HISTORY[t] && Object.keys(PRICE_HISTORY[t]).length).sort();
   if(window._aePnlChartInst){ try{window._aePnlChartInst.destroy();}catch(e){} window._aePnlChartInst=null; }
@@ -8392,6 +8395,7 @@ function renderAePnlChart(){
   const _tf = window._aePnlTypeFilter||'all', _sf = window._aePnlStatusFilter||'all';
   const nAct = tickers.filter(t=>window._aePnlTypes[t]==='Action').length;
   const nEtf = tickers.filter(t=>window._aePnlTypes[t]==='ETF').length;
+  const nCry = tickers.filter(t=>window._aePnlTypes[t]==='Crypto').length;
   const nGain = tickers.filter(t=>window._aePnlPnl[t]!=null && window._aePnlPnl[t]>=0).length;
   const nLoss = tickers.filter(t=>window._aePnlPnl[t]!=null && window._aePnlPnl[t]<0).length;
   if(filtersEl){
@@ -8405,6 +8409,7 @@ function renderAePnlChart(){
       + sep
       + fb('Actions ('+nAct+')', "aePnlType('action')", _tf==='action')
       + fb('ETFs ('+nEtf+')', "aePnlType('etf')", _tf==='etf')
+      + (nCry>0 ? fb('Crypto ('+nCry+')', "aePnlType('crypto')", _tf==='crypto', '#f59e0b') : '')
       + sep
       + fb('En gain ('+nGain+')', "aePnlStatus('gain')", _sf==='gain', '#4caf82')
       + fb('En perte ('+nLoss+')', "aePnlStatus('loss')", _sf==='loss', '#e06c6c');

@@ -47,11 +47,12 @@ def portefeuille_info():
             continue
         br = (r.get("broker") or "").strip().lower()
         ty = (r.get("typeInv") or "").strip().lower()
-        if br in CRYPTO_BROKERS or "crypto" in ty:
+        # Inclure le crypto BTC / ETH ; exclure tout autre crypto non price
+        if (br in CRYPTO_BROKERS or "crypto" in ty) and tk not in ("BTC", "ETH"):
             continue
         if re.search(r"structur|épargn|epargn|livret|obligation", ty):
             continue
-        d   = (str(r.get("date") or "")).strip()[:10]
+        d   = (str(r.get("date") or r.get("dateAchat") or "")).strip()[:10]
         cur = (r.get("currency") or "EUR").strip()
         nm  = r.get("name") or tk
         if not re.match(r"^\d{4}-\d{2}-\d{2}$", d):
@@ -105,7 +106,10 @@ def to_eur(close, cur, dstr, eurusd, eurgbp):
 
 
 # ── 3. Symbole Yahoo pour un ticker du portefeuille ───────────────────────────
+CRYPTO_YAHOO = {"BTC": "BTC-EUR", "ETH": "ETH-EUR"}
 def yahoo_symbol(tick, cur_hint):
+    if tick in CRYPTO_YAHOO:
+        return CRYPTO_YAHOO[tick]
     ov = up.YS_OVERRIDE.get(tick)
     if ov:
         return ov
