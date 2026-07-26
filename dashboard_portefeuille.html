@@ -10743,49 +10743,228 @@ window.addEventListener('load', () => {
              grid:{color:c=>(c.tick&&c.tick.value===0)?'rgba(60,58,54,0.6)':'rgba(0,0,0,0.05)'}}}}}));
   }
 
-  // ---- 7) ÉDITER ----------------------------------------------------------
-  function kidEditer(b){
-    const rows = holdSel();
-    let html=`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-        <button onclick="kidAddRow()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">+ Ajouter une ligne</button>
-        <button onclick="kidSaveEdit()" style="padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">💾 Enregistrer</button>
-        <span id="kidEditMsg" style="font-size:12px;color:var(--text2);align-self:center"></span></div>
-      <div class="card"><table id="kidEditTable"><thead><tr>
-        <th>Enfant</th><th>Compte</th><th>Nom</th><th>Type</th><th>ISIN</th>
-        <th style="text-align:right">Qté</th><th style="text-align:right">Valeur €</th><th style="text-align:right">Coût €</th><th></th></tr></thead><tbody>`;
-    KIDS_HOLD.forEach((h,i)=>{
-      if(!(sel()==='Tous'||h.e===sel())) return;
-      html+=`<tr data-i="${i}">
-        <td><select data-f="e" style="${selCss()}">${KIDS.map(k=>`<option ${h.e===k?'selected':''}>${k}</option>`).join('')}</select></td>
-        <td><select data-f="c" style="${selCss()}"><option ${h.c==='Linxea'?'selected':''}>Linxea</option><option ${h.c==='SAXO'?'selected':''}>SAXO</option></select></td>
-        <td><input data-f="nom" value="${(h.nom||'').replace(/"/g,'&quot;')}" style="${inpCss(160)}"></td>
-        <td><input data-f="t" value="${h.t||''}" style="${inpCss(70)}"></td>
-        <td><input data-f="isin" value="${h.isin||''}" style="${inpCss(110)}"></td>
-        <td><input data-f="qty" type="number" step="any" value="${h.qty!=null?h.qty:''}" style="${inpCss(70,'right')}"></td>
-        <td><input data-f="val" type="number" step="any" value="${h.val!=null?h.val:''}" style="${inpCss(90,'right')}"></td>
-        <td><input data-f="cout" type="number" step="any" value="${h.cout!=null?h.cout:''}" style="${inpCss(90,'right')}"></td>
-        <td><button onclick="kidDelRow(${i})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px">✕</button></td></tr>`;
+  // ---- 7) ÉDITER (réplique de l'onglet Éditer principal) -----------------
+  function kidEdRows(){
+    return KIDS_HOLD.map((h,i)=>{
+      const dev=h.devise||'EUR';
+      const cout = (h.cout!=null)? +h.cout : null;
+      const qty  = (h.qty!=null)? +h.qty : null;
+      const px   = (h.pxAchat!=null)? +h.pxAchat : ((cout!=null && qty)? cout/qty : null);
+      const val  = (h.val!=null)? +h.val : null;
+      const pnl  = (cout!=null && val!=null)? val-cout : null;
+      const pct  = (pnl!=null && cout>0)? pnl/cout*100 : null;
+      return { _i:i, e:h.e, isin:h.isin||'', nom:h.nom||'', t:h.t||'', ticker:h.ticker||'',
+        broker:h.c||'', date:h.date||'', devise:dev, qty:qty, px:px,
+        coutDev:(qty!=null&&px!=null)?qty*px:cout, coutEur:cout, vl:(h.vl!=null?+h.vl:null),
+        val:val, pnl:pnl, pct:pct };
     });
-    html+=`</tbody></table></div>
-      <p style="font-size:11px;color:var(--text2);margin-top:8px">Modifie les valeurs puis « Enregistrer ». Les données sont sauvegardées localement (et synchronisables via Google Sheets).</p>`;
-    b.innerHTML=html;
   }
-  function selCss(){ return 'background:var(--bg2);border:1px solid var(--border2);border-radius:4px;padding:3px 5px;font-size:11px;color:var(--text)'; }
-  function inpCss(w,al){ return `width:${w}px;background:var(--bg2);border:1px solid var(--border2);border-radius:4px;padding:3px 6px;font-size:11px;color:var(--text)${al==='right'?';text-align:right':''}`; }
-  window.kidAddRow=function(){ KIDS_HOLD.push({e:sel()==='Tous'?'Corentin':sel(), c:'Linxea', nom:'Nouveau fonds', t:'ETF', isin:'', val:0}); window._kidSub='edit'; window.renderEnfants(); };
-  window.kidDelRow=function(i){ KIDS_HOLD.splice(i,1); window.KIDS_HOLD=KIDS_HOLD; window.renderEnfants(); };
-  window.kidSaveEdit=function(){
-    document.querySelectorAll('#kidEditTable tbody tr').forEach(tr=>{
-      const i=+tr.getAttribute('data-i'); if(isNaN(i)||!KIDS_HOLD[i]) return;
-      tr.querySelectorAll('[data-f]').forEach(el=>{
-        const f=el.getAttribute('data-f'); let v=el.value;
-        if(['val','cout','qty'].includes(f)) v = (v===''?null:parseFloat(String(v).replace(',','.')));
-        KIDS_HOLD[i][f]=v;
-      });
+  function kidEditer(b){
+    if(window._kidEdFilter==null) window._kidEdFilter={};
+    if(window._kidEdSort==null) window._kidEdSort={col:null,dir:1};
+    const fxu=(typeof FX_RATES!=='undefined'&&FX_RATES&&FX_RATES.USD)?FX_RATES.USD:null;
+    const fxg=(typeof FX_RATES!=='undefined'&&FX_RATES&&FX_RATES.GBP)?FX_RATES.GBP:null;
+    const th=(col,lab,al)=>`<th data-col="${col}" onclick="kidEdSort('${col}')" style="padding:8px 14px;cursor:pointer;user-select:none;white-space:nowrap;text-align:${al||'left'}">${lab} <span style="font-size:9px;opacity:.35">⇅</span></th>`;
+    const fin=(col,ph,al)=>`<td style="padding:3px 8px"><input type="text" placeholder="${ph}" oninput="kidEdFilter('${col}',this.value)" style="width:100%;box-sizing:border-box;padding:4px 7px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none${al==='right'?';text-align:right':''}"></td>`;
+    b.innerHTML = `
+      <h2 style="font-size:16px;font-weight:700;margin-bottom:4px">Toutes les lignes d'investissement — enfants</h2>
+      <p class="section-desc" style="margin-bottom:16px">Chaque ligne correspond à une position détenue. Filtre, trie, modifie, vends ou supprime une ligne.</p>
+      <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+        <span id="kidEdStatus" style="font-size:12px;color:var(--text2);flex:1;min-width:200px"></span>
+        <button onclick="kidEdExport()" style="padding:8px 16px;background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:6px;font-size:12px;cursor:pointer">⬇ Export Excel (.xlsx)</button>
+        <button onclick="kidEdAdd()" style="padding:8px 16px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">＋ Nouvelle ligne</button>
+      </div>
+      <div style="display:flex;gap:20px;margin-bottom:14px;font-size:12px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:8px 14px;flex-wrap:wrap">
+        <span>Taux de change (CNB / ECB) :</span>
+        <span>1 USD = ${fxu?fxu.toFixed(4):'—'} EUR</span>
+        <span>1 GBP = ${fxg?fxg.toFixed(4):'—'} EUR</span>
+      </div>
+      <div id="kidEdKpi" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px"></div>
+      <div style="max-height:70vh;overflow:auto">
+        <table style="font-size:12px;width:100%;border-collapse:collapse;min-width:1200px">
+          <thead>
+            <tr style="background:var(--bg2);text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2)">
+              <th style="padding:8px 10px;width:26px;position:sticky;top:0;background:var(--bg2)">#</th>
+              ${th('e','Enfant')}${th('isin','ISIN')}${th('nom','Nom')}${th('t','Type')}${th('ticker','Ticker')}${th('broker','Broker')}${th('date','Date achat')}${th('devise','Devise')}
+              ${th('qty','Qté','right')}${th('px','Prix achat','right')}${th('coutDev','Coût (devise)','right')}${th('coutEur','Coût (€)','right')}${th('vl','Prix actuel','right')}${th('val','Valeur act. (€)','right')}${th('pnl','P&L (€)','right')}${th('pct','P&L (%)','right')}
+              <th style="padding:8px 10px;position:sticky;top:0;background:var(--bg2)"></th>
+            </tr>
+            <tr style="background:var(--bg3)">
+              <td></td><td></td>${fin('isin','ISIN')}${fin('nom','Filtrer nom')}${fin('t','Type…')}${fin('ticker','Ticker')}${fin('broker','Broker')}${fin('date','AAAA-MM-JJ')}${fin('devise','EUR/USD…')}
+              ${fin('qty','≥ qté','right')}<td></td><td></td>${fin('coutEur','≥ coût €','right')}<td></td>${fin('val','≥ valeur €','right')}${fin('pnl','≥ P&L €','right')}<td></td><td></td>
+            </tr>
+          </thead>
+          <tbody id="kidEdBody"></tbody>
+          <tfoot><tr id="kidEdTot" style="font-weight:700;background:var(--bg2)"></tr></tfoot>
+        </table>
+      </div>
+      <div id="kidEdModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:20px">
+        <div class="card" style="max-width:640px;width:100%;max-height:90vh;overflow:auto;padding:22px">
+          <h3 id="kidEdModalTitle" style="font-size:15px;font-weight:700;margin-bottom:14px">Nouvelle ligne</h3>
+          <div id="kidEdForm" style="display:grid;grid-template-columns:1fr 1fr;gap:10px"></div>
+          <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end">
+            <button onclick="kidEdModalClose()" style="padding:8px 16px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;cursor:pointer">Annuler</button>
+            <button onclick="kidEdSave()" style="padding:8px 16px;background:var(--green);border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:600;cursor:pointer">💾 Enregistrer</button>
+          </div>
+        </div>
+      </div>
+      <div id="kidEdSellModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:20px">
+        <div class="card" style="max-width:460px;width:100%;padding:22px">
+          <h3 id="kidEdSellTitle" style="font-size:15px;font-weight:700;margin-bottom:14px">Vendre la position</h3>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div><label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">Date de vente</label><input id="kidSellDate" type="date" style="width:100%;box-sizing:border-box;padding:7px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
+            <div><label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">Montant reçu (€)</label><input id="kidSellAmount" type="number" step="0.01" style="width:100%;box-sizing:border-box;padding:7px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
+            <div id="kidSellInfo" style="font-size:12px;color:var(--text2)"></div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end">
+            <button onclick="kidEdSellClose()" style="padding:8px 16px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;cursor:pointer">Annuler</button>
+            <button onclick="kidEdSellConfirm()" style="padding:8px 16px;background:#e06c6c;border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:600;cursor:pointer">📤 Confirmer la vente</button>
+          </div>
+        </div>
+      </div>`;
+    kidEdBuild();
+  }
+
+  function kidEdBuild(){
+    const body=document.getElementById('kidEdBody'); if(!body) return;
+    const f=window._kidEdFilter||{}, srt=window._kidEdSort||{col:null,dir:1};
+    const na=x=>String(x||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    let rows=kidEdRows().filter(r=> sel()==='Tous' || r.e===sel());
+    rows=rows.filter(r=>{
+      if(f.isin && !na(r.isin).includes(na(f.isin))) return false;
+      if(f.nom && !na(r.nom).includes(na(f.nom))) return false;
+      if(f.t && !na(r.t).includes(na(f.t))) return false;
+      if(f.ticker && !na(r.ticker).includes(na(f.ticker))) return false;
+      if(f.broker && !na(r.broker).includes(na(f.broker))) return false;
+      if(f.date && !String(r.date).includes(f.date)) return false;
+      if(f.devise && !na(r.devise).includes(na(f.devise))) return false;
+      if(f.qty && !(r.qty!=null && r.qty>=parseFloat(f.qty))) return false;
+      if(f.coutEur && !(r.coutEur!=null && r.coutEur>=parseFloat(f.coutEur))) return false;
+      if(f.val && !(r.val!=null && r.val>=parseFloat(f.val))) return false;
+      if(f.pnl && !(r.pnl!=null && r.pnl>=parseFloat(f.pnl))) return false;
+      return true;
     });
-    window.KIDS_HOLD=KIDS_HOLD; kidsSave();
-    const m=document.getElementById('kidEditMsg'); if(m){ m.textContent='✓ Enregistré'; setTimeout(()=>{m.textContent='';},2000); }
-    window.renderEnfants();
+    if(srt.col){ const c=srt.col,d=srt.dir; rows.sort((a,b2)=>{ let va=a[c],vb=b2[c]; if(va==null)va=d===1?Infinity:-Infinity; if(vb==null)vb=d===1?Infinity:-Infinity; if(typeof va==='string')return va.localeCompare(vb)*d; return (va-vb)*d; }); }
+    const fN=n=> n==null?'—':Number(n).toLocaleString('fr',{maximumFractionDigits:4});
+    const fE=n=> n==null?'—':Math.round(n).toLocaleString('fr')+' €';
+    const fP=n=> n==null?'—':(n>=0?'+':'')+n.toFixed(2).replace('.',',')+'%';
+    const cP=n=> n==null?'var(--text2)':(n>=0?'#4caf82':'#e06c6c');
+    body.innerHTML = rows.map((r,idx)=>`<tr style="border-bottom:1px solid var(--border)">
+      <td style="color:var(--text2);padding:6px 10px">${idx+1}</td>
+      <td style="padding:6px 14px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COL[r.e]};margin-right:5px"></span>${r.e}</td>
+      <td style="font-size:10px;padding:6px 10px;color:var(--text2);font-family:'DM Mono',monospace">${r.isin||'—'}</td>
+      <td style="padding:6px 14px"><strong>${r.nom}</strong></td>
+      <td style="padding:6px 10px">${r.t?`<span style="font-size:10px;padding:2px 7px;border-radius:4px;background:var(--bg3);border:1px solid var(--border2);white-space:nowrap">${r.t}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
+      <td style="font-size:11px;padding:6px 14px;font-family:'DM Mono',monospace">${r.ticker||'—'}</td>
+      <td style="font-size:11px;color:var(--text2);padding:6px 14px">${r.broker||'—'}</td>
+      <td style="font-size:11px;color:var(--text2);padding:6px 14px">${r.date||'—'}</td>
+      <td style="padding:6px 14px"><span style="font-size:10px;font-weight:600;padding:2px 5px;border-radius:3px;background:var(--bg3);border:1px solid var(--border)">${r.devise}</span></td>
+      <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace">${fN(r.qty)}</td>
+      <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace">${fN(r.px)}</td>
+      <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace">${r.coutDev!=null?Math.round(r.coutDev).toLocaleString('fr')+' '+r.devise:'—'}</td>
+      <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;color:var(--text2)">${fE(r.coutEur)}</td>
+      <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;color:var(--text2)">${fN(r.vl)}</td>
+      <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace">${fE(r.val)}</td>
+      <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;font-weight:600;color:${cP(r.pnl)}">${fE(r.pnl)}</td>
+      <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;color:${cP(r.pct)}">${fP(r.pct)}</td>
+      <td style="white-space:nowrap;padding:4px 8px">
+        <button onclick="kidEdEdit(${r._i})" title="Modifier" style="padding:3px 8px;font-size:11px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;color:var(--text);cursor:pointer;margin-right:4px">✏️</button>
+        <button onclick="kidEdSell(${r._i})" title="Vendre" style="padding:3px 8px;font-size:11px;background:#7f1d1d33;border:1px solid #ef444466;border-radius:4px;color:#f87171;cursor:pointer;margin-right:4px">📤 Vendre</button>
+        <button onclick="kidEdDel(${r._i})" title="Supprimer" style="padding:3px 8px;font-size:11px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;color:#e06c6c;cursor:pointer">🗑</button>
+      </td></tr>`).join('');
+    // Totaux + KPIs
+    let tCost=0,tVal=0,tPnl=0,hasV=false;
+    rows.forEach(r=>{ tCost+=r.coutEur||0; if(r.val!=null){tVal+=r.val;hasV=true;} if(r.pnl!=null)tPnl+=r.pnl; });
+    const perf = tCost>0? tPnl/tCost*100 : null;
+    const tot=document.getElementById('kidEdTot');
+    if(tot) tot.innerHTML=`<td colspan="12" style="padding:8px 14px">Total (${rows.length} lignes)</td>
+      <td style="text-align:right;padding:8px 14px;font-family:'DM Mono',monospace">${tCost>0?Math.round(tCost).toLocaleString('fr')+' €':'—'}</td>
+      <td></td><td style="text-align:right;padding:8px 14px;font-family:'DM Mono',monospace">${hasV?Math.round(tVal).toLocaleString('fr')+' €':'—'}</td>
+      <td style="text-align:right;padding:8px 14px;font-family:'DM Mono',monospace;color:${tPnl>=0?'#4caf82':'#e06c6c'}">${(tPnl>=0?'+':'')+Math.round(tPnl).toLocaleString('fr')} €</td>
+      <td style="text-align:right;padding:8px 14px;font-family:'DM Mono',monospace;color:${(perf==null||perf>=0)?'#4caf82':'#e06c6c'}">${perf!=null?(perf>=0?'+':'')+perf.toFixed(1).replace('.',',')+'%':'—'}</td><td></td>`;
+    const kpi=document.getElementById('kidEdKpi');
+    const card=(l,v,c)=>`<div class="card" style="padding:14px 16px"><div class="kpi-label">${l}</div><div class="kpi-value" style="font-size:20px;color:${c||'var(--text)'}">${v}</div></div>`;
+    if(kpi) kpi.innerHTML = card('Coût total (positions cotées)', tCost>0?fE(tCost):'—')
+      + card('Valeur actuelle', hasV?fE(tVal):'—')
+      + card('P&L total', (tPnl>=0?'+':'')+fE(Math.abs(tPnl)).replace('-',''), tPnl>=0?'#4caf82':'#e06c6c')
+      + card('Performance', perf!=null?(perf>=0?'+':'')+perf.toFixed(1).replace('.',',')+'%':'—', (perf==null||perf>=0)?'#4caf82':'#e06c6c');
+    const st=document.getElementById('kidEdStatus'); if(st) st.textContent=rows.length+' lignes affichées';
+  }
+  window.kidEdFilter=function(col,val){ if(window._kidEdFilter==null)window._kidEdFilter={}; window._kidEdFilter[col]=val; kidEdBuild(); };
+  window.kidEdSort=function(col){ const s2=window._kidEdSort||{col:null,dir:1}; if(s2.col===col) s2.dir=-s2.dir; else { s2.col=col; s2.dir=1; } window._kidEdSort=s2; kidEdBuild(); };
+
+  // ---- Modale ajout / édition ----
+  function kidEdField(id,label,val,type,opts){
+    if(type==='select'){ return `<div><label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">${label}</label><select id="${id}" style="${_kfi}">${opts.map(o=>`<option ${o===val?'selected':''}>${o}</option>`).join('')}</select></div>`; }
+    return `<div><label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">${label}</label><input id="${id}" type="${type||'text'}" ${type==='number'?'step="any"':''} value="${val!=null?String(val).replace(/"/g,'&quot;'):''}" style="${_kfi}"></div>`;
+  }
+  const _kfi="width:100%;box-sizing:border-box;padding:7px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px";
+  function kidEdOpenModal(i){
+    const h = (i!=null && KIDS_HOLD[i])? KIDS_HOLD[i] : {e:(sel()==='Tous'?'Corentin':sel()), c:'', nom:'', t:'ETF', isin:'', ticker:'', date:'', devise:'EUR', qty:'', pxAchat:'', cout:'', val:'', vl:''};
+    window._kidEdIdx = (i!=null)?i:null;
+    document.getElementById('kidEdModalTitle').textContent = (i!=null)?'Modifier la ligne':'Nouvelle ligne';
+    document.getElementById('kidEdForm').innerHTML =
+      kidEdField('kf_e','Enfant',h.e,'select',KIDS)
+      + kidEdField('kf_c','Broker / compte',h.c,'text')
+      + kidEdField('kf_nom','Nom',h.nom,'text')
+      + kidEdField('kf_t','Type',h.t,'text')
+      + kidEdField('kf_isin','ISIN',h.isin,'text')
+      + kidEdField('kf_ticker','Ticker',h.ticker,'text')
+      + kidEdField('kf_date','Date achat',h.date,'date')
+      + kidEdField('kf_devise','Devise',h.devise||'EUR','select',['EUR','USD','GBP','CZK'])
+      + kidEdField('kf_qty','Quantité',h.qty,'number')
+      + kidEdField('kf_px','Prix achat (unitaire)',h.pxAchat,'number')
+      + kidEdField('kf_cout','Coût total (€)',h.cout,'number')
+      + kidEdField('kf_vl','Prix actuel (VL)',h.vl,'number')
+      + kidEdField('kf_val','Valeur actuelle (€)',h.val,'number');
+    document.getElementById('kidEdModal').style.display='flex';
+  }
+  window.kidEdAdd=function(){ kidEdOpenModal(null); };
+  window.kidEdEdit=function(i){ kidEdOpenModal(i); };
+  window.kidEdModalClose=function(){ const m=document.getElementById('kidEdModal'); if(m)m.style.display='none'; };
+  window.kidEdSave=function(){
+    const gv=id=>{ const el=document.getElementById(id); return el?el.value:''; };
+    const gn=id=>{ const v=gv(id); return v===''?null:parseFloat(String(v).replace(',','.')); };
+    const obj={ e:gv('kf_e'), c:gv('kf_c'), nom:gv('kf_nom'), t:gv('kf_t'), isin:gv('kf_isin'), ticker:gv('kf_ticker'),
+      date:gv('kf_date'), devise:gv('kf_devise'), qty:gn('kf_qty'), pxAchat:gn('kf_px'), cout:gn('kf_cout'), vl:gn('kf_vl'), val:gn('kf_val') };
+    if(!obj.nom){ alert('Le nom est obligatoire.'); return; }
+    if(obj.val==null && obj.qty!=null && obj.vl!=null) obj.val=obj.qty*obj.vl;
+    if(window._kidEdIdx!=null && KIDS_HOLD[window._kidEdIdx]) KIDS_HOLD[window._kidEdIdx]=obj;
+    else KIDS_HOLD.push(obj);
+    window.KIDS_HOLD=KIDS_HOLD; kidsSave(); window.kidEdModalClose(); kidEdBuild();
+  };
+  window.kidEdDel=function(i){ if(!KIDS_HOLD[i])return; if(!confirm('Supprimer cette ligne ?')) return; KIDS_HOLD.splice(i,1); window.KIDS_HOLD=KIDS_HOLD; kidsSave(); kidEdBuild(); };
+
+  // ---- Vente ----
+  window.kidEdSell=function(i){ const h=KIDS_HOLD[i]; if(!h)return; window._kidSellIdx=i;
+    document.getElementById('kidEdSellTitle').textContent='Vendre : '+(h.nom||'');
+    document.getElementById('kidSellDate').value=new Date().toISOString().slice(0,10);
+    document.getElementById('kidSellAmount').value=(h.val!=null?h.val:'');
+    const basis=(h.cout!=null?h.cout:h.val);
+    document.getElementById('kidSellInfo').textContent='Coût de revient : '+(h.cout!=null?Math.round(h.cout).toLocaleString('fr')+' €':'inconnu (base = valeur actuelle)');
+    document.getElementById('kidEdSellModal').style.display='flex';
+  };
+  window.kidEdSellClose=function(){ const m=document.getElementById('kidEdSellModal'); if(m)m.style.display='none'; };
+  window.kidEdSellConfirm=function(){
+    const i=window._kidSellIdx; const h=KIDS_HOLD[i]; if(!h)return;
+    const amt=parseFloat(String(document.getElementById('kidSellAmount').value).replace(',','.'));
+    if(isNaN(amt)){ alert('Montant reçu invalide.'); return; }
+    const basis=(h.cout!=null?h.cout:(h.val!=null?h.val:0));
+    const pnl=amt-basis;
+    KIDS_CLOSED.push({ e:h.e, c:h.c, nom:h.nom, isin:h.isin||'', pnl:Math.round(pnl*100)/100 });
+    KIDS_HOLD.splice(i,1);
+    window.KIDS_HOLD=KIDS_HOLD; window.KIDS_CLOSED=KIDS_CLOSED; kidsSave();
+    window.kidEdSellClose(); kidEdBuild();
+  };
+
+  // ---- Export Excel ----
+  window.kidEdExport=function(){
+    if(typeof XLSX==='undefined'){ alert('Librairie Excel indisponible.'); return; }
+    const rows=kidEdRows().filter(r=> sel()==='Tous' || r.e===sel());
+    const aoa=[['Enfant','ISIN','Nom','Type','Ticker','Broker','Date achat','Devise','Qté','Prix achat','Coût (devise)','Coût (€)','Prix actuel','Valeur act. (€)','P&L (€)','P&L (%)']];
+    rows.forEach(r=>aoa.push([r.e,r.isin,r.nom,r.t,r.ticker,r.broker,r.date,r.devise,r.qty,r.px,r.coutDev,r.coutEur,r.vl,r.val,r.pnl,r.pct!=null?+r.pct.toFixed(2):null]));
+    const ws=XLSX.utils.aoa_to_sheet(aoa); const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Enfants'); XLSX.writeFile(wb,'investissements_enfants.xlsx');
   };
 
   // ---- petits helpers UI --------------------------------------------------
