@@ -8324,6 +8324,8 @@ function aePnlSetMode(m){ window._aePnlMode = m; renderAePnlChart(); }
 function aePnlToggle(t){ if(window._aePnlSel == null) window._aePnlSel = new Set(window._aePnlTickers||[]); if(window._aePnlSel.has(t)) window._aePnlSel.delete(t); else window._aePnlSel.add(t); renderAePnlChart(); }
 function aePnlAll(){ window._aePnlSel = null; renderAePnlChart(); }
 function aePnlNone(){ window._aePnlSel = new Set(); renderAePnlChart(); }
+function aePnlActions(){ window._aePnlSel = new Set((window._aePnlTickers||[]).filter(t=>(window._aePnlTypes||{})[t]==='Action')); renderAePnlChart(); }
+function aePnlETFs(){ window._aePnlSel = new Set((window._aePnlTickers||[]).filter(t=>(window._aePnlTypes||{})[t]==='ETF')); renderAePnlChart(); }
 function aeSubTab(which){
   window._aeSubTab = which;
   const t=document.getElementById('ae_sub_table'), c=document.getElementById('ae_sub_chart');
@@ -8345,7 +8347,7 @@ function renderAePnlChart(){
     if(!(ty===''||ty==='action'||ty==='etf')) return;
     if(!r.ticker || !r.date) return;
     const ce = r.costEur!=null ? r.costEur : (toEur(r.cost, r.currency)||0);
-    if(!lotsMap[r.ticker]) lotsMap[r.ticker] = { name:(r.name||r.ticker), lots:[] };
+    if(!lotsMap[r.ticker]) lotsMap[r.ticker] = { name:(r.name||r.ticker), type:((ty==='etf'||(typeof ETF_TICKERS!=='undefined'&&ETF_TICKERS.has(r.ticker)))?'ETF':'Action'), lots:[] };
     lotsMap[r.ticker].lots.push({ date:String(r.date).slice(0,10), qty:(r.qty||0), costEur:ce });
   });
   const tickers = Object.keys(lotsMap).filter(t=>PRICE_HISTORY[t] && Object.keys(PRICE_HISTORY[t]).length).sort();
@@ -8356,6 +8358,7 @@ function renderAePnlChart(){
     return;
   }
   window._aePnlTickers = tickers;
+  window._aePnlTypes = {}; tickers.forEach(t=>{ window._aePnlTypes[t] = (lotsMap[t]&&lotsMap[t].type)||'Action'; });
   if(window._aePnlSel == null) window._aePnlSel = new Set(tickers);
   window._aePnlSel = new Set([...window._aePnlSel].filter(t=>tickers.indexOf(t)>=0));
   const mode = window._aePnlMode || 'eur';
@@ -8365,7 +8368,12 @@ function renderAePnlChart(){
   const colorOf = t => _AE_PNL_PAL[tickers.indexOf(t) % _AE_PNL_PAL.length];
   if(toolbar){
     const chip='padding:3px 10px;border-radius:12px;font-size:11px;cursor:pointer;border:1px solid var(--border2);background:var(--bg3);color:var(--text)';
-    let html = '<button onclick="aePnlAll()" style="'+chip+'">Tout</button><button onclick="aePnlNone()" style="'+chip+'">Aucun</button>';
+    const nAct = tickers.filter(t=>window._aePnlTypes[t]==='Action').length;
+    const nEtf = tickers.filter(t=>window._aePnlTypes[t]==='ETF').length;
+    const chipT='padding:3px 10px;border-radius:12px;font-size:11px;cursor:pointer;border:1px solid var(--blue);background:var(--bg3);color:var(--blue);font-weight:600';
+    let html = '<button onclick="aePnlAll()" style="'+chip+'">Tout</button><button onclick="aePnlNone()" style="'+chip+'">Aucun</button>'
+             + '<button onclick="aePnlActions()" style="'+chipT+'">Actions ('+nAct+')</button>'
+             + '<button onclick="aePnlETFs()" style="'+chipT+'">ETFs ('+nEtf+')</button>';
     tickers.forEach(t=>{
       const on = window._aePnlSel.has(t); const c=colorOf(t);
       const short = (typeof ETF_META!=='undefined' && ETF_META[t] && ETF_META[t].short) ? ETF_META[t].short : t;
