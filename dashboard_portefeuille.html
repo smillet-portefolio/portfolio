@@ -480,7 +480,10 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
 
       <!-- Par type d'actif -->
       <div class="card" style="padding:20px">
-        <p style="font-size:14px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">Par type d'actif</p>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <p style="font-size:14px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0">Par type d'actif</p>
+          <button onclick="exportDbTypeXlsx()" title="Exporter en Excel" style="padding:4px 10px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);border-radius:8px;font-size:11px;cursor:pointer;white-space:nowrap;font-weight:600">⬇ Excel</button>
+        </div>
         <table style="width:100%;font-size:13px;border-collapse:collapse">
           <thead>
             <tr style="font-size:14px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);background:var(--bg3)">
@@ -499,7 +502,10 @@ if(xr(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Er
 
       <!-- Par broker -->
       <div class="card" style="padding:20px">
-        <p style="font-size:14px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">Par broker</p>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <p style="font-size:14px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0">Par broker</p>
+          <button onclick="exportDbBrokerXlsx()" title="Exporter en Excel" style="padding:4px 10px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);border-radius:8px;font-size:11px;cursor:pointer;white-space:nowrap;font-weight:600">⬇ Excel</button>
+        </div>
         <table style="width:100%;font-size:13px;border-collapse:collapse">
           <thead>
             <tr style="font-size:14px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);background:var(--bg3)">
@@ -2312,6 +2318,7 @@ function renderDashboard() {
     });
   };
 
+  window._exportType = typeData; window._exportBroker = brokerData;
   window._dbRender = {
     type:   () => renderDbTbl('type',   typeData,   'db_type_body'),
     broker: () => renderDbTbl('broker', brokerData, 'db_broker_body')
@@ -5367,7 +5374,10 @@ function renderEvolution() {
       <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);padding:16px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
           <span style="font-size:13px;font-weight:600">Historique quotidien</span>
-          <span id="evo_status" style="font-size:11px;color:var(--text2)"></span>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span id="evo_status" style="font-size:11px;color:var(--text2)"></span>
+            <button onclick="exportEvoXlsx()" title="Exporter en Excel" style="padding:4px 10px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);border-radius:8px;font-size:11px;cursor:pointer;white-space:nowrap;font-weight:600">⬇ Excel</button>
+          </div>
         </div>
         <div style="max-height:70vh;overflow:auto"><table id="evoTable" style="border-collapse:collapse;font-size:11px;width:100%;min-width:1746px">
           <thead>
@@ -8140,7 +8150,10 @@ function renderActEtf() {
     <div class="card" style="padding:22px 24px">
       <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px">
         <h2 style="font-size:18px;font-weight:700;margin:0">📉 Actions &amp; ETFs — Performance &amp; variations</h2>
-        <div id="ae_summary" style="font-size:13px"></div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div id="ae_summary" style="font-size:13px"></div>
+          <button onclick="exportAeXlsx()" title="Exporter en Excel" style="padding:4px 10px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);border-radius:8px;font-size:11px;cursor:pointer;white-space:nowrap;font-weight:600">⬇ Excel</button>
+        </div>
       </div>
       <div style="font-size:12px;margin-bottom:14px">${note}</div>
       <div style="max-height:70vh;overflow:auto">
@@ -9593,6 +9606,90 @@ function exportCSV() {
   const wb = _XLS.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Portefeuille');
   _XLS.writeFile(wb, 'portefeuille_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+}
+
+// ─── Exports Excel par tableau (SheetJS déjà chargé) ────────────────────────
+function _xlsDownload(aoa, sheetName, filename, opts) {
+  opts = opts || {};
+  const _XLS = window._XLSX || window.XLSX || XLSX;
+  const ws = _XLS.utils.aoa_to_sheet(aoa);
+  if (opts.cols) ws['!cols'] = opts.cols;
+  if (opts.fmt) {
+    for (let r = 1; r < aoa.length; r++) {
+      Object.entries(opts.fmt).forEach(([c, z]) => {
+        const cell = ws[_XLS.utils.encode_cell({ r: r, c: +c })];
+        if (cell && cell.v != null && typeof cell.v === 'number') cell.z = z;
+      });
+    }
+  }
+  const wb = _XLS.utils.book_new();
+  _XLS.utils.book_append_sheet(wb, ws, sheetName);
+  _XLS.writeFile(wb, filename + '_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+}
+
+// 1) Historique quotidien (onglet Évolution)
+function exportEvoXlsx() {
+  const rows = ((typeof mergeEvoRows === 'function') ? mergeEvoRows()
+              : (typeof EVO_HISTORY !== 'undefined' ? EVO_HISTORY : []) || [])
+              .slice().sort((a, b) => b.date.localeCompare(a.date));
+  const asc = [...rows].sort((a, b) => a.date.localeCompare(b.date));
+  const delta = {};
+  asc.forEach((r, i) => { delta[r.date] = (i === 0) ? null
+    : ((r.act_total || 0) - (asc[i-1].act_total || 0)) - ((r.inv_total || 0) - (asc[i-1].inv_total || 0)); });
+  const brokers = [['KB','kb'],['LUMO','lumo'],['LENDO.','lendo'],['ENERFIP','enerfip'],['LINXEA','linxea'],
+                   ['SAXO','saxo'],['IBKR','ibkr'],['T212','t212'],['JITO','jito'],['XTB','xtb'],
+                   ['LEDGER','ledger'],['BINANCE','binance']];
+  const header = ['Date','Valeur actuelle totale','Valeur investie totale','P&L €','P&L %','Delta jour (hors dépôts)'];
+  brokers.forEach(([lbl]) => { header.push(lbl + ' investi'); header.push(lbl + ' actuel'); });
+  header.push('Statut');
+  const aoa = [header];
+  rows.forEach(r => {
+    const pnl = (r.act_total || 0) - (r.inv_total || 0);
+    const pnlPct = (r.inv_total > 0) ? pnl / r.inv_total : null;
+    const line = [r.date, r.act_total ?? null, r.inv_total ?? null, pnl, pnlPct, delta[r.date] ?? null];
+    brokers.forEach(([, sfx]) => { line.push(r['inv_'+sfx] ?? null); line.push(r['act_'+sfx] ?? null); });
+    line.push(r.frozen ? 'Gelé' : 'Live');
+    aoa.push(line);
+  });
+  const fmt = { 1:'#,##0', 2:'#,##0', 3:'#,##0', 4:'0.00%', 5:'#,##0' };
+  for (let c = 6; c < 6 + brokers.length*2; c++) fmt[c] = '#,##0';
+  _xlsDownload(aoa, 'Historique', 'evolution_historique', { fmt: fmt });
+}
+
+// 2) Actions & ETFs — Performance & variations
+function exportAeXlsx() {
+  const rows = (typeof _aeBuildRows === 'function') ? _aeBuildRows() : [];
+  const vcols = (typeof AE_VARCOLS !== 'undefined') ? AE_VARCOLS : ['YTD','1D','1W','1M','3M','6M','1Y'];
+  const header = ['Nom','Type','ISIN','Qté','Prix achat','Devise achat','Prix actuel','Devise actuelle',
+                  'Valeur act. (€)','P&L (€)','P&L %'].concat(vcols.map(k => k + ' (%)'));
+  const aoa = [header];
+  rows.forEach(r => {
+    const line = [r.name, r.typeInv || '', r.isin || '', r.qty ?? null, r.pxAchat ?? null, r.currency || '',
+                  r.pxCurr ?? null, r.pxCur || '', r.valEur ?? null, r.pnl ?? null,
+                  (r.pnlPct != null ? r.pnlPct/100 : null)];
+    vcols.forEach(k => { const v = r.vars ? r.vars[k] : null; line.push(v != null ? v/100 : null); });
+    aoa.push(line);
+  });
+  const fmt = { 3:'#,##0.####', 4:'#,##0.####', 6:'#,##0.####', 8:'#,##0', 9:'#,##0', 10:'0.00%' };
+  for (let i = 0; i < vcols.length; i++) fmt[11 + i] = '0.00%';
+  _xlsDownload(aoa, 'Actions_ETFs', 'actions_etfs_variations', { fmt: fmt });
+}
+
+function _dbCatAoa(data, firstCol) {
+  const aoa = [[firstCol,'Investi (€)','Valeur act. (€)','+/− (€)','Perf.','Perf. YTD','Perf. MTD']];
+  (data || []).forEach(r => aoa.push([r.label, r.inv ?? null, r.val ?? null, r.pnl ?? null,
+    (r.perf != null ? r.perf/100 : null), (r.ytd != null ? r.ytd/100 : null), (r.mtd != null ? r.mtd/100 : null)]));
+  return aoa;
+}
+// 3) Dashboard — Par type d'actif
+function exportDbTypeXlsx() {
+  _xlsDownload(_dbCatAoa(window._exportType, 'Type'), 'Par_type', 'dashboard_par_type',
+    { fmt: { 1:'#,##0', 2:'#,##0', 3:'#,##0', 4:'0.00%', 5:'0.00%', 6:'0.00%' } });
+}
+// 4) Dashboard — Par broker
+function exportDbBrokerXlsx() {
+  _xlsDownload(_dbCatAoa(window._exportBroker, 'Broker'), 'Par_broker', 'dashboard_par_broker',
+    { fmt: { 1:'#,##0', 2:'#,##0', 3:'#,##0', 4:'0.00%', 5:'0.00%', 6:'0.00%' } });
 }
 
 
