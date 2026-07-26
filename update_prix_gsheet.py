@@ -18,6 +18,8 @@ import yfinance as yf
 SERVICE_ACCOUNT_FILE = r"C:\Users\smill\OneDrive\Documents\banque\bourse\service_account.json"
 SHEET_ID  = os.environ.get("SHEET_ID", "15w4s6chCytFKmPSpGXeYQ9fiJEVD_T5U9671Q0chn_Q")
 SHEET_TAB = "Prices"
+HIST_TAB  = "Historique_Prix"        # onglet historique quotidien (Date|Ticker|Close_EUR)
+PORTFOLIO_EUR_CLOSES = {}            # {ticker: close_eur} rempli par collecter_prix()
 LINXEA_FILE = os.environ.get("LINXEA_FILE", r"C:\Users\smill\OneDrive\Documents\banque\bourse\linxea.xlsx")
 
 try:
@@ -385,6 +387,10 @@ def collecter_prix():
             cur = "EUR"
         var = variations_yahoo(ysym)
         print(f"  {'OK' if prix else 'KO'} {str(nom)[:40]:<40s} ({tick}) -> {prix} [{cur}]")
+        if prix and prix > 0:
+            _e = _native_to_eur(prix, cur, cnb)
+            if _e and _e > 0:
+                PORTFOLIO_EUR_CLOSES[tick] = round(_e, 4)
         rows.append([tick, nom, fmt_prix(prix), cur, maintenant if prix else ""]
                     + [fmt_var(var[k]) for k in VAR_KEYS])
 
@@ -591,6 +597,68 @@ def mise_a_jour_linxea(fichier=None):
     print(f"\n  OK : {nb_ok} mis a jour  |  KO : {nb_ko} non trouves  ->  linxea.xlsx sauvegarde.")
 
 
+def _native_to_eur(prix, cur, cnb):
+    """Convertit un prix natif en EUR via les taux CNB (CZK par unite)."""
+    try:
+        cur = (cur or "EUR").strip()
+        eur = cnb.get("EUR")
+        if cur in ("", "EUR"):
+            return prix
+        if not eur:
+            return None
+        if cur == "USD" and cnb.get("USD"):
+            return prix * cnb["USD"] / eur
+        if cur == "GBP" and cnb.get("GBP"):
+            return prix * cnb["GBP"] / eur
+        if cur in ("GBp", "GBX") and cnb.get("GBP"):
+            return (prix / 100.0) * cnb["GBP"] / eur
+        if cur == "CZK":
+            return prix / eur
+    except Exception:
+        pass
+    return None
+
+
+def append_price_history():
+    """Enregistre le close EUR du jour de chaque titre du portefeuille dans
+    l'onglet Historique_Prix (format long Date|Ticker|Close_EUR). Upsert : une
+    seule valeur par (date, ticker) -> le dernier run du jour fait foi."""
+    if not PORTFOLIO_EUR_CLOSES:
+        print("  [Historique] aucun close a stocker.")
+        return
+    if not GOOGLE_OK:
+        print("  [Historique] modules Google manquants.")
+        return
+    try:
+        svc = build("sheets", "v4", credentials=_get_creds()).spreadsheets()
+        meta = svc.get(spreadsheetId=SHEET_ID).execute()
+        tabs = [sh["properties"]["title"] for sh in meta["sheets"]]
+        if HIST_TAB not in tabs:
+            svc.batchUpdate(spreadsheetId=SHEET_ID, body={
+                "requests": [{"addSheet": {"properties": {"title": HIST_TAB}}}]}).execute()
+            print(f"  Onglet '{HIST_TAB}' cree")
+        res = svc.values().get(spreadsheetId=SHEET_ID, range=f"{HIST_TAB}!A:C").execute()
+        vals = res.get("values", []) or []
+        start = 1 if (vals and vals[0] and str(vals[0][0]).strip().lower().startswith("date")) else 0
+        data = {}
+        for r in vals[start:]:
+            if len(r) >= 3 and r[0] and r[1]:
+                data[(r[0], r[1])] = r[2]
+        today = datetime.date.today().isoformat()
+        for tk, close in PORTFOLIO_EUR_CLOSES.items():
+            data[(today, tk)] = str(close)
+        out = [["Date", "Ticker", "Close_EUR"]]
+        for key in sorted(data.keys()):
+            out.append([key[0], key[1], data[key]])
+        svc.values().clear(spreadsheetId=SHEET_ID, range=f"{HIST_TAB}!A:C").execute()
+        svc.values().update(spreadsheetId=SHEET_ID, range=f"{HIST_TAB}!A1",
+                            valueInputOption="RAW", body={"values": out}).execute()
+        print(f"  Historique_Prix : {len(PORTFOLIO_EUR_CLOSES)} close du {today} "
+              f"enregistres ({len(out)-1} lignes au total)")
+    except Exception as e:
+        print(f"  [Historique] erreur : {e}")
+
+
 if __name__ == "__main__":
     print("=" * 55)
     print("  Mise à jour prix + variations → Google Sheets")
@@ -599,6 +667,10 @@ if __name__ == "__main__":
     ok   = ecrire_google_sheets(rows)
     if ok:
         print("\n✅ Prix et variations écrits")
+    try:
+        append_price_history()
+    except Exception as e:
+        print(f"  [Historique] {e}")
     else:
         print("\n⚠️  Vérifier service_account.json")
     # Etape locale optionnelle : mise a jour du fichier linxea.xlsx
