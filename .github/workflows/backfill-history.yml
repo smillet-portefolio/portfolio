@@ -1,0 +1,33 @@
+name: Backfill historique des cours (1x)
+
+# À placer dans le repo sous : .github/workflows/backfill-history.yml
+#
+# Lancement MANUEL uniquement (bouton "Run workflow"). A executer UNE SEULE FOIS
+# pour remplir l'onglet "Historique_Prix" du Google Sheet avec l'historique
+# quotidien de chaque titre depuis sa premiere date d'achat.
+#
+# Ensuite, la mise a jour quotidienne (update-prices.yml) ajoute automatiquement
+# le close du jour — plus besoin de relancer ce backfill.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install yfinance pandas requests google-auth google-api-python-client
+
+      - name: Backfill historique -> Historique_Prix
+        env:
+          GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+        run: python backfill_price_history_gsheet.py
