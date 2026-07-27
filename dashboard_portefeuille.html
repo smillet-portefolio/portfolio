@@ -3250,8 +3250,8 @@ function buildPosTable(rebuild) {
       <td class="mono" style="text-align:right;padding:6px 14px">${fmtN(r.pxAchat)}</td>
       <td class="mono" style="text-align:right;padding:6px 14px">${Math.round(r.cost).toLocaleString('fr')} ${r.currency}</td>
       <td id="costeur-${i}" class="mono" style="text-align:right;padding:6px 14px;color:var(--text2)">${row.costEur ? Math.round(row.costEur).toLocaleString('fr') + ' €' : '—'}</td>
-      <td class="mono" style="text-align:right;padding:6px 14px;color:var(--text2)">${row.comm!=null?Math.round(row.comm).toLocaleString('fr')+' '+r.currency:'—'}</td>
-      <td class="mono" style="text-align:right;padding:6px 14px;color:var(--text2)">${row.taxe!=null?Math.round(row.taxe).toLocaleString('fr')+' '+r.currency:'—'}</td>
+      <td class="mono" style="text-align:right;padding:6px 14px;color:var(--text2)">${row.comm!=null?Math.round(row.comm).toLocaleString('fr')+' '+({EUR:'€',USD:'$',GBP:'£',CZK:'Kč'}[r.currency]||r.currency||'€'):'—'}</td>
+      <td class="mono" style="text-align:right;padding:6px 14px;color:var(--text2)">${row.taxe!=null?Math.round(row.taxe).toLocaleString('fr')+' '+({EUR:'€',USD:'$',GBP:'£',CZK:'Kč'}[r.currency]||r.currency||'€'):'—'}</td>
       <td id="px-${i}"      class="mono" style="text-align:right;padding:6px 14px;color:var(--text2)">${row.pxActuel != null ? fmtN(row.pxActuel) : '—'}</td>
       <td id="val-${i}"     class="mono" style="text-align:right;padding:6px 14px;color:var(--text2)">${fmtE(row.valEur)}</td>
       <td id="pnl-${i}"     class="mono" style="text-align:right;padding:6px 14px;font-weight:600;color:${colP(row.pnl)}">${fmtE(row.pnl)}</td>
@@ -3676,11 +3676,14 @@ function updateTableRows() {
   const sr = document.getElementById('summaryRow');
   if (sr) {
     sr.style.display = 'flex';
+    let _feesTot = 0;
+    (typeof BOOK2_ROWS!=='undefined'?BOOK2_ROWS:[]).forEach(r=>{ const f=(r.comm||0)+(r.taxe||0); if(f) _feesTot += (r.currency==='EUR'?f:(toEur(f,r.currency)||f)); });
     const cards = [
       { label:'Coût total', val: Math.round(totalCostEur).toLocaleString('fr') + ' €', color:'var(--text)' },
       { label:'Valeur actuelle', val: Math.round(totalValEur).toLocaleString('fr') + ' €', color:'var(--text)' },
       { label:'P&L total', val: tsign + Math.round(totalPnlEur).toLocaleString('fr') + ' €', color: tcol },
       { label:'Performance', val: tsign + totalPnlPct.toFixed(1) + '%', color: tcol },
+      { label:'Frais / Taxe', val: (_feesTot>0?Math.round(_feesTot).toLocaleString('fr')+' €':'—'), color:'#e06c6c' },
     ];
     sr.innerHTML = cards.map(c =>
       `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 18px;min-width:140px">
@@ -4300,6 +4303,7 @@ function closedFilter(key, val) {
 }
 function renderClosedPositions() {
   const tbody = document.getElementById('closedBody'); if (!tbody) return;
+  const _sym = c => ({EUR:'€', USD:'$', GBP:'£', CZK:'Kč', GBp:'p'}[c] || c || '€');
   let all = [];
   try { all = JSON.parse(localStorage.getItem('closed_positions')||'[]'); } catch(e){}
   // Identifiant stable par clôture (nécessaire pour l'édition)
@@ -4329,7 +4333,7 @@ function renderClosedPositions() {
     const s = th.querySelector('.cs-arr');
     if (s) s.textContent = (th.dataset.csort === cs.col) ? (cs.dir < 0 ? ' \u25bc' : ' \u25b2') : '';
   });
-  let totCost=0, totVal=0, totPnl=0;
+  let totCost=0, totVal=0, totPnl=0, totFees=0;
 
   rows.forEach(p => {
     const col  = p.pnl>=0 ? '#4caf82' : '#e06c6c';
@@ -4342,17 +4346,18 @@ function renderClosedPositions() {
       <td style="padding:7px 12px;font-size:11px;color:var(--text2)">${p.dateAchat}</td>
       <td style="padding:7px 12px;font-size:11px;color:var(--text2)">${p.dateSell}</td>
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${p.qty.toLocaleString('fr',{maximumFractionDigits:4})}</td>
-      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${p.pxAchat.toLocaleString('fr',{maximumFractionDigits:4})} ${p.currencyAchat}</td>
-      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${p.pxVente.toLocaleString('fr',{maximumFractionDigits:4})} ${p.currencyVente}</td>
+      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${p.pxAchat.toLocaleString('fr',{maximumFractionDigits:4})} ${_sym(p.currencyAchat)}</td>
+      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${p.pxVente.toLocaleString('fr',{maximumFractionDigits:4})} ${_sym(p.currencyVente)}</td>
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${Math.round(p.costEur).toLocaleString('fr')} €</td>
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${Math.round(p.saleEur).toLocaleString('fr')} €</td>
-      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${((p.commAchat||0)+(p.commVente||0))?Math.round((p.commAchat||0)+(p.commVente||0)).toLocaleString('fr')+' '+(p.currencyFrais||p.currencyAchat||'€'):'—'}</td>
-      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${p.taxe?Math.round(p.taxe).toLocaleString('fr')+' '+(p.currencyFrais||p.currencyAchat||'€'):'—'}</td>
+      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${((p.commAchat||0)+(p.commVente||0))?Math.round((p.commAchat||0)+(p.commVente||0)).toLocaleString('fr')+' €':'—'}</td>
+      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${p.taxe?Math.round(p.taxe).toLocaleString('fr')+' €':'—'}</td>
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:${col}">${sign}${Math.round(p.pnl).toLocaleString('fr')} €</td>
       <td style="padding:7px 12px;text-align:right;color:${col}">${sign}${p.pnlPct.toFixed(1)}%</td>
       <td style="padding:7px 12px;text-align:center"><button onclick="openEditClosed('${p._id}')" title="Modifier la clôture (tous les champs)" style="background:none;border:none;cursor:pointer;font-size:13px;line-height:1">✏️</button></td>`;
     tbody.appendChild(tr);
     totCost += p.costEur; totVal += p.saleEur; totPnl += p.pnl;
+    totFees += (p.commAchat||0)+(p.commVente||0)+(p.taxe||0);
   });
 
   {
@@ -4366,6 +4371,8 @@ function renderClosedPositions() {
     const pctS  = sign+totPct.toFixed(1)+'%';
     set('closedCost', costS); set('closedVal', valS); set('closedPnl', pnlS); set('closedPct', pctS);
     set('closedTopCost', costS); set('closedTopVal', valS); set('closedTopPnl', pnlS); set('closedTopPct', pctS);
+    const feesS = totFees>0 ? Math.round(totFees).toLocaleString('fr')+' €' : '—';
+    set('closedFees', feesS); set('closedTopFees', feesS);
   }
 
   if (typeof renderClosedByPos === 'function') renderClosedByPos();
@@ -7209,6 +7216,7 @@ function renderObligCharts(data) {
       <div class="card" style="padding:16px"><div class="kpi-label">Vente totale (€)</div><div id="closedTopVal" class="kpi-value" style="font-size:20px">—</div></div>
       <div class="card" style="padding:16px"><div class="kpi-label">P&amp;L (€)</div><div id="closedTopPnl" class="kpi-value" style="font-size:20px">—</div></div>
       <div class="card" style="padding:16px"><div class="kpi-label">P&amp;L (%)</div><div id="closedTopPct" class="kpi-value" style="font-size:20px">—</div></div>
+      <div class="card" style="padding:16px"><div class="kpi-label">Frais / Taxe (€)</div><div id="closedTopFees" class="kpi-value" style="font-size:20px;color:#e06c6c">—</div></div>
     </div>
     <div id="closed_empty" style="padding:40px;text-align:center;color:var(--text2)">
       Aucune position clôturée pour le moment.
