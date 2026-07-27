@@ -3696,8 +3696,8 @@ function updateChartsFromCurrentPrices() {
 
 function openNewLineModal() {
   // Reset form
-  ['nl_isin','nl_nom','nl_ticker','nl_broker','nl_qte','nl_prix','nl_fx'].forEach(id => {
-    document.getElementById(id).value = '';
+  ['nl_isin','nl_nom','nl_ticker','nl_broker','nl_qte','nl_prix','nl_fx','nl_comm','nl_taxe'].forEach(id => {
+    const _el = document.getElementById(id); if (_el) _el.value = '';
   });
   const nlType = document.getElementById('nl_type');
   if (nlType) nlType.value = '';
@@ -3872,13 +3872,29 @@ function submitNewLine() {
     typeInv:  document.getElementById('nl_type')?.value || ''
   };
 
+  // ── Lignes companion : Commission / Taxe (même devise que l'investissement) ─
+  const comm = parseFloat(document.getElementById('nl_comm')?.value);
+  const taxe = parseFloat(document.getElementById('nl_taxe')?.value);
+  const feeRow = (label, amt, typeLbl) => ({
+    isin: '', ticker: '', name: label + ' — ' + nom,
+    broker: broker || '—', date: date, currency: devise,
+    qty: 1, pxAchat: amt, cost: Math.round(amt*100)/100,
+    costEur: Math.round((devise === 'EUR' ? amt : amt * fx) * 100) / 100,
+    fxRate: devise !== 'EUR' ? fx : 1, typeInv: typeLbl
+  });
+  const _feeRows = [];
+  if (!isNaN(comm) && comm > 0) _feeRows.push(feeRow('Commission fees', comm, 'Frais'));
+  if (!isNaN(taxe) && taxe > 0) _feeRows.push(feeRow('Taxe', taxe, 'Taxe'));
+
   // ── Add to BOOK2_ROWS and persist ────────────────────────────────────────
   BOOK2_ROWS.push(newRow);
+  _feeRows.forEach(fr => BOOK2_ROWS.push(fr));
   if(newRow.typeInv==='ETF') _registerPortfolioETFs();
   // Persist new rows to localStorage
   try {
     const extra = JSON.parse(localStorage.getItem('book2_extra_rows') || '[]');
     extra.push(newRow);
+    _feeRows.forEach(fr => extra.push(fr));
     localStorage.setItem('book2_extra_rows', JSON.stringify(extra));
   } catch(e) {}
 
@@ -5912,7 +5928,7 @@ function renderDividendSection(){
       '<td class="mono">'+fmt2(d.brutEur)+'</td>'+
       '<td class="mono" style="color:#e06c6c">'+fmt2(d.taxeEur)+'</td>'+
       '<td class="mono" style="color:#4caf82;font-weight:600">'+fmt2(d.netEur)+'</td>'+
-      '<td><span onclick="divDelete(\''+d.id+'\')" title="Supprimer" style="cursor:pointer;color:var(--text2);font-size:13px">✕</span></td>'+
+      '<td style="white-space:nowrap"><span onclick="divOpenEdit(\''+d.id+'\')" title="Modifier" style="cursor:pointer;font-size:13px;margin-right:12px">✏️</span><span onclick="divDelete(\''+d.id+'\')" title="Supprimer" style="cursor:pointer;color:var(--text2);font-size:13px">✕</span></td>'+
     '</tr>';
   }).join('')+
   '<tr style="border-top:2px solid var(--border2);font-weight:700;background:var(--bg3)"><td colspan="5">Total ('+rows.length+')</td><td class="mono">'+fmt2(totBrut)+'</td><td class="mono" style="color:#e06c6c">'+fmt2(totTax)+'</td><td class="mono" style="color:#4caf82">'+fmt2(totNet)+'</td><td></td></tr>';
@@ -5937,6 +5953,7 @@ function divRenderYearChart(){
 }
 
 function divOpenAdd(){
+  window._divEditId=null;
   const t=document.getElementById('divModalTitle'); if(t)t.textContent='Ajouter un dividende';
   const td=new Date().toISOString().slice(0,10);
   document.getElementById('divf_date').value=td;
@@ -5965,12 +5982,30 @@ function divSubmit(){
   const net=+(brut-taxe).toFixed(4);
   const date=document.getElementById('divf_date').value;
   if(!date){ alert('Date requise'); return; }
-  DIVIDEND_DATA.push({ id:'d'+Date.now(), broker:document.getElementById('divf_broker').value.trim(),
+  const rec={ broker:document.getElementById('divf_broker').value.trim(),
     name:document.getElementById('divf_name').value.trim(), ticker:document.getElementById('divf_ticker').value.trim(),
     isin:document.getElementById('divf_isin').value.trim(), date:date, currency:cur, fx:fx,
     brut:+brut.toFixed(2), taxe:+taxe.toFixed(2), net:net,
-    brutEur:+(brut*fx).toFixed(2), taxeEur:+(taxe*fx).toFixed(2), netEur:+(net*fx).toFixed(2) });
+    brutEur:+(brut*fx).toFixed(2), taxeEur:+(taxe*fx).toFixed(2), netEur:+(net*fx).toFixed(2) };
+  if(window._divEditId){
+    const idx=DIVIDEND_DATA.findIndex(d=>d.id===window._divEditId);
+    if(idx>=0){ rec.id=window._divEditId; DIVIDEND_DATA[idx]=rec; }
+    else { rec.id='d'+Date.now(); DIVIDEND_DATA.push(rec); }
+    window._divEditId=null;
+  } else { rec.id='d'+Date.now(); DIVIDEND_DATA.push(rec); }
   divSave(); renderDividendSection(); divCloseModal();
+}
+function divOpenEdit(id){
+  const d=DIVIDEND_DATA.find(x=>x.id===id); if(!d) return;
+  window._divEditId=id;
+  const t=document.getElementById('divModalTitle'); if(t)t.textContent='Modifier un dividende';
+  divBuildLists();
+  const set=(f,v)=>{ const e=document.getElementById('divf_'+f); if(e)e.value=(v!=null?v:''); };
+  set('date',d.date); set('broker',d.broker); set('name',d.name); set('ticker',d.ticker); set('isin',d.isin);
+  set('cur',d.currency||'EUR'); set('fx',(d.fx!=null?d.fx:_divEurPerUnit(d.currency||'EUR')));
+  set('brut',d.brut); set('taxe',d.taxe);
+  divPreview();
+  document.getElementById('divModal').style.display='flex';
 }
 function divDelete(id){ DIVIDEND_DATA=DIVIDEND_DATA.filter(d=>d.id!==id); divSave(); renderDividendSection(); }
 function divBuildLists(){
@@ -10023,6 +10058,20 @@ window.addEventListener('load', () => {
           style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
       </div>
 
+      <!-- COMMISSION -->
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Commission / frais (devise)</label>
+        <input id="nl_comm" type="number" step="any" placeholder="optionnel, ex: 5"
+          style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
+      </div>
+
+      <!-- TAXE -->
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Taxe (devise)</label>
+        <input id="nl_taxe" type="number" step="any" placeholder="optionnel, ex: 2"
+          style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
+      </div>
+
     </div>
 
     <!-- PREVIEW des coûts calculés -->
@@ -10916,7 +10965,8 @@ window.addEventListener('load', () => {
       + kidEdField('kf_px','Prix achat (unitaire)',h.pxAchat,'number')
       + kidEdField('kf_cout','Coût total (€)',h.cout,'number')
       + kidEdField('kf_vl','Prix actuel (VL)',h.vl,'number')
-      + kidEdField('kf_val','Valeur actuelle (€)',h.val,'number');
+      + kidEdField('kf_val','Valeur actuelle (€)',h.val,'number')
+      + ((i==null) ? (kidEdField('kf_comm','Commission / frais (optionnel)',null,'number') + kidEdField('kf_taxe','Taxe (optionnel)',null,'number')) : '');
     document.getElementById('kidEdModal').style.display='flex';
   }
   window.kidEdAdd=function(){ kidEdOpenModal(null); };
@@ -10930,7 +10980,13 @@ window.addEventListener('load', () => {
     if(!obj.nom){ alert('Le nom est obligatoire.'); return; }
     if(obj.val==null && obj.qty!=null && obj.vl!=null) obj.val=obj.qty*obj.vl;
     if(window._kidEdIdx!=null && KIDS_HOLD[window._kidEdIdx]) KIDS_HOLD[window._kidEdIdx]=obj;
-    else KIDS_HOLD.push(obj);
+    else {
+      KIDS_HOLD.push(obj);
+      const comm=gn('kf_comm'), taxe=gn('kf_taxe');
+      const mkFee=(label,amt,typeLbl)=>({ e:obj.e, c:obj.c, nom:label+' — '+obj.nom, t:typeLbl, isin:'', ticker:'', date:obj.date, devise:obj.devise, qty:1, pxAchat:amt, cout:Math.round(amt*100)/100, vl:null, val:null });
+      if(comm!=null && comm>0) KIDS_HOLD.push(mkFee('Commission fees',comm,'Frais'));
+      if(taxe!=null && taxe>0) KIDS_HOLD.push(mkFee('Taxe',taxe,'Taxe'));
+    }
     window.KIDS_HOLD=KIDS_HOLD; kidsSave(); window.kidEdModalClose(); kidEdBuild();
   };
   window.kidEdDel=function(i){ if(!KIDS_HOLD[i])return; if(!confirm('Supprimer cette ligne ?')) return; KIDS_HOLD.splice(i,1); window.KIDS_HOLD=KIDS_HOLD; kidsSave(); kidEdBuild(); };
