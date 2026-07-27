@@ -790,6 +790,8 @@
             <th data-col="cost"     onclick="edSort('cost',this)"     style="padding:8px 14px;cursor:pointer;user-select:none;white-space:nowrap;text-align:right">Prix achat <span class="sort-arrow" style="font-size:9px;opacity:.35">⇅</span></th>
             <th data-col="costTotal" onclick="edSort('costTotal',this)" style="padding:8px 14px;cursor:pointer;user-select:none;white-space:nowrap;text-align:right">Coût (devise) <span class="sort-arrow" style="font-size:9px;opacity:.35">⇅</span></th>
             <th data-col="costEur"  onclick="edSort('costEur',this)"  style="padding:8px 14px;cursor:pointer;user-select:none;white-space:nowrap;text-align:right">Coût (€) <span class="sort-arrow" style="font-size:9px;opacity:.35">⇅</span></th>
+            <th style="padding:8px 14px;white-space:nowrap;text-align:right">Comm./frais</th>
+            <th style="padding:8px 14px;white-space:nowrap;text-align:right">Taxe</th>
             <th data-col="pxActuel" onclick="edSort('pxActuel',this)" style="padding:8px 14px;cursor:pointer;user-select:none;white-space:nowrap;text-align:right">Prix actuel <span class="sort-arrow" style="font-size:9px;opacity:.35">⇅</span></th>
             <th data-col="valEur"   onclick="edSort('valEur',this)"   style="padding:8px 14px;cursor:pointer;user-select:none;white-space:nowrap;text-align:right">Valeur act. (€) <span class="sort-arrow" style="font-size:9px;opacity:.35">⇅</span></th>
             <th data-col="pnl"      onclick="edSort('pnl',this)"      style="padding:8px 14px;cursor:pointer;user-select:none;white-space:nowrap;text-align:right">P&amp;L (€) <span class="sort-arrow" style="font-size:9px;opacity:.35">⇅</span></th>
@@ -810,6 +812,8 @@
             <td></td>
             <td style="padding:3px 8px"><input type="text" placeholder="≥ coût €"       oninput="edFilter('costEur',this.value)"  style="width:100%;box-sizing:border-box;padding:4px 7px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none;text-align:right"></td>
             <td></td>
+            <td></td>
+            <td></td>
             <td style="padding:3px 8px"><input type="text" placeholder="≥ valeur €"     oninput="edFilter('valEur',this.value)"   style="width:100%;box-sizing:border-box;padding:4px 7px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none;text-align:right"></td>
             <td style="padding:3px 8px"><input type="text" placeholder="≥ P&L €"        oninput="edFilter('pnl',this.value)"      style="width:100%;box-sizing:border-box;padding:4px 7px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none;text-align:right"></td>
             <td></td>
@@ -822,6 +826,8 @@
             <td colspan="8">Total portefeuille</td>
             <td id="totCost" style="text-align:right;font-family:'DM Mono',monospace">—</td>
             <td id="totCostEur" style="text-align:right;font-family:'DM Mono',monospace">—</td>
+            <td></td>
+            <td></td>
             <td></td>
             <td id="totVal" style="text-align:right;font-family:'DM Mono',monospace">—</td>
             <td id="totPnl" style="text-align:right;font-family:'DM Mono',monospace">—</td>
@@ -3183,6 +3189,7 @@ function buildPosTable(rebuild) {
       costEur: costEur ?? 0, pxActuel,
       valEur, pnl, pnlPct,
       typeInv: r.typeInv || '',
+      comm: (r.comm!=null?r.comm:null), taxe: (r.taxe!=null?r.taxe:null),
       _r: r,
     };
   });
@@ -3242,6 +3249,8 @@ function buildPosTable(rebuild) {
       <td class="mono" style="text-align:right;padding:6px 14px">${fmtN(r.pxAchat)}</td>
       <td class="mono" style="text-align:right;padding:6px 14px">${Math.round(r.cost).toLocaleString('fr')} ${r.currency}</td>
       <td id="costeur-${i}" class="mono" style="text-align:right;padding:6px 14px;color:var(--text2)">${row.costEur ? Math.round(row.costEur).toLocaleString('fr') + ' €' : '—'}</td>
+      <td class="mono" style="text-align:right;padding:6px 14px;color:var(--text2)">${row.comm!=null?Math.round(row.comm).toLocaleString('fr')+' '+r.currency:'—'}</td>
+      <td class="mono" style="text-align:right;padding:6px 14px;color:var(--text2)">${row.taxe!=null?Math.round(row.taxe).toLocaleString('fr')+' '+r.currency:'—'}</td>
       <td id="px-${i}"      class="mono" style="text-align:right;padding:6px 14px;color:var(--text2)">${row.pxActuel != null ? fmtN(row.pxActuel) : '—'}</td>
       <td id="val-${i}"     class="mono" style="text-align:right;padding:6px 14px;color:var(--text2)">${fmtE(row.valEur)}</td>
       <td id="pnl-${i}"     class="mono" style="text-align:right;padding:6px 14px;font-weight:600;color:${colP(row.pnl)}">${fmtE(row.pnl)}</td>
@@ -3872,29 +3881,30 @@ function submitNewLine() {
     typeInv:  document.getElementById('nl_type')?.value || ''
   };
 
-  // ── Lignes companion : Commission / Taxe (même devise que l'investissement) ─
+  // ── Commission / Taxe : réduisent le CASH DISPONIBLE du broker (même devise).
+  //     Pas de ligne d'investissement (le coût est déjà pris dans le cash).
   const comm = parseFloat(document.getElementById('nl_comm')?.value);
   const taxe = parseFloat(document.getElementById('nl_taxe')?.value);
-  const feeRow = (label, amt, typeLbl) => ({
-    isin: '', ticker: '', name: label + ' — ' + nom,
-    broker: broker || '—', date: date, currency: devise,
-    qty: 1, pxAchat: amt, cost: Math.round(amt*100)/100,
-    costEur: Math.round((devise === 'EUR' ? amt : amt * fx) * 100) / 100,
-    fxRate: devise !== 'EUR' ? fx : 1, typeInv: typeLbl
-  });
-  const _feeRows = [];
-  if (!isNaN(comm) && comm > 0) _feeRows.push(feeRow('Commission fees', comm, 'Frais'));
-  if (!isNaN(taxe) && taxe > 0) _feeRows.push(feeRow('Taxe', taxe, 'Taxe'));
+  let _fees = 0;
+  if (!isNaN(comm) && comm > 0) _fees += comm;
+  if (!isNaN(taxe) && taxe > 0) _fees += taxe;
+  newRow.comm = (!isNaN(comm) && comm > 0) ? Math.round(comm*100)/100 : null;
+  newRow.taxe = (!isNaN(taxe) && taxe > 0) ? Math.round(taxe*100)/100 : null;
+  if (_fees > 0 && broker && broker !== '—' && typeof CASH_DATA !== 'undefined') {
+    if (!CASH_DATA.cash) CASH_DATA.cash = {};
+    if (!CASH_DATA.cash[broker]) CASH_DATA.cash[broker] = {};
+    CASH_DATA.cash[broker][devise] = Math.round(((CASH_DATA.cash[broker][devise] || 0) - _fees) * 100) / 100;
+    if (typeof cashSave === 'function') cashSave();
+    if (typeof renderCashSection === 'function') renderCashSection();
+  }
 
   // ── Add to BOOK2_ROWS and persist ────────────────────────────────────────
   BOOK2_ROWS.push(newRow);
-  _feeRows.forEach(fr => BOOK2_ROWS.push(fr));
   if(newRow.typeInv==='ETF') _registerPortfolioETFs();
   // Persist new rows to localStorage
   try {
     const extra = JSON.parse(localStorage.getItem('book2_extra_rows') || '[]');
     extra.push(newRow);
-    _feeRows.forEach(fr => extra.push(fr));
     localStorage.setItem('book2_extra_rows', JSON.stringify(extra));
   } catch(e) {}
 
@@ -4118,6 +4128,7 @@ function openSellLine(i) {
   document.getElementById('sl_date').value   = new Date().toISOString().slice(0,10);
   document.getElementById('sl_devise').value = r.currency; // pre-fill with purchase currency
   document.getElementById('sl_prix').value   = '';
+  { const _slc=document.getElementById('sl_comm'); if(_slc) _slc.value=''; }
   document.getElementById('sl_fx').value     = '';
   document.getElementById('sl_qty').value    = r.qty;
   document.getElementById('sl_qty_max').textContent = '(max ' + r.qty.toLocaleString('fr',{maximumFractionDigits:4}) + ')';
@@ -4202,13 +4213,23 @@ function submitSellLine() {
   const pnlPct     = costEur ? Math.round(pnl/costEur*10000)/100 : 0;
   const partial    = sellQ < totQ - 1e-9;
 
+  // Commission de vente (optionnelle) — réduit le cash dispo du broker
+  const _commVente = parseFloat(document.getElementById('sl_comm')?.value);
+  const _commV = (!isNaN(_commVente) && _commVente > 0) ? Math.round(_commVente*100)/100 : 0;
+  if (_commV > 0 && r.broker && typeof CASH_DATA !== 'undefined') {
+    if (!CASH_DATA.cash) CASH_DATA.cash = {};
+    if (!CASH_DATA.cash[r.broker]) CASH_DATA.cash[r.broker] = {};
+    CASH_DATA.cash[r.broker][dev] = Math.round(((CASH_DATA.cash[r.broker][dev]||0) - _commV)*100)/100;
+    if (typeof cashSave==='function') cashSave();
+  }
   // Build closed position record (quantité vendue)
   const closed = {
     name:r.name, ticker:r.ticker, broker:r.broker||'',
     dateAchat:r.date, dateSell,
     qty:sellQ, pxAchat:r.pxAchat, currencyAchat:r.currency,
     pxVente:prix, currencyVente:dev, fxVente:fx,
-    costEur, saleEur, pnl, pnlPct
+    costEur, saleEur, pnl, pnlPct,
+    commAchat:(r.comm||0), taxe:(r.taxe||0), commVente:_commV, currencyFrais:r.currency
   };
 
   // Save to localStorage
@@ -4321,6 +4342,8 @@ function renderClosedPositions() {
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${p.pxVente.toLocaleString('fr',{maximumFractionDigits:4})} ${p.currencyVente}</td>
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${Math.round(p.costEur).toLocaleString('fr')} €</td>
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${Math.round(p.saleEur).toLocaleString('fr')} €</td>
+      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${((p.commAchat||0)+(p.commVente||0))?Math.round((p.commAchat||0)+(p.commVente||0)).toLocaleString('fr')+' '+(p.currencyFrais||p.currencyAchat||'€'):'—'}</td>
+      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${p.taxe?Math.round(p.taxe).toLocaleString('fr')+' '+(p.currencyFrais||p.currencyAchat||'€'):'—'}</td>
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:${col}">${sign}${Math.round(p.pnl).toLocaleString('fr')} €</td>
       <td style="padding:7px 12px;text-align:right;color:${col}">${sign}${p.pnlPct.toFixed(1)}%</td>
       <td style="padding:7px 12px;text-align:center"><button onclick="editClosedPos('${p._id}')" title="Modifier prix de vente / FX" style="background:none;border:none;cursor:pointer;font-size:13px;line-height:1">✏️</button></td>`;
@@ -7158,6 +7181,8 @@ function renderObligCharts(data) {
             <th onclick="closedSort('pxVente',this)" data-csort="pxVente" style="padding:8px 12px;text-align:right;cursor:pointer;user-select:none">Px vente<span class="cs-arr" style="font-size:9px"></span></th>
             <th onclick="closedSort('costEur',this)" data-csort="costEur" style="padding:8px 12px;text-align:right;cursor:pointer;user-select:none">Coût €<span class="cs-arr" style="font-size:9px"></span></th>
             <th onclick="closedSort('saleEur',this)" data-csort="saleEur" style="padding:8px 12px;text-align:right;cursor:pointer;user-select:none">Vente €<span class="cs-arr" style="font-size:9px"></span></th>
+            <th style="padding:8px 12px;text-align:right">Comm./frais</th>
+            <th style="padding:8px 12px;text-align:right">Taxe</th>
             <th onclick="closedSort('pnl',this)" data-csort="pnl" style="padding:8px 12px;text-align:right;cursor:pointer;user-select:none;font-weight:700">P&amp;L €<span class="cs-arr" style="font-size:9px"></span></th>
             <th onclick="closedSort('pnlPct',this)" data-csort="pnlPct" style="padding:8px 12px;text-align:right;cursor:pointer;user-select:none">P&amp;L %<span class="cs-arr" style="font-size:9px"></span></th>
             <th style="padding:8px 12px;text-align:center">Modifier</th>
@@ -7165,7 +7190,7 @@ function renderObligCharts(data) {
           <tr style="background:var(--bg2)">
             <td style="padding:3px 8px"><input type="text" placeholder="Filtrer nom..." oninput="closedFilter('nom',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>
             <td style="padding:3px 8px"><input type="text" placeholder="Ticker..." oninput="closedFilter('ticker',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>
-            <td colspan="10"></td>
+            <td colspan="12"></td>
           </tr>
         </thead>
         <tbody id="closedBody"></tbody>
@@ -7174,6 +7199,8 @@ function renderObligCharts(data) {
             <td colspan="7" style="padding:8px 12px">Total réalisé</td>
             <td id="closedCost" style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">—</td>
             <td id="closedVal"  style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">—</td>
+            <td></td>
+            <td></td>
             <td id="closedPnl"  style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:700">—</td>
             <td id="closedPct"  style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">—</td>
           </tr>
@@ -10219,6 +10246,10 @@ window.addEventListener('load', () => {
         <input id="sl_fx" type="number" step="any" oninput="slPreview()" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
       </div>
     </div>
+    <div style="margin-top:14px">
+      <label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Commission / frais de vente (optionnel, devise)</label>
+      <input id="sl_comm" type="number" step="any" placeholder="optionnel" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
+    </div>
     <!-- Preview P&L -->
     <div id="sl_preview" style="display:none;margin-top:18px;padding:14px 16px;background:var(--bg3);border-radius:8px;font-size:13px">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -10751,13 +10782,15 @@ window.addEventListener('load', () => {
   function kidClotures(b){
     const rows = KIDS_CLOSED.filter(h=>sel()==='Tous'||h.e===sel());
     const tot = rows.reduce((s,h)=>s+(+h.pnl||0),0);
-    let html=`<div class="card"><table><thead><tr><th>Enfant</th><th>Compte</th><th>Position</th><th>ISIN</th><th style="text-align:right">P&L réalisé</th></tr></thead><tbody>`;
+    let html=`<div class="card"><table><thead><tr><th>Enfant</th><th>Compte</th><th>Position</th><th>ISIN</th><th style="text-align:right">Comm./frais</th><th style="text-align:right">Taxe</th><th style="text-align:right">P&L réalisé</th></tr></thead><tbody>`;
     rows.forEach(h=>{
       html+=`<tr><td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COL[h.e]};margin-right:6px"></span>${h.e}</td>
         <td>${h.c}</td><td>${h.nom}</td><td style="color:var(--text3);font-size:10px">${h.isin||''}</td>
+        <td style="text-align:right;color:var(--text2)">${h.comm?Math.round(h.comm).toLocaleString('fr')+' '+(h.devise||'€'):'—'}</td>
+        <td style="text-align:right;color:var(--text2)">${h.taxe?Math.round(h.taxe).toLocaleString('fr')+' '+(h.devise||'€'):'—'}</td>
         <td style="text-align:right;font-weight:600;color:${col(h.pnl)}">${fmts(h.pnl)}</td></tr>`;
     });
-    html+=`<tr style="border-top:2px solid var(--border2);font-weight:700"><td colspan="4">TOTAL réalisé</td><td style="text-align:right;color:${col(tot)}">${fmts(tot)}</td></tr>`;
+    html+=`<tr style="border-top:2px solid var(--border2);font-weight:700"><td colspan="6">TOTAL réalisé</td><td style="text-align:right;color:${col(tot)}">${fmts(tot)}</td></tr>`;
     html+=`</tbody></table></div>`;
     b.innerHTML=html;
   }
@@ -10805,6 +10838,7 @@ window.addEventListener('load', () => {
       return { _i:i, e:h.e, isin:h.isin||'', nom:h.nom||'', t:h.t||'', ticker:h.ticker||'',
         broker:h.c||'', date:h.date||'', devise:dev, qty:qty, px:px,
         coutDev:(qty!=null&&px!=null)?qty*px:cout, coutEur:cout, vl:(h.vl!=null?+h.vl:null),
+        comm:(h.comm!=null?+h.comm:null), taxe:(h.taxe!=null?+h.taxe:null),
         val:val, pnl:pnl, pct:pct };
     });
   }
@@ -10835,12 +10869,12 @@ window.addEventListener('load', () => {
             <tr style="background:var(--bg2);text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2)">
               <th style="padding:8px 10px;width:26px;position:sticky;top:0;background:var(--bg2)">#</th>
               ${th('e','Enfant')}${th('isin','ISIN')}${th('nom','Nom')}${th('t','Type')}${th('ticker','Ticker')}${th('broker','Broker')}${th('date','Date achat')}${th('devise','Devise')}
-              ${th('qty','Qté','right')}${th('px','Prix achat','right')}${th('coutDev','Coût (devise)','right')}${th('coutEur','Coût (€)','right')}${th('vl','Prix actuel','right')}${th('val','Valeur act. (€)','right')}${th('pnl','P&L (€)','right')}${th('pct','P&L (%)','right')}
+              ${th('qty','Qté','right')}${th('px','Prix achat','right')}${th('coutDev','Coût (devise)','right')}${th('coutEur','Coût (€)','right')}${th('comm','Comm./frais','right')}${th('taxe','Taxe','right')}${th('vl','Prix actuel','right')}${th('val','Valeur act. (€)','right')}${th('pnl','P&L (€)','right')}${th('pct','P&L (%)','right')}
               <th style="padding:8px 10px;position:sticky;top:0;background:var(--bg2)"></th>
             </tr>
             <tr style="background:var(--bg3)">
               <td></td><td></td>${fin('isin','ISIN')}${fin('nom','Filtrer nom')}${fin('t','Type…')}${fin('ticker','Ticker')}${fin('broker','Broker')}${fin('date','AAAA-MM-JJ')}${fin('devise','EUR/USD…')}
-              ${fin('qty','≥ qté','right')}<td></td><td></td>${fin('coutEur','≥ coût €','right')}<td></td>${fin('val','≥ valeur €','right')}${fin('pnl','≥ P&L €','right')}<td></td><td></td>
+              ${fin('qty','≥ qté','right')}<td></td><td></td>${fin('coutEur','≥ coût €','right')}<td></td><td></td><td></td>${fin('val','≥ valeur €','right')}${fin('pnl','≥ P&L €','right')}<td></td><td></td>
             </tr>
           </thead>
           <tbody id="kidEdBody"></tbody>
@@ -10863,6 +10897,7 @@ window.addEventListener('load', () => {
           <div style="display:flex;flex-direction:column;gap:10px">
             <div><label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">Date de vente</label><input id="kidSellDate" type="date" style="width:100%;box-sizing:border-box;padding:7px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
             <div><label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">Montant reçu (€)</label><input id="kidSellAmount" type="number" step="0.01" style="width:100%;box-sizing:border-box;padding:7px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
+            <div><label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">Commission / frais de vente (optionnel)</label><input id="kidSellComm" type="number" step="0.01" style="width:100%;box-sizing:border-box;padding:7px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
             <div id="kidSellInfo" style="font-size:12px;color:var(--text2)"></div>
           </div>
           <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end">
@@ -10912,6 +10947,8 @@ window.addEventListener('load', () => {
       <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace">${fN(r.px)}</td>
       <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace">${r.coutDev!=null?Math.round(r.coutDev).toLocaleString('fr')+' '+r.devise:'—'}</td>
       <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;color:var(--text2)">${fE(r.coutEur)}</td>
+      <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;color:var(--text2)">${r.comm!=null?Math.round(r.comm).toLocaleString('fr')+' '+r.devise:'—'}</td>
+      <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;color:var(--text2)">${r.taxe!=null?Math.round(r.taxe).toLocaleString('fr')+' '+r.devise:'—'}</td>
       <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;color:var(--text2)">${fN(r.vl)}</td>
       <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace">${fE(r.val)}</td>
       <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;font-weight:600;color:${cP(r.pnl)}">${fE(r.pnl)}</td>
@@ -10928,7 +10965,7 @@ window.addEventListener('load', () => {
     const tot=document.getElementById('kidEdTot');
     if(tot) tot.innerHTML=`<td colspan="12" style="padding:8px 14px">Total (${rows.length} lignes)</td>
       <td style="text-align:right;padding:8px 14px;font-family:'DM Mono',monospace">${tCost>0?Math.round(tCost).toLocaleString('fr')+' €':'—'}</td>
-      <td></td><td style="text-align:right;padding:8px 14px;font-family:'DM Mono',monospace">${hasV?Math.round(tVal).toLocaleString('fr')+' €':'—'}</td>
+      <td></td><td></td><td></td><td style="text-align:right;padding:8px 14px;font-family:'DM Mono',monospace">${hasV?Math.round(tVal).toLocaleString('fr')+' €':'—'}</td>
       <td style="text-align:right;padding:8px 14px;font-family:'DM Mono',monospace;color:${tPnl>=0?'#4caf82':'#e06c6c'}">${(tPnl>=0?'+':'')+Math.round(tPnl).toLocaleString('fr')} €</td>
       <td style="text-align:right;padding:8px 14px;font-family:'DM Mono',monospace;color:${(perf==null||perf>=0)?'#4caf82':'#e06c6c'}">${perf!=null?(perf>=0?'+':'')+perf.toFixed(1).replace('.',',')+'%':'—'}</td><td></td>`;
     const kpi=document.getElementById('kidEdKpi');
@@ -10966,7 +11003,7 @@ window.addEventListener('load', () => {
       + kidEdField('kf_cout','Coût total (€)',h.cout,'number')
       + kidEdField('kf_vl','Prix actuel (VL)',h.vl,'number')
       + kidEdField('kf_val','Valeur actuelle (€)',h.val,'number')
-      + ((i==null) ? (kidEdField('kf_comm','Commission / frais (optionnel)',null,'number') + kidEdField('kf_taxe','Taxe (optionnel)',null,'number')) : '');
+      + kidEdField('kf_comm','Commission / frais (optionnel)',h.comm,'number') + kidEdField('kf_taxe','Taxe (optionnel)',h.taxe,'number');
     document.getElementById('kidEdModal').style.display='flex';
   }
   window.kidEdAdd=function(){ kidEdOpenModal(null); };
@@ -10976,16 +11013,21 @@ window.addEventListener('load', () => {
     const gv=id=>{ const el=document.getElementById(id); return el?el.value:''; };
     const gn=id=>{ const v=gv(id); return v===''?null:parseFloat(String(v).replace(',','.')); };
     const obj={ e:gv('kf_e'), c:gv('kf_c'), nom:gv('kf_nom'), t:gv('kf_t'), isin:gv('kf_isin'), ticker:gv('kf_ticker'),
-      date:gv('kf_date'), devise:gv('kf_devise'), qty:gn('kf_qty'), pxAchat:gn('kf_px'), cout:gn('kf_cout'), vl:gn('kf_vl'), val:gn('kf_val') };
+      date:gv('kf_date'), devise:gv('kf_devise'), qty:gn('kf_qty'), pxAchat:gn('kf_px'), cout:gn('kf_cout'), vl:gn('kf_vl'), val:gn('kf_val'), comm:gn('kf_comm'), taxe:gn('kf_taxe') };
     if(!obj.nom){ alert('Le nom est obligatoire.'); return; }
     if(obj.val==null && obj.qty!=null && obj.vl!=null) obj.val=obj.qty*obj.vl;
     if(window._kidEdIdx!=null && KIDS_HOLD[window._kidEdIdx]) KIDS_HOLD[window._kidEdIdx]=obj;
     else {
       KIDS_HOLD.push(obj);
+      // Commission / Taxe : réduisent le cash disponible du broker (pas de ligne d'invest)
       const comm=gn('kf_comm'), taxe=gn('kf_taxe');
-      const mkFee=(label,amt,typeLbl)=>({ e:obj.e, c:obj.c, nom:label+' — '+obj.nom, t:typeLbl, isin:'', ticker:'', date:obj.date, devise:obj.devise, qty:1, pxAchat:amt, cout:Math.round(amt*100)/100, vl:null, val:null });
-      if(comm!=null && comm>0) KIDS_HOLD.push(mkFee('Commission fees',comm,'Frais'));
-      if(taxe!=null && taxe>0) KIDS_HOLD.push(mkFee('Taxe',taxe,'Taxe'));
+      let fees=0; if(comm!=null&&comm>0)fees+=comm; if(taxe!=null&&taxe>0)fees+=taxe;
+      if(fees>0 && obj.c){
+        const cur=obj.devise||'EUR';
+        if(!KIDS_CASH[obj.c]) KIDS_CASH[obj.c]={};
+        KIDS_CASH[obj.c][cur]=Math.round(((KIDS_CASH[obj.c][cur]||0)-fees)*100)/100;
+        window.KIDS_CASH=KIDS_CASH; if(typeof kidsCashSave==='function') kidsCashSave();
+      }
     }
     window.KIDS_HOLD=KIDS_HOLD; kidsSave(); window.kidEdModalClose(); kidEdBuild();
   };
@@ -10996,6 +11038,7 @@ window.addEventListener('load', () => {
     document.getElementById('kidEdSellTitle').textContent='Vendre : '+(h.nom||'');
     document.getElementById('kidSellDate').value=new Date().toISOString().slice(0,10);
     document.getElementById('kidSellAmount').value=(h.val!=null?h.val:'');
+    { const _ksc=document.getElementById('kidSellComm'); if(_ksc)_ksc.value=''; }
     const basis=(h.cout!=null?h.cout:h.val);
     document.getElementById('kidSellInfo').textContent='Coût de revient : '+(h.cout!=null?Math.round(h.cout).toLocaleString('fr')+' €':'inconnu (base = valeur actuelle)');
     document.getElementById('kidEdSellModal').style.display='flex';
@@ -11007,7 +11050,10 @@ window.addEventListener('load', () => {
     if(isNaN(amt)){ alert('Montant reçu invalide.'); return; }
     const basis=(h.cout!=null?h.cout:(h.val!=null?h.val:0));
     const pnl=amt-basis;
-    KIDS_CLOSED.push({ e:h.e, c:h.c, nom:h.nom, isin:h.isin||'', pnl:Math.round(pnl*100)/100 });
+    const _kscEl=document.getElementById('kidSellComm'); const _csc=_kscEl?parseFloat(String(_kscEl.value).replace(',','.')):NaN;
+    const _cv=(!isNaN(_csc)&&_csc>0)?Math.round(_csc*100)/100:0;
+    KIDS_CLOSED.push({ e:h.e, c:h.c, nom:h.nom, isin:h.isin||'', pnl:Math.round(pnl*100)/100, comm:Math.round(((h.comm||0)+_cv)*100)/100, taxe:(h.taxe||0), devise:h.devise||'EUR' });
+    if(_cv>0 && h.c){ const cur=h.devise||'EUR'; if(!KIDS_CASH[h.c])KIDS_CASH[h.c]={}; KIDS_CASH[h.c][cur]=Math.round(((KIDS_CASH[h.c][cur]||0)-_cv)*100)/100; window.KIDS_CASH=KIDS_CASH; if(typeof kidsCashSave==='function')kidsCashSave(); }
     KIDS_HOLD.splice(i,1);
     window.KIDS_HOLD=KIDS_HOLD; window.KIDS_CLOSED=KIDS_CLOSED; kidsSave();
     window.kidEdSellClose(); kidEdBuild();
