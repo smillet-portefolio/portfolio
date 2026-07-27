@@ -3250,8 +3250,8 @@ function buildPosTable(rebuild) {
       <td class="mono" style="text-align:right;padding:6px 14px">${fmtN(r.pxAchat)}</td>
       <td class="mono" style="text-align:right;padding:6px 14px">${Math.round(r.cost).toLocaleString('fr')} ${r.currency}</td>
       <td id="costeur-${i}" class="mono" style="text-align:right;padding:6px 14px;color:var(--text2)">${row.costEur ? Math.round(row.costEur).toLocaleString('fr') + ' €' : '—'}</td>
-      <td class="mono" style="text-align:right;padding:6px 14px;color:var(--text2)">${row.comm!=null?Math.round(row.comm).toLocaleString('fr')+' '+({EUR:'€',USD:'$',GBP:'£',CZK:'Kč'}[r.currency]||r.currency||'€'):'—'}</td>
-      <td class="mono" style="text-align:right;padding:6px 14px;color:var(--text2)">${row.taxe!=null?Math.round(row.taxe).toLocaleString('fr')+' '+({EUR:'€',USD:'$',GBP:'£',CZK:'Kč'}[r.currency]||r.currency||'€'):'—'}</td>
+      <td class="mono" style="text-align:right;padding:6px 14px;color:var(--text2)">${row.comm!=null?Math.round(row.comm).toLocaleString('fr')+' '+({EUR:'€',USD:'$',GBP:'£',CZK:'Kč'}[r.commCur||r.currency]||r.commCur||r.currency||'€'):'—'}</td>
+      <td class="mono" style="text-align:right;padding:6px 14px;color:var(--text2)">${row.taxe!=null?Math.round(row.taxe).toLocaleString('fr')+' '+({EUR:'€',USD:'$',GBP:'£',CZK:'Kč'}[r.commCur||r.currency]||r.commCur||r.currency||'€'):'—'}</td>
       <td id="px-${i}"      class="mono" style="text-align:right;padding:6px 14px;color:var(--text2)">${row.pxActuel != null ? fmtN(row.pxActuel) : '—'}</td>
       <td id="val-${i}"     class="mono" style="text-align:right;padding:6px 14px;color:var(--text2)">${fmtE(row.valEur)}</td>
       <td id="pnl-${i}"     class="mono" style="text-align:right;padding:6px 14px;font-weight:600;color:${colP(row.pnl)}">${fmtE(row.pnl)}</td>
@@ -3677,7 +3677,7 @@ function updateTableRows() {
   if (sr) {
     sr.style.display = 'flex';
     let _feesTot = 0;
-    (typeof BOOK2_ROWS!=='undefined'?BOOK2_ROWS:[]).forEach(r=>{ const f=(r.comm||0)+(r.taxe||0); if(f) _feesTot += (r.currency==='EUR'?f:(toEur(f,r.currency)||f)); });
+    (typeof BOOK2_ROWS!=='undefined'?BOOK2_ROWS:[]).forEach(r=>{ const f=(r.comm||0)+(r.taxe||0); const _c=r.commCur||r.currency||'EUR'; if(f) _feesTot += (_c==='EUR'?f:(toEur(f,_c)||f)); });
     const cards = [
       { label:'Coût total', val: Math.round(totalCostEur).toLocaleString('fr') + ' €', color:'var(--text)' },
       { label:'Valeur actuelle', val: Math.round(totalValEur).toLocaleString('fr') + ' €', color:'var(--text)' },
@@ -3732,6 +3732,7 @@ function openNewLineModal() {
   }
   document.getElementById('nl_fx_row').style.display = 'none';
   document.getElementById('nl_devise').value = 'EUR';
+  { const _fc=document.getElementById('nl_feecur'); if(_fc) _fc.value='EUR'; }
   document.getElementById('nl_date').value = new Date().toISOString().slice(0,10);
   document.getElementById('nl_preview').style.display = 'none';
   document.getElementById('nl_error').style.display = 'none';
@@ -3882,7 +3883,8 @@ function submitNewLine() {
     cost:     costDevise,
     costEur:  costEur,
     fxRate:   devise !== 'EUR' ? fx : 1,
-    typeInv:  document.getElementById('nl_type')?.value || ''
+    typeInv:  document.getElementById('nl_type')?.value || '',
+    commCur:  document.getElementById('nl_feecur')?.value || devise
   };
 
   // ── Commission / Taxe : réduisent le CASH DISPONIBLE du broker (même devise).
@@ -4019,7 +4021,7 @@ function openEditLine(i) {
   document.getElementById('el_date').value   = r.date    || '';
   document.getElementById('el_qte').value    = r.qty     || '';
   document.getElementById('el_prix').value   = r.pxAchat || '';
-  { const _ec=document.getElementById('el_comm'); if(_ec) _ec.value = (r.comm!=null?r.comm:''); const _et=document.getElementById('el_taxe'); if(_et) _et.value = (r.taxe!=null?r.taxe:''); }
+  { const _ec=document.getElementById('el_comm'); if(_ec) _ec.value = (r.comm!=null?r.comm:''); const _et=document.getElementById('el_taxe'); if(_et) _et.value = (r.taxe!=null?r.taxe:''); const _fc=document.getElementById('el_feecur'); if(_fc) _fc.value = (r.commCur||r.currency||'EUR'); }
   if (document.getElementById('el_pxActuel')) {
     const _cp = (typeof CURRENT_PRICES !== 'undefined' && CURRENT_PRICES[r.ticker]) ? CURRENT_PRICES[r.ticker].price : null;
     document.getElementById('el_pxActuel').value = (_cp != null ? _cp : '');
@@ -4072,7 +4074,8 @@ function submitEditLine() {
   r.currency=devise; r.qty=qte; r.pxAchat=prix;
   r.cost=costDevise; r.costEur=costEur; if (devise!=='EUR') r.fxRate=fx;
   { const _c=parseFloat(document.getElementById('el_comm')?.value); r.comm=(!isNaN(_c)&&_c>0)?Math.round(_c*100)/100:null;
-    const _t=parseFloat(document.getElementById('el_taxe')?.value); r.taxe=(!isNaN(_t)&&_t>0)?Math.round(_t*100)/100:null; }
+    const _t=parseFloat(document.getElementById('el_taxe')?.value); r.taxe=(!isNaN(_t)&&_t>0)?Math.round(_t*100)/100:null;
+    r.commCur=document.getElementById('el_feecur')?.value || r.currency || 'EUR'; }
   r.typeInv = document.getElementById('el_type')?.value || r.typeInv || '';
   r._modified = true;  // flag pour la persistance
 
@@ -4135,7 +4138,7 @@ function openSellLine(i) {
   document.getElementById('sl_date').value   = new Date().toISOString().slice(0,10);
   document.getElementById('sl_devise').value = r.currency; // pre-fill with purchase currency
   document.getElementById('sl_prix').value   = '';
-  { const _slc=document.getElementById('sl_comm'); if(_slc) _slc.value=''; }
+  { const _slc=document.getElementById('sl_comm'); if(_slc) _slc.value=''; const _slcc=document.getElementById('sl_commcur'); if(_slcc) _slcc.value=(r.currency||'EUR'); }
   document.getElementById('sl_fx').value     = '';
   document.getElementById('sl_qty').value    = r.qty;
   document.getElementById('sl_qty_max').textContent = '(max ' + r.qty.toLocaleString('fr',{maximumFractionDigits:4}) + ')';
@@ -4236,7 +4239,7 @@ function submitSellLine() {
     qty:sellQ, pxAchat:r.pxAchat, currencyAchat:r.currency,
     pxVente:prix, currencyVente:dev, fxVente:fx,
     costEur, saleEur, pnl, pnlPct,
-    commAchat:(r.comm||0), taxe:(r.taxe||0), commVente:_commV, currencyFrais:r.currency
+    commAchat:(r.comm||0), taxe:(r.taxe||0), commVente:_commV, currencyFrais:(document.getElementById('sl_commcur')?.value || r.commCur || r.currency || 'EUR')
   };
 
   // Save to localStorage
@@ -4350,14 +4353,14 @@ function renderClosedPositions() {
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${p.pxVente.toLocaleString('fr',{maximumFractionDigits:4})} ${_sym(p.currencyVente)}</td>
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${Math.round(p.costEur).toLocaleString('fr')} €</td>
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${Math.round(p.saleEur).toLocaleString('fr')} €</td>
-      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${((p.commAchat||0)+(p.commVente||0))?Math.round((p.commAchat||0)+(p.commVente||0)).toLocaleString('fr')+' €':'—'}</td>
-      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${p.taxe?Math.round(p.taxe).toLocaleString('fr')+' €':'—'}</td>
+      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${((p.commAchat||0)+(p.commVente||0))?Math.round((p.commAchat||0)+(p.commVente||0)).toLocaleString('fr')+' '+_sym(p.currencyFrais||'EUR'):'—'}</td>
+      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${p.taxe?Math.round(p.taxe).toLocaleString('fr')+' '+_sym(p.currencyFrais||'EUR'):'—'}</td>
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:${col}">${sign}${Math.round(p.pnl).toLocaleString('fr')} €</td>
       <td style="padding:7px 12px;text-align:right;color:${col}">${sign}${p.pnlPct.toFixed(1)}%</td>
       <td style="padding:7px 12px;text-align:center"><button onclick="openEditClosed('${p._id}')" title="Modifier la clôture (tous les champs)" style="background:none;border:none;cursor:pointer;font-size:13px;line-height:1">✏️</button></td>`;
     tbody.appendChild(tr);
     totCost += p.costEur; totVal += p.saleEur; totPnl += p.pnl;
-    totFees += (p.commAchat||0)+(p.commVente||0)+(p.taxe||0);
+    { const _ff=(p.commAchat||0)+(p.commVente||0)+(p.taxe||0), _cc=p.currencyFrais||'EUR'; totFees += (_cc==='EUR'?_ff:(toEur(_ff,_cc)||_ff)); }
   });
 
   {
@@ -4425,7 +4428,7 @@ function openEditClosed(id){
   set('ce_dateAchat',p.dateAchat); set('ce_dateSell',p.dateSell); set('ce_qty',p.qty);
   set('ce_curAchat',p.currencyAchat||'EUR'); set('ce_pxAchat',p.pxAchat); set('ce_fxAchat',fxA);
   set('ce_curVente',p.currencyVente||'EUR'); set('ce_pxVente',p.pxVente); set('ce_fxVente',fxV);
-  set('ce_commAchat',p.commAchat!=null?p.commAchat:''); set('ce_taxe',p.taxe!=null?p.taxe:''); set('ce_commVente',p.commVente!=null?p.commVente:'');
+  set('ce_commAchat',p.commAchat!=null?p.commAchat:''); set('ce_taxe',p.taxe!=null?p.taxe:''); set('ce_commVente',p.commVente!=null?p.commVente:''); set('ce_feecur',p.currencyFrais||'EUR');
   // La modale est physiquement dans la section #editeur (masquée hors onglet Éditer).
   // On la rattache au <body> pour qu'elle s'affiche depuis n'importe quel onglet.
   const _m=document.getElementById('closedEditModal');
@@ -4446,7 +4449,7 @@ function submitEditClosed(){
   p.currencyVente=g('ce_curVente')||'EUR'; p.pxVente=(gn('ce_pxVente')!=null?gn('ce_pxVente'):p.pxVente);
   const fxV=(p.currencyVente==='EUR')?1:(gn('ce_fxVente')||1); p.fxVente=fxV;
   p.commAchat=gn('ce_commAchat')||0; p.taxe=gn('ce_taxe')||0; p.commVente=gn('ce_commVente')||0;
-  p.currencyFrais=p.currencyAchat;
+  p.currencyFrais=g('ce_feecur')||'EUR';
   p.costEur=Math.round(p.qty*p.pxAchat*fxA*100)/100;
   p.saleEur=Math.round(p.qty*p.pxVente*fxV*100)/100;
   p.pnl=Math.round((p.saleEur-p.costEur)*100)/100;
@@ -10152,6 +10155,12 @@ window.addEventListener('load', () => {
           style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
       </div>
 
+      <!-- DEVISE FRAIS -->
+      <div style="grid-column:1/-1">
+        <label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Devise des frais / taxe</label>
+        <select id="nl_feecur" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none"><option>EUR</option><option>USD</option><option>GBP</option><option>CZK</option></select>
+      </div>
+
     </div>
 
     <!-- PREVIEW des coûts calculés -->
@@ -10254,6 +10263,10 @@ window.addEventListener('load', () => {
         <label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Taxe (devise)</label>
         <input id="el_taxe" type="number" step="any" placeholder="optionnel" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
       </div>
+      <div style="grid-column:1/-1">
+        <label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Devise des frais / taxe</label>
+        <select id="el_feecur" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none"><option>EUR</option><option>USD</option><option>GBP</option><option>CZK</option></select>
+      </div>
       <div id="el_fx_row" style="display:none">
         <label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Taux de change (1 devise = ? €)</label>
         <input id="el_fx" type="number" step="any" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
@@ -10307,9 +10320,15 @@ window.addEventListener('load', () => {
         <input id="sl_fx" type="number" step="any" oninput="slPreview()" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
       </div>
     </div>
-    <div style="margin-top:14px">
-      <label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Commission / frais de vente (optionnel, devise)</label>
-      <input id="sl_comm" type="number" step="any" placeholder="optionnel" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
+    <div style="margin-top:14px;display:grid;grid-template-columns:2fr 1fr;gap:10px">
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Commission / frais de vente (optionnel)</label>
+        <input id="sl_comm" type="number" step="any" placeholder="optionnel" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Devise</label>
+        <select id="sl_commcur" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none"><option>EUR</option><option>USD</option><option>GBP</option><option>CZK</option></select>
+      </div>
     </div>
     <!-- Preview P&L -->
     <div id="sl_preview" style="display:none;margin-top:18px;padding:14px 16px;background:var(--bg3);border-radius:8px;font-size:13px">
@@ -11176,6 +11195,7 @@ window.addEventListener('load', () => {
       <div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Commission / frais d'achat</label><input id="ce_commAchat" type="number" step="any" placeholder="optionnel" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
       <div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Taxe</label><input id="ce_taxe" type="number" step="any" placeholder="optionnel" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
       <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Commission / frais de vente</label><input id="ce_commVente" type="number" step="any" placeholder="optionnel" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
+      <div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Devise des frais / taxe</label><select id="ce_feecur" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"><option>EUR</option><option>USD</option><option>GBP</option><option>CZK</option></select></div>
     </div>
     <div style="font-size:11px;color:var(--text2);margin-top:10px">Le coût, la valeur de vente et le P&L sont recalculés automatiquement. Les commissions/frais et la taxe sont informatifs (ils ont déjà réduit le cash).</div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
