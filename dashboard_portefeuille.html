@@ -4015,6 +4015,7 @@ function openEditLine(i) {
   document.getElementById('el_date').value   = r.date    || '';
   document.getElementById('el_qte').value    = r.qty     || '';
   document.getElementById('el_prix').value   = r.pxAchat || '';
+  { const _ec=document.getElementById('el_comm'); if(_ec) _ec.value = (r.comm!=null?r.comm:''); const _et=document.getElementById('el_taxe'); if(_et) _et.value = (r.taxe!=null?r.taxe:''); }
   if (document.getElementById('el_pxActuel')) {
     const _cp = (typeof CURRENT_PRICES !== 'undefined' && CURRENT_PRICES[r.ticker]) ? CURRENT_PRICES[r.ticker].price : null;
     document.getElementById('el_pxActuel').value = (_cp != null ? _cp : '');
@@ -4066,6 +4067,8 @@ function submitEditLine() {
   r.name=nom; r.ticker=ticker; r.broker=broker; r.date=date;
   r.currency=devise; r.qty=qte; r.pxAchat=prix;
   r.cost=costDevise; r.costEur=costEur; if (devise!=='EUR') r.fxRate=fx;
+  { const _c=parseFloat(document.getElementById('el_comm')?.value); r.comm=(!isNaN(_c)&&_c>0)?Math.round(_c*100)/100:null;
+    const _t=parseFloat(document.getElementById('el_taxe')?.value); r.taxe=(!isNaN(_t)&&_t>0)?Math.round(_t*100)/100:null; }
   r.typeInv = document.getElementById('el_type')?.value || r.typeInv || '';
   r._modified = true;  // flag pour la persistance
 
@@ -4346,7 +4349,7 @@ function renderClosedPositions() {
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${p.taxe?Math.round(p.taxe).toLocaleString('fr')+' '+(p.currencyFrais||p.currencyAchat||'€'):'—'}</td>
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:${col}">${sign}${Math.round(p.pnl).toLocaleString('fr')} €</td>
       <td style="padding:7px 12px;text-align:right;color:${col}">${sign}${p.pnlPct.toFixed(1)}%</td>
-      <td style="padding:7px 12px;text-align:center"><button onclick="editClosedPos('${p._id}')" title="Modifier prix de vente / FX" style="background:none;border:none;cursor:pointer;font-size:13px;line-height:1">✏️</button></td>`;
+      <td style="padding:7px 12px;text-align:center"><button onclick="openEditClosed('${p._id}')" title="Modifier la clôture (tous les champs)" style="background:none;border:none;cursor:pointer;font-size:13px;line-height:1">✏️</button></td>`;
     tbody.appendChild(tr);
     totCost += p.costEur; totVal += p.saleEur; totPnl += p.pnl;
   });
@@ -4400,6 +4403,47 @@ function editClosedPos(id) {
       (p.pnl>=0?'+':'') + Math.round(p.pnl).toLocaleString('fr') + ' €';
     st.style.color = '#4caf82';
   }
+}
+
+// ── Édition complète d'une position clôturée (modale, tous les champs) ────────
+function openEditClosed(id){
+  let all=[]; try{ all=JSON.parse(localStorage.getItem('closed_positions')||'[]'); }catch(e){ return; }
+  const p=all.find(x=>String(x._id)===String(id)); if(!p){ alert('Position introuvable'); return; }
+  window._ceId=id;
+  const fxA=(p.qty&&p.pxAchat)? +(((p.costEur||0)/(p.qty*p.pxAchat))).toFixed(6) : 1;
+  const fxV=(p.fxVente!=null)? p.fxVente : ((p.qty&&p.pxVente)? +(((p.saleEur||0)/(p.qty*p.pxVente))).toFixed(6):1);
+  const set=(k,v)=>{ const e=document.getElementById(k); if(e) e.value=(v!=null?v:''); };
+  set('ce_nom',p.name); set('ce_ticker',p.ticker); set('ce_broker',p.broker);
+  set('ce_dateAchat',p.dateAchat); set('ce_dateSell',p.dateSell); set('ce_qty',p.qty);
+  set('ce_curAchat',p.currencyAchat||'EUR'); set('ce_pxAchat',p.pxAchat); set('ce_fxAchat',fxA);
+  set('ce_curVente',p.currencyVente||'EUR'); set('ce_pxVente',p.pxVente); set('ce_fxVente',fxV);
+  set('ce_commAchat',p.commAchat!=null?p.commAchat:''); set('ce_taxe',p.taxe!=null?p.taxe:''); set('ce_commVente',p.commVente!=null?p.commVente:'');
+  if(typeof _modal==='function') _modal('closedEditModal', true);
+  else { const m=document.getElementById('closedEditModal'); if(m) m.style.display='flex'; }
+}
+function closeClosedEdit(){ const m=document.getElementById('closedEditModal'); if(m) m.style.display='none'; }
+function submitEditClosed(){
+  let all=[]; try{ all=JSON.parse(localStorage.getItem('closed_positions')||'[]'); }catch(e){ return; }
+  const i=all.findIndex(x=>String(x._id)===String(window._ceId)); if(i<0) return;
+  const g=k=>{ const e=document.getElementById(k); return e?e.value:''; };
+  const gn=k=>{ const v=parseFloat(String(g(k)).replace(',','.')); return isNaN(v)?null:v; };
+  const p=all[i];
+  p.name=g('ce_nom')||p.name; p.ticker=(g('ce_ticker')||'').toUpperCase(); p.broker=g('ce_broker')||'';
+  p.dateAchat=g('ce_dateAchat')||p.dateAchat; p.dateSell=g('ce_dateSell')||p.dateSell;
+  p.qty=(gn('ce_qty')!=null?gn('ce_qty'):p.qty);
+  p.currencyAchat=g('ce_curAchat')||'EUR'; p.pxAchat=(gn('ce_pxAchat')!=null?gn('ce_pxAchat'):p.pxAchat);
+  const fxA=(p.currencyAchat==='EUR')?1:(gn('ce_fxAchat')||1);
+  p.currencyVente=g('ce_curVente')||'EUR'; p.pxVente=(gn('ce_pxVente')!=null?gn('ce_pxVente'):p.pxVente);
+  const fxV=(p.currencyVente==='EUR')?1:(gn('ce_fxVente')||1); p.fxVente=fxV;
+  p.commAchat=gn('ce_commAchat')||0; p.taxe=gn('ce_taxe')||0; p.commVente=gn('ce_commVente')||0;
+  p.currencyFrais=p.currencyAchat;
+  p.costEur=Math.round(p.qty*p.pxAchat*fxA*100)/100;
+  p.saleEur=Math.round(p.qty*p.pxVente*fxV*100)/100;
+  p.pnl=Math.round((p.saleEur-p.costEur)*100)/100;
+  p.pnlPct=p.costEur?Math.round(p.pnl/p.costEur*10000)/100:0;
+  all[i]=p; try{ localStorage.setItem('closed_positions', JSON.stringify(all)); }catch(e){}
+  closeClosedEdit(); renderClosedPositions();
+  if(typeof _gsToken!=='undefined'&&_gsToken&&typeof gsSaveAll==='function') gsSaveAll({silent:true});
 }
 
 // ── P&L par position : tri + filtre (sélection) ─────────────────────────────
@@ -4565,7 +4609,7 @@ function clearClosedPositions() {
 
 // Close modals on Escape
 document.addEventListener('keydown', e => {
-  if (e.key==='Escape') { closeEditLine(); closeSellLine(); obligCloseModal(); }
+  if (e.key==='Escape') { closeEditLine(); closeSellLine(); obligCloseModal(); if(typeof closeClosedEdit==='function') closeClosedEdit(); }
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -10193,6 +10237,14 @@ window.addEventListener('load', () => {
         <label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Prix d'achat (devise)</label>
         <input id="el_prix" type="number" step="any" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
       </div>
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Commission / frais (devise)</label>
+        <input id="el_comm" type="number" step="any" placeholder="optionnel" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Taxe (devise)</label>
+        <input id="el_taxe" type="number" step="any" placeholder="optionnel" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
+      </div>
       <div id="el_fx_row" style="display:none">
         <label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Taux de change (1 devise = ? €)</label>
         <input id="el_fx" type="number" step="any" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
@@ -10212,6 +10264,37 @@ window.addEventListener('load', () => {
 </div>
 
 <!-- ═══ MODAL VENDRE ════════════════════════════════════════════════════════════ -->
+<div id="closedEditModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:26px 30px;width:640px;max-width:96vw;max-height:92vh;overflow:auto;box-shadow:0 24px 60px rgba(0,0,0,.5)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <h3 style="margin:0;font-size:16px;font-weight:700">✏️ Modifier la position clôturée</h3>
+      <button onclick="closeClosedEdit()" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer">×</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Nom</label><input id="ce_nom" type="text" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
+      <div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Ticker</label><input id="ce_ticker" type="text" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
+      <div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Broker</label><input id="ce_broker" type="text" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
+      <div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Date d'achat</label><input id="ce_dateAchat" type="date" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
+      <div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Date de vente</label><input id="ce_dateSell" type="date" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
+      <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Quantité</label><input id="ce_qty" type="number" step="any" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
+      <div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Devise achat</label><select id="ce_curAchat" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"><option>EUR</option><option>USD</option><option>GBP</option><option>CZK</option></select></div>
+      <div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Prix d'achat (devise)</label><input id="ce_pxAchat" type="number" step="any" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
+      <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Taux de change achat (1 devise = ? €, 1 si EUR)</label><input id="ce_fxAchat" type="number" step="any" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
+      <div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Devise vente</label><select id="ce_curVente" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"><option>EUR</option><option>USD</option><option>GBP</option><option>CZK</option></select></div>
+      <div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Prix de vente (devise)</label><input id="ce_pxVente" type="number" step="any" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
+      <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Taux de change vente (1 devise = ? €, 1 si EUR)</label><input id="ce_fxVente" type="number" step="any" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
+      <div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Commission / frais d'achat</label><input id="ce_commAchat" type="number" step="any" placeholder="optionnel" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
+      <div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Taxe</label><input id="ce_taxe" type="number" step="any" placeholder="optionnel" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
+      <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Commission / frais de vente</label><input id="ce_commVente" type="number" step="any" placeholder="optionnel" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
+    </div>
+    <div style="font-size:11px;color:var(--text2);margin-top:10px">Le coût, la valeur de vente et le P&L sont recalculés automatiquement. Les commissions/frais et la taxe sont informatifs (ils ont déjà réduit le cash).</div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+      <button onclick="closeClosedEdit()" style="padding:9px 20px;background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:6px;font-size:13px;cursor:pointer">Annuler</button>
+      <button onclick="submitEditClosed()" style="padding:9px 20px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600">✓ Enregistrer</button>
+    </div>
+  </div>
+</div>
+
 <div id="sellLineModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;align-items:center;justify-content:center">
   <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:28px 32px;width:500px;max-width:95vw;box-shadow:0 24px 60px rgba(0,0,0,.5)">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px">
