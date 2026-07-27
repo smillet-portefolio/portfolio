@@ -4319,10 +4319,11 @@ function renderClosedPositions() {
   if (emptyEl) emptyEl.style.display = all.length ? 'none' : 'block';
   if (tableEl) tableEl.style.display = all.length ? '' : 'none';
   // Filtre + tri
-  const cf = window._closedFilter || { nom:'', ticker:'' };
+  const cf = window._closedFilter || { nom:'', ticker:'', broker:'' };
   let rows = all.filter(p =>
     (!cf.nom || (p.name||'').toLowerCase().includes(cf.nom)) &&
-    (!cf.ticker || (p.ticker||'').toLowerCase().includes(cf.ticker)));
+    (!cf.ticker || (p.ticker||'').toLowerCase().includes(cf.ticker)) &&
+    (!cf.broker || (p.broker||'').toLowerCase().includes(cf.broker)));
   const cs = window._closedSort || { col:'dateSell', dir:-1 };
   rows = rows.slice().sort((a,b) => {
     let x = a[cs.col], y = b[cs.col];
@@ -4346,6 +4347,7 @@ function renderClosedPositions() {
     tr.innerHTML = `
       <td style="padding:7px 12px"><strong>${p.name}</strong></td>
       <td style="padding:7px 12px;font-size:11px;font-family:'DM Mono',monospace">${p.ticker}</td>
+      <td style="padding:7px 12px;font-size:11px;color:var(--text2)">${p.broker||'—'}</td>
       <td style="padding:7px 12px;font-size:11px;color:var(--text2)">${p.dateAchat}</td>
       <td style="padding:7px 12px;font-size:11px;color:var(--text2)">${p.dateSell}</td>
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${p.qty.toLocaleString('fr',{maximumFractionDigits:4})}</td>
@@ -7230,6 +7232,7 @@ function renderObligCharts(data) {
           <tr style="background:var(--bg2);text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2)">
             <th onclick="closedSort('name',this)" data-csort="name" style="padding:8px 12px;text-align:left;cursor:pointer;user-select:none">Nom<span class="cs-arr" style="font-size:9px"></span></th>
             <th onclick="closedSort('ticker',this)" data-csort="ticker" style="padding:8px 12px;text-align:left;cursor:pointer;user-select:none">Ticker<span class="cs-arr" style="font-size:9px"></span></th>
+            <th onclick="closedSort('broker',this)" data-csort="broker" style="padding:8px 12px;text-align:left;cursor:pointer;user-select:none">Broker<span class="cs-arr" style="font-size:9px"></span></th>
             <th onclick="closedSort('dateAchat',this)" data-csort="dateAchat" style="padding:8px 12px;text-align:left;cursor:pointer;user-select:none">Date achat<span class="cs-arr" style="font-size:9px"></span></th>
             <th onclick="closedSort('dateSell',this)" data-csort="dateSell" style="padding:8px 12px;text-align:left;cursor:pointer;user-select:none">Date vente<span class="cs-arr" style="font-size:9px"></span></th>
             <th onclick="closedSort('qty',this)" data-csort="qty" style="padding:8px 12px;text-align:right;cursor:pointer;user-select:none">Qté<span class="cs-arr" style="font-size:9px"></span></th>
@@ -7246,13 +7249,14 @@ function renderObligCharts(data) {
           <tr style="background:var(--bg2)">
             <td style="padding:3px 8px"><input type="text" placeholder="Filtrer nom..." oninput="closedFilter('nom',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>
             <td style="padding:3px 8px"><input type="text" placeholder="Ticker..." oninput="closedFilter('ticker',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>
-            <td colspan="12"></td>
+            <td style="padding:3px 8px"><input type="text" placeholder="Broker..." oninput="closedFilter('broker',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>
+            <td colspan="11"></td>
           </tr>
         </thead>
         <tbody id="closedBody"></tbody>
         <tfoot>
           <tr style="font-weight:700;background:var(--bg2)">
-            <td colspan="7" style="padding:8px 12px">Total réalisé</td>
+            <td colspan="8" style="padding:8px 12px">Total réalisé</td>
             <td id="closedCost" style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">—</td>
             <td id="closedVal"  style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">—</td>
             <td></td>
