@@ -4670,7 +4670,7 @@ const GS_KEYS = [
   'etf_comp_override','etf_comp_date',
   'direct_sector_overrides',
   'evo_history',
-  'kids_hold','kids_closed','kids_deposits','kids_cash',
+  'kids_hold','kids_closed','kids_deposits','kids_cash','kids_comm',
   're_estimates',
   're_mortgage',
   're_rental',
@@ -10519,9 +10519,15 @@ window.addEventListener('load', () => {
   if(!Array.isArray(KIDS_HOLD) || !KIDS_HOLD.length) KIDS_HOLD = JSON.parse(JSON.stringify(KIDS_HOLD_DEFAULT));
   try { KIDS_CLOSED = JSON.parse(localStorage.getItem('kids_closed')) || null; } catch(e){ KIDS_CLOSED=null; }
   if(!Array.isArray(KIDS_CLOSED) || !KIDS_CLOSED.length) KIDS_CLOSED = JSON.parse(JSON.stringify(KIDS_CLOSED_DEFAULT));
-  function kidsSave(){ try{ localStorage.setItem('kids_hold', JSON.stringify(KIDS_HOLD)); localStorage.setItem('kids_closed', JSON.stringify(KIDS_CLOSED)); }catch(e){} }
+  // Identifiants stables (nécessaires pour rattacher les commissions à une ligne)
+  KIDS_HOLD.forEach(h=>{ if(h && !h._id) h._id = 'kh'+Math.random().toString(36).slice(2,9); });
+  // ---- Commissions UC (frais trimestriels qui réduisent la quantité) -------
+  let KIDS_COMM;
+  try { KIDS_COMM = JSON.parse(localStorage.getItem('kids_comm')) || null; } catch(e){ KIDS_COMM=null; }
+  if(!Array.isArray(KIDS_COMM)) KIDS_COMM = [];
+  function kidsSave(){ try{ localStorage.setItem('kids_hold', JSON.stringify(KIDS_HOLD)); localStorage.setItem('kids_closed', JSON.stringify(KIDS_CLOSED)); localStorage.setItem('kids_comm', JSON.stringify(KIDS_COMM)); }catch(e){} }
   // exposer pour la sync GSheets
-  window.KIDS_HOLD = KIDS_HOLD; window.KIDS_CLOSED = KIDS_CLOSED; window.kidsSave = kidsSave;
+  window.KIDS_HOLD = KIDS_HOLD; window.KIDS_CLOSED = KIDS_CLOSED; window.KIDS_COMM = KIDS_COMM; window.kidsSave = kidsSave;
   // Persister d'emblée (défauts ou données chargées) pour que gsSaveAll les synchronise
   try{ if(!localStorage.getItem('kids_hold')) kidsSave(); }catch(e){}
 
@@ -10946,19 +10952,44 @@ window.addEventListener('load', () => {
   }
 
   // ---- 7) ÉDITER (réplique de l'onglet Éditer principal) -----------------
+  const kidToEur = (amt,cur)=>{ cur=cur||'EUR'; if(amt==null) return null; if(cur==='EUR') return amt; if(typeof toEur==='function'){ const r=toEur(amt,cur); if(r!=null) return r; } return amt; };
+  // Commissions rattachées à une ligne (par id) : {qty total, coût € total}
+  function kidCommAgg(hid){
+    let q=0, cEur=0;
+    (KIDS_COMM||[]).forEach(cm=>{ if(cm && cm.hid===hid){
+      q += (+cm.qty||0);
+      const cd = (cm.cout!=null)? +cm.cout : ((+cm.qty||0)*(+cm.px||0));
+      cEur += kidToEur(cd, cm.devise||'EUR')||0;
+    }});
+    return { qty:q, coutEur:cEur };
+  }
   function kidEdRows(){
     return KIDS_HOLD.map((h,i)=>{
       const dev=h.devise||'EUR';
       const cout = (h.cout!=null)? +h.cout : null;
-      const qty  = (h.qty!=null)? +h.qty : null;
-      const px   = (h.pxAchat!=null)? +h.pxAchat : ((cout!=null && qty)? cout/qty : null);
-      const val  = (h.val!=null)? +h.val : null;
-      const pnl  = (cout!=null && val!=null)? val-cout : null;
-      const pct  = (pnl!=null && cout>0)? pnl/cout*100 : null;
-      return { _i:i, e:h.e, isin:h.isin||'', nom:h.nom||'', t:h.t||'', ticker:h.ticker||'',
-        broker:h.c||'', date:h.date||'', devise:dev, qty:qty, px:px,
-        coutDev:(qty!=null&&px!=null)?qty*px:cout, coutEur:cout, vl:(h.vl!=null?+h.vl:null),
-        comm:(h.comm!=null?+h.comm:null), taxe:(h.taxe!=null?+h.taxe:null),
+      const qtyAch = (h.qty!=null)? +h.qty : null;              // Qté achetée
+      const px   = (h.pxAchat!=null)? +h.pxAchat : ((cout!=null && qtyAch)? cout/qtyAch : null);
+      const coutDev = (qtyAch!=null&&px!=null)? qtyAch*px : cout;
+      // Coût (€) automatique : EUR = coût devise ; sinon conversion FX (jour d'achat indisponible → FX courant)
+      let coutEur;
+      if(dev==='EUR') coutEur = (cout!=null? cout : coutDev);
+      else coutEur = (coutDev!=null? kidToEur(coutDev,dev) : (cout!=null? cout : null));
+      // Commissions UC : réduisent la quantité et s'ajoutent aux frais
+      const agg = kidCommAgg(h._id);
+      const qtyAct = (qtyAch!=null)? (qtyAch - agg.qty) : null;   // Qté actuelle
+      const commBase = (h.comm!=null)? +h.comm : 0;
+      const commTot = (commBase + agg.coutEur) || null;
+      const vl = (h.vl!=null?+h.vl:null);
+      // Valeur actuelle basée sur la Qté actuelle (après frais)
+      let val;
+      if(vl!=null && qtyAct!=null) val = qtyAct*vl;
+      else val = (h.val!=null)? +h.val : null;
+      const pnl  = (coutEur!=null && val!=null)? val-coutEur : null;
+      const pct  = (pnl!=null && coutEur>0)? pnl/coutEur*100 : null;
+      return { _i:i, _id:h._id, e:h.e, isin:h.isin||'', nom:h.nom||'', t:h.t||'', ticker:h.ticker||'',
+        broker:h.c||'', date:h.date||'', devise:dev, qty:qtyAch, qtyAct:qtyAct, px:px,
+        coutDev:coutDev, coutEur:coutEur, vl:vl,
+        comm:commTot, taxe:(h.taxe!=null?+h.taxe:null),
         val:val, pnl:pnl, pct:pct };
     });
   }
@@ -10976,6 +11007,7 @@ window.addEventListener('load', () => {
         <span id="kidEdStatus" style="font-size:12px;color:var(--text2);flex:1;min-width:200px"></span>
         <button onclick="kidEdExport()" style="padding:8px 16px;background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:6px;font-size:12px;cursor:pointer">⬇ Export Excel (.xlsx)</button>
         <button onclick="kidEdAdd()" style="padding:8px 16px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">＋ Nouvelle ligne</button>
+        <button onclick="kidCommAdd()" style="padding:8px 16px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">＋ Nouvelle commission</button>
       </div>
       <div style="display:flex;gap:20px;margin-bottom:14px;font-size:12px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:8px 14px;flex-wrap:wrap">
         <span>Taux de change (CNB / ECB) :</span>
@@ -10989,12 +11021,12 @@ window.addEventListener('load', () => {
             <tr style="background:var(--bg2);text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2)">
               <th style="padding:8px 10px;width:26px;position:sticky;top:0;background:var(--bg2)">#</th>
               ${th('e','Enfant')}${th('isin','ISIN')}${th('nom','Nom')}${th('t','Type')}${th('ticker','Ticker')}${th('broker','Broker')}${th('date','Date achat')}${th('devise','Devise')}
-              ${th('qty','Qté','right')}${th('px','Prix achat','right')}${th('coutDev','Coût (devise)','right')}${th('coutEur','Coût (€)','right')}${th('comm','Comm./frais','right')}${th('taxe','Taxe','right')}${th('vl','Prix actuel','right')}${th('val','Valeur act. (€)','right')}${th('pnl','P&L (€)','right')}${th('pct','P&L (%)','right')}
+              ${th('qty','Qté achetée','right')}${th('px','Prix achat','right')}${th('coutDev','Coût (devise)','right')}${th('coutEur','Coût (€)','right')}${th('comm','Comm./frais','right')}${th('taxe','Taxe','right')}${th('qtyAct','Qté actuelle','right')}${th('vl','Prix actuel','right')}${th('val','Valeur act. (€)','right')}${th('pnl','P&L (€)','right')}${th('pct','P&L (%)','right')}
               <th style="padding:8px 10px;position:sticky;top:0;background:var(--bg2)"></th>
             </tr>
             <tr style="background:var(--bg3)">
               <td></td><td></td>${fin('isin','ISIN')}${fin('nom','Filtrer nom')}${fin('t','Type…')}${fin('ticker','Ticker')}${fin('broker','Broker')}${fin('date','AAAA-MM-JJ')}${fin('devise','EUR/USD…')}
-              ${fin('qty','≥ qté','right')}<td></td><td></td>${fin('coutEur','≥ coût €','right')}<td></td><td></td><td></td>${fin('val','≥ valeur €','right')}${fin('pnl','≥ P&L €','right')}<td></td><td></td>
+              ${fin('qty','≥ qté ach.','right')}<td></td><td></td>${fin('coutEur','≥ coût €','right')}<td></td><td></td>${fin('qtyAct','≥ qté act.','right')}<td></td>${fin('val','≥ valeur €','right')}${fin('pnl','≥ P&L €','right')}<td></td><td></td>
             </tr>
           </thead>
           <tbody id="kidEdBody"></tbody>
@@ -11025,6 +11057,22 @@ window.addEventListener('load', () => {
             <button onclick="kidEdSellConfirm()" style="padding:8px 16px;background:#e06c6c;border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:600;cursor:pointer">📤 Confirmer la vente</button>
           </div>
         </div>
+      </div>
+      <div id="kidCommModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:20px">
+        <div class="card" style="max-width:660px;width:100%;max-height:90vh;overflow:auto;padding:22px">
+          <h3 style="font-size:15px;font-weight:700;margin-bottom:6px">Nouvelle commission (frais UC)</h3>
+          <p class="section-desc" style="margin-bottom:14px;font-size:12px">Les frais trimestriels consomment des parts : le coût s'ajoute aux frais de la ligne et réduit la Qté actuelle.</p>
+          <div style="margin-bottom:12px">
+            <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">Ligne d'investissement concernée</label>
+            <select id="kc_line" onchange="kidCommLineChange()" style="${_kfi}"></select>
+          </div>
+          <div id="kidCommForm" style="display:grid;grid-template-columns:1fr 1fr;gap:10px"></div>
+          <div id="kidCommHist" style="margin-top:16px"></div>
+          <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end">
+            <button onclick="kidCommModalClose()" style="padding:8px 16px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;cursor:pointer">Fermer</button>
+            <button onclick="kidCommSave()" style="padding:8px 16px;background:#7c3aed;border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:600;cursor:pointer">💾 Ajouter la commission</button>
+          </div>
+        </div>
       </div>`;
     kidEdBuild();
   }
@@ -11043,6 +11091,7 @@ window.addEventListener('load', () => {
       if(f.date && !String(r.date).includes(f.date)) return false;
       if(f.devise && !na(r.devise).includes(na(f.devise))) return false;
       if(f.qty && !(r.qty!=null && r.qty>=parseFloat(f.qty))) return false;
+      if(f.qtyAct && !(r.qtyAct!=null && r.qtyAct>=parseFloat(f.qtyAct))) return false;
       if(f.coutEur && !(r.coutEur!=null && r.coutEur>=parseFloat(f.coutEur))) return false;
       if(f.val && !(r.val!=null && r.val>=parseFloat(f.val))) return false;
       if(f.pnl && !(r.pnl!=null && r.pnl>=parseFloat(f.pnl))) return false;
@@ -11069,6 +11118,7 @@ window.addEventListener('load', () => {
       <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;color:var(--text2)">${fE(r.coutEur)}</td>
       <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;color:var(--text2)">${r.comm!=null?Math.round(r.comm).toLocaleString('fr')+' '+r.devise:'—'}</td>
       <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;color:var(--text2)">${r.taxe!=null?Math.round(r.taxe).toLocaleString('fr')+' '+r.devise:'—'}</td>
+      <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;${(r.qtyAct!=null&&r.qty!=null&&r.qtyAct<r.qty)?'color:#f0956e':'color:var(--text2)'}">${fN(r.qtyAct)}</td>
       <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;color:var(--text2)">${fN(r.vl)}</td>
       <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace">${fE(r.val)}</td>
       <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;font-weight:600;color:${cP(r.pnl)}">${fE(r.pnl)}</td>
@@ -11085,7 +11135,7 @@ window.addEventListener('load', () => {
     const tot=document.getElementById('kidEdTot');
     if(tot) tot.innerHTML=`<td colspan="12" style="padding:8px 14px">Total (${rows.length} lignes)</td>
       <td style="text-align:right;padding:8px 14px;font-family:'DM Mono',monospace">${tCost>0?Math.round(tCost).toLocaleString('fr')+' €':'—'}</td>
-      <td></td><td></td><td></td><td style="text-align:right;padding:8px 14px;font-family:'DM Mono',monospace">${hasV?Math.round(tVal).toLocaleString('fr')+' €':'—'}</td>
+      <td></td><td></td><td></td><td></td><td style="text-align:right;padding:8px 14px;font-family:'DM Mono',monospace">${hasV?Math.round(tVal).toLocaleString('fr')+' €':'—'}</td>
       <td style="text-align:right;padding:8px 14px;font-family:'DM Mono',monospace;color:${tPnl>=0?'#4caf82':'#e06c6c'}">${(tPnl>=0?'+':'')+Math.round(tPnl).toLocaleString('fr')} €</td>
       <td style="text-align:right;padding:8px 14px;font-family:'DM Mono',monospace;color:${(perf==null||perf>=0)?'#4caf82':'#e06c6c'}">${perf!=null?(perf>=0?'+':'')+perf.toFixed(1).replace('.',',')+'%':'—'}</td><td></td>`;
     const kpi=document.getElementById('kidEdKpi');
@@ -11118,9 +11168,9 @@ window.addEventListener('load', () => {
       + kidEdField('kf_ticker','Ticker',h.ticker,'text')
       + kidEdField('kf_date','Date achat',h.date,'date')
       + kidEdField('kf_devise','Devise',h.devise||'EUR','select',['EUR','USD','GBP','CZK'])
-      + kidEdField('kf_qty','Quantité',h.qty,'number')
+      + kidEdField('kf_qty','Qté achetée',h.qty,'number')
       + kidEdField('kf_px','Prix achat (unitaire)',h.pxAchat,'number')
-      + kidEdField('kf_cout','Coût total (€)',h.cout,'number')
+      + kidEdField('kf_cout','Coût total (€) — auto si Qté×Prix',h.cout,'number')
       + kidEdField('kf_vl','Prix actuel (VL)',h.vl,'number')
       + kidEdField('kf_val','Valeur actuelle (€)',h.val,'number')
       + kidEdField('kf_comm','Commission / frais (optionnel)',h.comm,'number') + kidEdField('kf_taxe','Taxe (optionnel)',h.taxe,'number');
@@ -11135,9 +11185,12 @@ window.addEventListener('load', () => {
     const obj={ e:gv('kf_e'), c:gv('kf_c'), nom:gv('kf_nom'), t:gv('kf_t'), isin:gv('kf_isin'), ticker:gv('kf_ticker'),
       date:gv('kf_date'), devise:gv('kf_devise'), qty:gn('kf_qty'), pxAchat:gn('kf_px'), cout:gn('kf_cout'), vl:gn('kf_vl'), val:gn('kf_val'), comm:gn('kf_comm'), taxe:gn('kf_taxe') };
     if(!obj.nom){ alert('Le nom est obligatoire.'); return; }
+    // Coût (€) automatique : Qté achetée × Prix, converti au FX courant si non-EUR
+    if(obj.qty!=null && obj.pxAchat!=null){ const cd=obj.qty*obj.pxAchat; obj.cout = (obj.devise==='EUR')? cd : kidToEur(cd,obj.devise); }
     if(obj.val==null && obj.qty!=null && obj.vl!=null) obj.val=obj.qty*obj.vl;
-    if(window._kidEdIdx!=null && KIDS_HOLD[window._kidEdIdx]) KIDS_HOLD[window._kidEdIdx]=obj;
+    if(window._kidEdIdx!=null && KIDS_HOLD[window._kidEdIdx]){ obj._id = KIDS_HOLD[window._kidEdIdx]._id || ('kh'+Math.random().toString(36).slice(2,9)); KIDS_HOLD[window._kidEdIdx]=obj; }
     else {
+      obj._id = 'kh'+Math.random().toString(36).slice(2,9);
       KIDS_HOLD.push(obj);
       // Commission / Taxe : réduisent le cash disponible du broker (pas de ligne d'invest)
       const comm=gn('kf_comm'), taxe=gn('kf_taxe');
@@ -11152,6 +11205,76 @@ window.addEventListener('load', () => {
     window.KIDS_HOLD=KIDS_HOLD; kidsSave(); window.kidEdModalClose(); kidEdBuild();
   };
   window.kidEdDel=function(i){ if(!KIDS_HOLD[i])return; if(!confirm('Supprimer cette ligne ?')) return; KIDS_HOLD.splice(i,1); window.KIDS_HOLD=KIDS_HOLD; kidsSave(); kidEdBuild(); };
+
+  // ---- Commission UC (frais trimestriels qui réduisent la quantité) --------
+  const _kfiRO = _kfi + ';background:var(--bg2);color:var(--text2)';
+  function kidCommRO(id,label){ return `<div><label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">${label}</label><input id="${id}" type="text" readonly style="${_kfiRO}"></div>`; }
+  function kidCommIn(id,label,type,attrs){ return `<div><label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">${label}</label><input id="${id}" type="${type||'text'}" ${attrs||''} style="${_kfi}"></div>`; }
+  window.kidCommModalClose=function(){ const m=document.getElementById('kidCommModal'); if(m)m.style.display='none'; };
+  window.kidCommAdd=function(){
+    if(!KIDS_HOLD.length){ alert('Aucune ligne d\'investissement à sélectionner.'); return; }
+    const selEl=document.getElementById('kc_line');
+    if(selEl) selEl.innerHTML=KIDS_HOLD.map(h=>`<option value="${h._id}">${h.e} · ${h.nom||'(sans nom)'} · ${h.c||''}</option>`).join('');
+    document.getElementById('kidCommForm').innerHTML =
+        kidCommRO('kc_e','Enfant')
+      + kidCommRO('kc_c','Broker / compte')
+      + kidCommRO('kc_nom','Nom')
+      + kidCommRO('kc_isin','ISIN')
+      + kidCommRO('kc_ticker','Ticker')
+      + kidCommIn('kc_date','Date commission','date','')
+      + kidCommRO('kc_devise','Devise')
+      + kidCommIn('kc_qty','Qté (parts prélevées)','number','step="any" oninput="kidCommRecalc()"')
+      + kidCommIn('kc_px','Prix (VL unitaire)','number','step="any" oninput="kidCommRecalc()"')
+      + kidCommRO('kc_coutDev','Coût total (devise)')
+      + kidCommRO('kc_coutEur','Coût total (€)');
+    document.getElementById('kidCommModal').style.display='flex';
+    kidCommLineChange();
+  };
+  window.kidCommLineChange=function(){
+    const id=(document.getElementById('kc_line')||{}).value;
+    const h=KIDS_HOLD.find(x=>x._id===id)||{};
+    const sv=(fid,v)=>{ const e=document.getElementById(fid); if(e) e.value=(v!=null?v:''); };
+    sv('kc_e',h.e); sv('kc_c',h.c); sv('kc_nom',h.nom); sv('kc_isin',h.isin); sv('kc_ticker',h.ticker); sv('kc_devise',h.devise||'EUR');
+    kidCommRecalc(); kidCommHistRender(id);
+  };
+  window.kidCommRecalc=function(){
+    const gn=fid=>{ const e=document.getElementById(fid); const v=e?e.value:''; return v===''?null:parseFloat(String(v).replace(',','.')); };
+    const q=gn('kc_qty'), px=gn('kc_px'); const dev=((document.getElementById('kc_devise')||{}).value)||'EUR';
+    const cd=(q!=null&&px!=null)?q*px:null; const ce=(cd!=null)?kidToEur(cd,dev):null;
+    const cdEl=document.getElementById('kc_coutDev'); if(cdEl) cdEl.value=(cd!=null?Math.round(cd*100)/100+' '+dev:'');
+    const ceEl=document.getElementById('kc_coutEur'); if(ceEl) ceEl.value=(ce!=null?Math.round(ce*100)/100+' €':'');
+  };
+  window.kidCommHistRender=function(id){
+    const box=document.getElementById('kidCommHist'); if(!box) return;
+    const list=(KIDS_COMM||[]).map((cm,idx)=>({cm,idx})).filter(o=>o.cm.hid===id);
+    if(!list.length){ box.innerHTML='<div style="font-size:11px;color:var(--text3)">Aucune commission enregistrée pour cette ligne.</div>'; return; }
+    box.innerHTML='<div style="font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:600">Commissions enregistrées</div>'
+      +'<table style="width:100%;font-size:11px;border-collapse:collapse">'
+      +'<tr style="color:var(--text2)"><th style="padding:3px 6px;text-align:left">Date</th><th style="padding:3px 6px;text-align:right">Qté</th><th style="padding:3px 6px;text-align:right">Prix</th><th style="padding:3px 6px;text-align:right">Coût</th><th></th></tr>'
+      +list.map(o=>{ const cm=o.cm; const cd=(cm.cout!=null)?cm.cout:((+cm.qty||0)*(+cm.px||0)); return `<tr style="border-top:1px solid var(--border)"><td style="padding:3px 6px">${cm.date||'—'}</td><td style="padding:3px 6px;text-align:right;font-family:'DM Mono',monospace">${(+cm.qty||0).toLocaleString('fr',{maximumFractionDigits:4})}</td><td style="padding:3px 6px;text-align:right;font-family:'DM Mono',monospace">${(+cm.px||0).toLocaleString('fr',{maximumFractionDigits:4})}</td><td style="padding:3px 6px;text-align:right;font-family:'DM Mono',monospace">${Math.round(cd).toLocaleString('fr')} ${cm.devise||'EUR'}</td><td style="padding:3px 6px;text-align:right"><button onclick="kidCommDel(${o.idx})" title="Supprimer" style="background:none;border:none;cursor:pointer;color:#e06c6c">🗑</button></td></tr>`; }).join('')
+      +'</table>';
+  };
+  window.kidCommSave=function(){
+    const id=(document.getElementById('kc_line')||{}).value;
+    const h=KIDS_HOLD.find(x=>x._id===id); if(!h){ alert('Ligne introuvable.'); return; }
+    const gn=fid=>{ const e=document.getElementById(fid); const v=e?e.value:''; return v===''?null:parseFloat(String(v).replace(',','.')); };
+    const gv=fid=>{ const e=document.getElementById(fid); return e?e.value:''; };
+    const q=gn('kc_qty'), px=gn('kc_px'), dev=((document.getElementById('kc_devise')||{}).value)||'EUR';
+    if(q==null||q<=0){ alert('Indique une quantité de parts prélevées (> 0).'); return; }
+    if(px==null){ alert('Indique le prix (VL) de la part.'); return; }
+    const cd=q*px; const ce=kidToEur(cd,dev);
+    KIDS_COMM.push({ hid:id, e:h.e, c:h.c, nom:h.nom, isin:h.isin, ticker:h.ticker, date:gv('kc_date'), devise:dev, qty:q, px:px, cout:cd, coutEur:ce });
+    window.KIDS_COMM=KIDS_COMM; kidsSave();
+    const rq=document.getElementById('kc_qty'); if(rq) rq.value='';
+    const rp=document.getElementById('kc_px'); if(rp) rp.value='';
+    kidCommRecalc(); kidCommHistRender(id); kidEdBuild();
+  };
+  window.kidCommDel=function(idx){
+    if(!KIDS_COMM[idx]) return; if(!confirm('Supprimer cette commission ?')) return;
+    const hid=KIDS_COMM[idx].hid;
+    KIDS_COMM.splice(idx,1); window.KIDS_COMM=KIDS_COMM; kidsSave();
+    kidCommHistRender(hid); kidEdBuild();
+  };
 
   // ---- Vente ----
   window.kidEdSell=function(i){ const h=KIDS_HOLD[i]; if(!h)return; window._kidSellIdx=i;
