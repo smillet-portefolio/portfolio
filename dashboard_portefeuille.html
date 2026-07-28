@@ -826,8 +826,8 @@
             <td colspan="10">Total portefeuille</td>
             <td id="totCost" style="text-align:right;font-family:'DM Mono',monospace">—</td>
             <td id="totCostEur" style="text-align:right;font-family:'DM Mono',monospace">—</td>
-            <td></td>
-            <td></td>
+            <td id="totComm" style="text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">—</td>
+            <td id="totTaxe" style="text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">—</td>
             <td></td>
             <td id="totVal" style="text-align:right;font-family:'DM Mono',monospace">—</td>
             <td id="totPnl" style="text-align:right;font-family:'DM Mono',monospace">—</td>
@@ -835,8 +835,7 @@
             <td></td>
           </tr>
         </tfoot>
-      </
-          <td></td>table>
+      </table>
     </div>
     <div id="editMsg" style="margin-top:14px;font-size:12px;color:#4caf82;display:none">✅ Mis à jour.</div>
   </div>
@@ -3168,6 +3167,36 @@ function edFilter(col, val) {
   buildPosTable(true);
 }
 
+// ── Totaux de la ligne « Total portefeuille » (Éditer) — sensibles aux filtres ──
+// Ne compte que les lignes actuellement affichées (= filtrées). Une ligne est
+// "affichée" si sa cellule costeur-<i> existe dans le DOM (rendue par buildPosTable).
+function refreshEditerTotals() {
+  let c = 0, v = 0, p = 0, comm = 0, taxe = 0, hasVal = false;
+  (typeof BOOK2_ROWS !== 'undefined' ? BOOK2_ROWS : []).forEach((r, i) => {
+    if (!document.getElementById('costeur-' + i)) return;   // ligne filtrée → ignorée
+    const costEur = r.costEur != null ? r.costEur : toEur(r.cost, r.currency);
+    c += costEur || 0;
+    const info = CURRENT_PRICES[r.ticker];
+    if (info && info.price) {
+      const valEur = toEur(r.qty * info.price, info.currency || r.currency);
+      if (valEur != null) { v += valEur; hasVal = true; if (costEur != null) p += valEur - costEur; }
+    }
+    const fc = r.commCur || r.currency || 'EUR';
+    if (r.comm) comm += (fc === 'EUR' ? r.comm : (toEur(r.comm, fc) || r.comm));
+    if (r.taxe) taxe += (fc === 'EUR' ? r.taxe : (toEur(r.taxe, fc) || r.taxe));
+  });
+  const fmtT = n => Math.round(n).toLocaleString('fr') + ' €';
+  const set = (id, txt, col) => { const e = document.getElementById(id); if (e) { e.textContent = txt; e.style.fontWeight = '700'; if (col !== undefined) e.style.color = col; } };
+  set('totCost', '—');
+  set('totCostEur', c > 0 ? fmtT(c) : '—');
+  set('totVal', hasVal ? fmtT(v) : '—', hasVal ? 'var(--text)' : 'var(--text2)');
+  set('totPnl', hasVal ? ((p >= 0 ? '+' : '') + fmtT(p)) : '—', hasVal ? (p >= 0 ? '#4caf82' : '#e06c6c') : 'var(--text2)');
+  const pct = c > 0 ? (p / c * 100) : null;
+  set('totPnlPct', pct != null ? ((pct >= 0 ? '+' : '') + pct.toFixed(1).replace('.', ',') + '%') : '—', pct != null ? (pct >= 0 ? '#4caf82' : '#e06c6c') : 'var(--text2)');
+  set('totComm', comm > 0 ? fmtT(comm) : '—', 'var(--text2)');
+  set('totTaxe', taxe > 0 ? fmtT(taxe) : '—', 'var(--text2)');
+}
+
 function buildPosTable(rebuild) {
   const tbody = document.getElementById('posTableBody');
   if (!tbody) return;
@@ -3268,28 +3297,8 @@ function buildPosTable(rebuild) {
     tbody.appendChild(tr);
   });
 
-  // ── Recalculer les totaux selon les lignes filtrées ──────────────────────
-  let sTotCostEur = 0, sTotVal = 0, sTotPnl = 0, hasVal = false;
-  rows.forEach(row => {
-    sTotCostEur += row.costEur  || 0;
-    if (row.valEur != null) { sTotVal += row.valEur; hasVal = true; }
-    if (row.pnl    != null)   sTotPnl += row.pnl;
-  });
-  const fmtT = n => Math.round(n).toLocaleString('fr') + ' €';
-  const elT  = id => document.getElementById(id);
-  if (elT('totCostEur'))  elT('totCostEur').textContent  = sTotCostEur > 0 ? fmtT(sTotCostEur) : '—';
-  if (elT('totVal')) {
-    elT('totVal').textContent = hasVal ? fmtT(sTotVal) : '—';
-  }
-  if (elT('totPnl')) {
-    elT('totPnl').textContent = hasVal ? (sTotPnl >= 0 ? '+' : '') + fmtT(sTotPnl) : '—';
-    elT('totPnl').style.color = hasVal ? (sTotPnl >= 0 ? '#4caf82' : '#e06c6c') : 'var(--text)';
-  }
-  if (elT('totPnlPct')) {
-    const pct = sTotCostEur > 0 ? (sTotPnl / sTotCostEur * 100) : null;
-    elT('totPnlPct').textContent = pct != null ? (pct >= 0 ? '+' : '') + pct.toFixed(1).replace('.', ',') + '%' : '—';
-    elT('totPnlPct').style.color = pct != null ? (pct >= 0 ? '#4caf82' : '#e06c6c') : 'var(--text)';
-  }
+  // ── Totaux (Coût €, Valeur, P&L, Comm./frais, Taxe) selon les lignes filtrées ──
+  refreshEditerTotals();
 }
 
 // ── Fetch FX rates
@@ -3692,6 +3701,8 @@ function updateTableRows() {
        </div>`
     ).join('');
   }
+  // Ligne « Total portefeuille » : toujours refléter les filtres (comm/frais + taxe inclus)
+  refreshEditerTotals();
 }
 
 
@@ -4301,7 +4312,7 @@ function closedSort(col) {
   renderClosedPositions();
 }
 function closedFilter(key, val) {
-  window._closedFilter[key] = (val || '').toLowerCase();
+  window._closedFilter[key] = (val || '').trim().toLowerCase();
   renderClosedPositions();
 }
 function renderClosedPositions() {
@@ -4319,11 +4330,18 @@ function renderClosedPositions() {
   if (emptyEl) emptyEl.style.display = all.length ? 'none' : 'block';
   if (tableEl) tableEl.style.display = all.length ? '' : 'none';
   // Filtre + tri
-  const cf = window._closedFilter || { nom:'', ticker:'', broker:'' };
+  const cf = window._closedFilter || {};
+  const _num = s => parseFloat(String(s).replace(',', '.'));
   let rows = all.filter(p =>
     (!cf.nom || (p.name||'').toLowerCase().includes(cf.nom)) &&
     (!cf.ticker || (p.ticker||'').toLowerCase().includes(cf.ticker)) &&
-    (!cf.broker || (p.broker||'').toLowerCase().includes(cf.broker)));
+    (!cf.broker || (p.broker||'').toLowerCase().includes(cf.broker)) &&
+    (!cf.dateAchat || (p.dateAchat||'').toLowerCase().includes(cf.dateAchat)) &&
+    (!cf.dateSell || (p.dateSell||'').toLowerCase().includes(cf.dateSell)) &&
+    (!cf.qty || (p.qty != null && p.qty >= _num(cf.qty))) &&
+    (!cf.costEur || (p.costEur != null && p.costEur >= _num(cf.costEur))) &&
+    (!cf.saleEur || (p.saleEur != null && p.saleEur >= _num(cf.saleEur))) &&
+    (!cf.pnl || (p.pnl != null && p.pnl >= _num(cf.pnl))));
   const cs = window._closedSort || { col:'dateSell', dir:-1 };
   rows = rows.slice().sort((a,b) => {
     let x = a[cs.col], y = b[cs.col];
@@ -4337,7 +4355,7 @@ function renderClosedPositions() {
     const s = th.querySelector('.cs-arr');
     if (s) s.textContent = (th.dataset.csort === cs.col) ? (cs.dir < 0 ? ' \u25bc' : ' \u25b2') : '';
   });
-  let totCost=0, totVal=0, totPnl=0, totFees=0;
+  let totCost=0, totVal=0, totPnl=0, totFees=0, totComm=0, totTaxe=0;
 
   rows.forEach(p => {
     const col  = p.pnl>=0 ? '#4caf82' : '#e06c6c';
@@ -4362,7 +4380,11 @@ function renderClosedPositions() {
       <td style="padding:7px 12px;text-align:center"><button onclick="openEditClosed('${p._id}')" title="Modifier la clôture (tous les champs)" style="background:none;border:none;cursor:pointer;font-size:13px;line-height:1">✏️</button></td>`;
     tbody.appendChild(tr);
     totCost += p.costEur; totVal += p.saleEur; totPnl += p.pnl;
-    { const _ff=(p.commAchat||0)+(p.commVente||0)+(p.taxe||0), _cc=p.currencyFrais||'EUR'; totFees += (_cc==='EUR'?_ff:(toEur(_ff,_cc)||_ff)); }
+    { const _cc=p.currencyFrais||'EUR';
+      const _cm=(p.commAchat||0)+(p.commVente||0), _tx=(p.taxe||0), _ff=_cm+_tx;
+      totFees += (_cc==='EUR'?_ff:(toEur(_ff,_cc)||_ff));
+      totComm += (_cc==='EUR'?_cm:(toEur(_cm,_cc)||_cm));
+      totTaxe += (_cc==='EUR'?_tx:(toEur(_tx,_cc)||_tx)); }
   });
 
   {
@@ -4378,6 +4400,9 @@ function renderClosedPositions() {
     set('closedTopCost', costS); set('closedTopVal', valS); set('closedTopPnl', pnlS); set('closedTopPct', pctS);
     const feesS = totFees>0 ? Math.round(totFees).toLocaleString('fr')+' €' : '—';
     set('closedFees', feesS); set('closedTopFees', feesS);
+    { const _s=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+      _s('closedTotComm', totComm>0?Math.round(totComm).toLocaleString('fr')+' €':'—');
+      _s('closedTotTaxe', totTaxe>0?Math.round(totTaxe).toLocaleString('fr')+' €':'—'); }
   }
 
   if (typeof renderClosedByPos === 'function') renderClosedByPos();
@@ -7250,7 +7275,18 @@ function renderObligCharts(data) {
             <td style="padding:3px 8px"><input type="text" placeholder="Filtrer nom..." oninput="closedFilter('nom',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>
             <td style="padding:3px 8px"><input type="text" placeholder="Ticker..." oninput="closedFilter('ticker',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>
             <td style="padding:3px 8px"><input type="text" placeholder="Broker..." oninput="closedFilter('broker',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>
-            <td colspan="11"></td>
+            <td style="padding:3px 8px"><input type="text" placeholder="AAAA-MM-JJ" oninput="closedFilter('dateAchat',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>
+            <td style="padding:3px 8px"><input type="text" placeholder="AAAA-MM-JJ" oninput="closedFilter('dateSell',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>
+            <td style="padding:3px 8px"><input type="text" placeholder="≥ qté" oninput="closedFilter('qty',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none;text-align:right"></td>
+            <td></td>
+            <td></td>
+            <td style="padding:3px 8px"><input type="text" placeholder="≥ coût" oninput="closedFilter('costEur',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none;text-align:right"></td>
+            <td style="padding:3px 8px"><input type="text" placeholder="≥ vente" oninput="closedFilter('saleEur',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none;text-align:right"></td>
+            <td></td>
+            <td></td>
+            <td style="padding:3px 8px"><input type="text" placeholder="≥ P&amp;L" oninput="closedFilter('pnl',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none;text-align:right"></td>
+            <td></td>
+            <td></td>
           </tr>
         </thead>
         <tbody id="closedBody"></tbody>
@@ -7259,8 +7295,8 @@ function renderObligCharts(data) {
             <td colspan="8" style="padding:8px 12px">Total réalisé</td>
             <td id="closedCost" style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">—</td>
             <td id="closedVal"  style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">—</td>
-            <td></td>
-            <td></td>
+            <td id="closedTotComm" style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">—</td>
+            <td id="closedTotTaxe" style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">—</td>
             <td id="closedPnl"  style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:700">—</td>
             <td id="closedPct"  style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">—</td>
           </tr>
