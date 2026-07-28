@@ -319,6 +319,66 @@ def tickers_portefeuille():
     return [(tk, nm) for tk, nm in seen.items()]
 
 
+ISIN_RE = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")
+
+
+def tickers_enfants():
+    """Liste [(cle, nom)] des lignes enfants (kids_hold) detenues avec un ticker
+    OU un ISIN. Cle = ticker si present, sinon ISIN. Exclut les fonds euro / cash /
+    monetaire SANS ticker (Netissima, Eurossima... mis a jour manuellement)."""
+    if not GOOGLE_OK:
+        return []
+    try:
+        svc = build("sheets", "v4", credentials=_get_creds()).spreadsheets()
+        res = svc.values().get(spreadsheetId=SHEET_ID, range="Data!A:Z").execute()
+        data = {}
+        for r in (res.get("values", []) or []):
+            if r and r[0]:
+                data[r[0]] = "".join(r[1:])
+        raw = data.get("kids_hold")
+        hold = json.loads(raw) if raw else []
+    except Exception as e:
+        print(f"  [Data] kids_hold indisponible : {e}")
+        return []
+    seen = {}
+    for h in (hold or []):
+        if not isinstance(h, dict):
+            continue
+        tk = (h.get("ticker") or "").strip()
+        isin = (h.get("isin") or "").strip().upper()
+        ty = (h.get("t") or "").strip().lower()
+        # Fonds euro / cash / monetaire sans ticker : prix manuel -> ignore
+        if not tk and re.search(r"fonds ?€|euro|cash|monét|monet|livret", ty):
+            continue
+        key = tk if tk else isin
+        if not key or key in STATIC_TICKS or key.upper() in SKIP_TICKS:
+            continue
+        if key not in seen:
+            seen[key] = (h.get("nom") or key)
+    return [(k, n) for k, n in seen.items()]
+
+
+def resolve_isin(isin):
+    """Resout un ISIN en (symbole Yahoo, prix, devise) via l'endpoint de recherche Yahoo."""
+    try:
+        url = "https://query2.finance.yahoo.com/v1/finance/search"
+        r = requests.get(url, params={"q": isin, "quotesCount": 5, "newsCount": 0},
+                         headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        quotes = (r.json() or {}).get("quotes") or []
+        for q in quotes:
+            sym = q.get("symbol")
+            if not sym:
+                continue
+            p, c = prix_devise_yahoo(sym)
+            if p and p > 0:
+                print(f"    [isin] {isin} -> {sym} ({c})")
+                return sym, p, c
+        return isin, None, None
+    except Exception as e:
+        print(f"  [ISIN {isin}] {e}")
+        return isin, None, None
+
+
 _YS_SUFFIXES = ["", ".DE", ".MI", ".PA", ".AS", ".L", ".SW", ".F"]
 def resolve_yahoo(tick):
     """Repli multi-place : pour un ticker sans suffixe (nouvel ETF/action europeen
@@ -380,11 +440,24 @@ def collecter_prix():
         dyn = [(t, n) for (t, n, c, y) in TICKERS if t not in STATIC_TICKS]
     else:
         print(f"\n--- Actions / ETFs du portefeuille ({len(dyn)} tickers, DYNAMIQUE) ---")
+    # Ajouter les lignes enfants (ticker OU ISIN) non deja presentes, cle = ticker sinon ISIN
+    enfants = tickers_enfants()
+    if enfants:
+        _existants = {t for (t, _) in dyn}
+        _ajoutes = 0
+        for k, n in enfants:
+            if k not in _existants:
+                dyn.append((k, n))
+                _existants.add(k)
+                _ajoutes += 1
+        print(f"--- Enfants (Éditer) : {_ajoutes} tickers/ISIN ajoutés au feed quotidien ---")
     for tick, nom in sorted(dyn, key=lambda x: x[0]):
         ov = YS_OVERRIDE.get(tick)
         if ov:
             ysym = ov                               # override explicite (ex. Q8Y0 -> Q8Y0.DE)
             prix, cur = prix_devise_yahoo(ysym)
+        elif ISIN_RE.match(tick):
+            ysym, prix, cur = resolve_isin(tick)    # ligne enfant sans ticker -> resolution ISIN
         else:
             ysym, prix, cur = resolve_yahoo(tick)   # repli multi-place automatique
         if not cur:

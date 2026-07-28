@@ -3703,6 +3703,8 @@ function updateTableRows() {
   }
   // Ligne « Total portefeuille » : toujours refléter les filtres (comm/frais + taxe inclus)
   refreshEditerTotals();
+  // Rafraîchir l'Éditer enfants (prix actuel / valeur actuelle par ticker) s'il est affiché
+  if (typeof window.kidEdBuild === 'function' && document.getElementById('kidEdBody')) { try { window.kidEdBuild(); } catch(e){} }
 }
 
 
@@ -10963,6 +10965,10 @@ window.addEventListener('load', () => {
     }});
     return { qty:q, coutEur:cEur };
   }
+  // Regroupement par fonds (même enfant + même nom + même compte) pour répartir les commissions
+  const _kidNorm = s=>String(s||'').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  function kidFundGroup(h){ if(!h) return []; const nk=_kidNorm(h.nom), ck=(h.c||''), ek=(h.e||''); return KIDS_HOLD.filter(x=> x.e===ek && (x.c||'')===ck && _kidNorm(x.nom)===nk); }
+  function kidCurQtyAct(line){ const qa=(line.qty!=null?+line.qty:0); const ag=kidCommAgg(line._id); return qa-ag.qty; }
   function kidEdRows(){
     return KIDS_HOLD.map((h,i)=>{
       const dev=h.devise||'EUR';
@@ -10980,10 +10986,14 @@ window.addEventListener('load', () => {
       const qtyAct = (qtyAch!=null)? (qtyAch - agg.qty) : null;   // Qté actuelle
       const commBase = (h.comm!=null)? (kidToEur(+h.comm, h.commCur||dev)||0) : 0;
       const commTot = (commBase + agg.coutEur) || null;
-      const vl = (h.vl!=null?+h.vl:null);
-      // Valeur actuelle basée sur la Qté actuelle (après frais)
+      // Prix actuel : cours du feed quotidien (CURRENT_PRICES par ticker) si dispo, sinon VL saisie manuellement
+      let vl = (h.vl!=null?+h.vl:null);
+      let priceCur = dev;
+      const _info = (typeof CURRENT_PRICES!=='undefined') ? ((h.ticker && CURRENT_PRICES[h.ticker]) || (h.isin && CURRENT_PRICES[h.isin]) || null) : null;
+      if(_info && _info.price){ vl = _info.price; priceCur = _info.currency || dev; }
+      // Valeur actuelle basée sur la Qté actuelle (après frais), convertie en €
       let val;
-      if(vl!=null && qtyAct!=null) val = qtyAct*vl;
+      if(vl!=null && qtyAct!=null) val = kidToEur(qtyAct*vl, priceCur);
       else val = (h.val!=null)? +h.val : null;
       const pnl  = (coutEur!=null && val!=null)? val-coutEur : null;
       const pct  = (pnl!=null && coutEur>0)? pnl/coutEur*100 : null;
@@ -11105,7 +11115,7 @@ window.addEventListener('load', () => {
     const cP=n=> n==null?'var(--text2)':(n>=0?'#4caf82':'#e06c6c');
     body.innerHTML = rows.map((r,idx)=>`<tr style="border-bottom:1px solid var(--border)">
       <td style="color:var(--text2);padding:6px 10px">${idx+1}</td>
-      <td style="padding:6px 14px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COL[r.e]};margin-right:5px"></span>${r.e}</td>
+      <td style="padding:6px 14px;white-space:nowrap"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COL[r.e]};margin-right:5px"></span>${r.e}</td>
       <td style="font-size:10px;padding:6px 10px;color:var(--text2);font-family:'DM Mono',monospace">${r.isin||'—'}</td>
       <td style="padding:6px 14px"><strong>${r.nom}</strong></td>
       <td style="padding:6px 10px">${r.t?`<span style="font-size:10px;padding:2px 7px;border-radius:4px;background:var(--bg3);border:1px solid var(--border2);white-space:nowrap">${r.t}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
@@ -11247,12 +11257,20 @@ window.addEventListener('load', () => {
   };
   window.kidCommHistRender=function(id){
     const box=document.getElementById('kidCommHist'); if(!box) return;
-    const list=(KIDS_COMM||[]).map((cm,idx)=>({cm,idx})).filter(o=>o.cm.hid===id);
-    if(!list.length){ box.innerHTML='<div style="font-size:11px;color:var(--text3)">Aucune commission enregistrée pour cette ligne.</div>'; return; }
-    box.innerHTML='<div style="font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:600">Commissions enregistrées</div>'
+    const h=KIDS_HOLD.find(x=>x._id===id);
+    const group=h?kidFundGroup(h):[];
+    const ids=new Set(group.map(x=>x._id)); ids.add(id);
+    const note = group.length>1 ? `<div style="font-size:11px;color:#f0956e;margin-bottom:8px">↔ Ce fonds a ${group.length} lignes : la commission est répartie au prorata de la Qté actuelle.</div>` : '';
+    const recs=(KIDS_COMM||[]).map((cm,idx)=>({cm,idx})).filter(o=> ids.has(o.cm.hid));
+    if(!recs.length){ box.innerHTML=note+'<div style="font-size:11px;color:var(--text3)">Aucune commission enregistrée pour ce fonds.</div>'; return; }
+    // Regrouper les enregistrements par lot (une commission saisie = 1 lot, éventuellement réparti sur N lignes)
+    const batches={};
+    recs.forEach(o=>{ const b=o.cm.batch||('i'+o.idx); if(!batches[b]) batches[b]={date:o.cm.date,devise:o.cm.devise||'EUR',qty:0,cost:0,batch:o.cm.batch||null,idx:o.idx}; batches[b].qty+=(+o.cm.qty||0); batches[b].cost+=((o.cm.cout!=null)?+o.cm.cout:((+o.cm.qty||0)*(+o.cm.px||0))); });
+    const rows=Object.values(batches).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+    box.innerHTML=note+'<div style="font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:600">Commissions enregistrées</div>'
       +'<table style="width:100%;font-size:11px;border-collapse:collapse">'
-      +'<tr style="color:var(--text2)"><th style="padding:3px 6px;text-align:left">Date</th><th style="padding:3px 6px;text-align:right">Qté</th><th style="padding:3px 6px;text-align:right">Prix</th><th style="padding:3px 6px;text-align:right">Coût</th><th></th></tr>'
-      +list.map(o=>{ const cm=o.cm; const cd=(cm.cout!=null)?cm.cout:((+cm.qty||0)*(+cm.px||0)); return `<tr style="border-top:1px solid var(--border)"><td style="padding:3px 6px">${cm.date||'—'}</td><td style="padding:3px 6px;text-align:right;font-family:'DM Mono',monospace">${(+cm.qty||0).toLocaleString('fr',{maximumFractionDigits:4})}</td><td style="padding:3px 6px;text-align:right;font-family:'DM Mono',monospace">${(+cm.px||0).toLocaleString('fr',{maximumFractionDigits:4})}</td><td style="padding:3px 6px;text-align:right;font-family:'DM Mono',monospace">${Math.round(cd).toLocaleString('fr')} ${cm.devise||'EUR'}</td><td style="padding:3px 6px;text-align:right"><button onclick="kidCommDel(${o.idx})" title="Supprimer" style="background:none;border:none;cursor:pointer;color:#e06c6c">🗑</button></td></tr>`; }).join('')
+      +'<tr style="color:var(--text2)"><th style="padding:3px 6px;text-align:left">Date</th><th style="padding:3px 6px;text-align:right">Qté totale</th><th style="padding:3px 6px;text-align:right">Coût total</th><th></th></tr>'
+      +rows.map(r=>`<tr style="border-top:1px solid var(--border)"><td style="padding:3px 6px">${r.date||'—'}</td><td style="padding:3px 6px;text-align:right;font-family:'DM Mono',monospace">${r.qty.toLocaleString('fr',{maximumFractionDigits:4})}</td><td style="padding:3px 6px;text-align:right;font-family:'DM Mono',monospace">${Math.round(r.cost).toLocaleString('fr')} ${r.devise}</td><td style="padding:3px 6px;text-align:right"><button onclick="${r.batch?`kidCommDelBatch('${r.batch}')`:`kidCommDel(${r.idx})`}" title="Supprimer" style="background:none;border:none;cursor:pointer;color:#e06c6c">🗑</button></td></tr>`).join('')
       +'</table>';
   };
   window.kidCommSave=function(){
@@ -11263,12 +11281,28 @@ window.addEventListener('load', () => {
     const q=gn('kc_qty'), px=gn('kc_px'), dev=((document.getElementById('kc_devise')||{}).value)||'EUR';
     if(q==null||q<=0){ alert('Indique une quantité de parts prélevées (> 0).'); return; }
     if(px==null){ alert('Indique le prix (VL) de la part.'); return; }
-    const cd=q*px; const ce=kidToEur(cd,dev);
-    KIDS_COMM.push({ hid:id, e:h.e, c:h.c, nom:h.nom, isin:h.isin, ticker:h.ticker, date:gv('kc_date'), devise:dev, qty:q, px:px, cout:cd, coutEur:ce });
+    const date=gv('kc_date');
+    const batch='cb'+Math.random().toString(36).slice(2,9);
+    const mk=(line,qShare)=>({ hid:line._id, batch:batch, e:line.e, c:line.c, nom:line.nom, isin:line.isin, ticker:line.ticker, date:date, devise:dev, qty:qShare, px:px, cout:qShare*px, coutEur:kidToEur(qShare*px,dev) });
+    // Répartition au prorata de la Qté actuelle (avant cette déduction) si le fonds a plusieurs lignes
+    const group=kidFundGroup(h);
+    const acts=group.map(kidCurQtyAct);
+    const totalAct=acts.reduce((a,b)=>a+(b>0?b:0),0);
+    if(group.length<=1 || totalAct<=0){
+      KIDS_COMM.push(mk(h,q));
+    } else {
+      group.forEach((line,i)=>{ const a=acts[i]>0?acts[i]:0; const qShare=q*(a/totalAct); if(qShare>0) KIDS_COMM.push(mk(line,qShare)); });
+    }
     window.KIDS_COMM=KIDS_COMM; kidsSave();
     const rq=document.getElementById('kc_qty'); if(rq) rq.value='';
     const rp=document.getElementById('kc_px'); if(rp) rp.value='';
     kidCommRecalc(); kidCommHistRender(id); kidEdBuild();
+  };
+  window.kidCommDelBatch=function(batch){
+    if(!confirm('Supprimer cette commission ?')) return;
+    const ref=(KIDS_COMM||[]).find(cm=>cm.batch===batch); const hid=ref?ref.hid:((document.getElementById('kc_line')||{}).value);
+    KIDS_COMM = (KIDS_COMM||[]).filter(cm=>cm.batch!==batch); window.KIDS_COMM=KIDS_COMM; kidsSave();
+    kidCommHistRender(hid); kidEdBuild();
   };
   window.kidCommDel=function(idx){
     if(!KIDS_COMM[idx]) return; if(!confirm('Supprimer cette commission ?')) return;
