@@ -10647,53 +10647,58 @@ window.addEventListener('load', () => {
   function kidSynthese(b){
     const s=sel();
     const list = s==='Tous' ? KIDS : [s];
-    const A={}; KIDS.forEach(c=>A[c]=agg(c));
-    const totVal = list.reduce((t,c)=>t+A[c].valeur,0);
-    const totInv = list.reduce((t,c)=>t+A[c].investi,0);
-    const totGain= totVal-totInv;
-    // KPI globaux
-    let html = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px">
-        ${kpi('Valeur actuelle', fmt(totVal), 'var(--text)')}
-        ${kpi('Investi net', fmt(totInv), 'var(--text)')}
-        ${kpi('Plus-value', fmts(totGain), col(totGain))}
-        ${kpi('Performance', pct(totInv?totGain/totInv*100:null), col(totGain))}
-      </div>`;
-    // Cartes par enfant
-    html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-bottom:22px">`;
+    const rowsAll = kidEdRows();
+    const typePal = {'Action':'#5a8dee','ETF':'#38bdf8','Fonds':'#9b87d4','Fonds €':'#c084fc','Monétaire':'#e8a838','Cash':'#94a3b8','Crypto':'#f0956e','Action ':'#5a8dee'};
+    const kid=c=>({rows:rowsAll.filter(r=>r.e===c)});
+    let html='';
     list.forEach(c=>{
-      const a=A[c];
-      html += `<div class="card" style="border-left:3px solid ${COL[c]}">
-          <div style="font-weight:700;font-size:14px;margin-bottom:8px">${c}</div>
-          <div style="display:flex;justify-content:space-between;font-size:12px;margin:3px 0"><span style="color:var(--text2)">Valeur</span><b>${fmt(a.valeur)}</b></div>
-          <div style="display:flex;justify-content:space-between;font-size:12px;margin:3px 0"><span style="color:var(--text2)">Investi net</span><span>${fmt(a.investi)}</span></div>
-          <div style="display:flex;justify-content:space-between;font-size:12px;margin:3px 0"><span style="color:var(--text2)">+/-</span><b style="color:${col(a.gain)}">${fmts(a.gain)} (${pct(a.pct)})</b></div>
-        </div>`;
+      const rows=rowsAll.filter(r=>r.e===c);
+      const invest=rows.reduce((t,r)=>t+(r.coutEur||0),0);
+      const valeur=rows.reduce((t,r)=>t+(+r.val||0),0);
+      const gain=valeur-invest; const perf=invest?gain/invest*100:null;
+      const byType={}; rows.forEach(r=>{ const t=r.t||'Autre'; if((+r.val||0)>0) byType[t]=(byType[t]||0)+(+r.val||0); });
+      const byBk={}; rows.forEach(r=>{ const k=r.broker||'—'; if(!byBk[k])byBk[k]={inv:0,val:0}; byBk[k].inv+=(r.coutEur||0); byBk[k].val+=(+r.val||0); });
+      const bkKeys=Object.keys(byBk).sort((a,b2)=>byBk[b2].val-byBk[a].val);
+      const donutId='kidSynDonut_'+c.replace(/[^a-zA-Z]/g,'');
+      html+=`<div class="card" style="border-left:4px solid ${COL[c]};margin-bottom:22px;padding:22px 24px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+          <h2 style="font-size:17px;font-weight:700;margin:0;display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${COL[c]}"></span>${c}</h2>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px">
+          ${kpi('Montant investi', fmt(invest), 'var(--text)')}
+          ${kpi('Valeur actuelle', fmt(valeur), 'var(--text)')}
+          ${kpi('Performance (€)', fmts(gain), col(gain))}
+          ${kpi('Performance (%)', pct(perf), col(gain))}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1.5fr;gap:20px;align-items:start">
+          <div>
+            <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);text-align:center;margin:0 0 8px">Par type d'actif</h3>
+            <div style="height:250px"><canvas id="${donutId}"></canvas></div>
+          </div>
+          <div>
+            <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin:0 0 8px">Par broker</h3>
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+              <thead><tr style="color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.4px;border-bottom:1px solid var(--border)"><th style="text-align:left;padding:6px 8px">Broker</th><th style="text-align:right;padding:6px 8px">Investi €</th><th style="text-align:right;padding:6px 8px">Valeur act. €</th><th style="text-align:right;padding:6px 8px">+/− €</th><th style="text-align:right;padding:6px 8px">Perf.</th></tr></thead>
+              <tbody>
+                ${bkKeys.map(k=>{ const g=byBk[k].val-byBk[k].inv; const p=byBk[k].inv?g/byBk[k].inv*100:null; return `<tr style="border-bottom:1px solid var(--border)"><td style="padding:6px 8px;font-weight:600">${k}</td><td style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace">${fmt(byBk[k].inv)}</td><td style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace">${fmt(byBk[k].val)}</td><td style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;color:${col(g)}">${fmts(g)}</td><td style="text-align:right;padding:6px 8px;color:${col(g)}">${pct(p)}</td></tr>`; }).join('')}
+                <tr style="font-weight:700;border-top:2px solid var(--border2);background:var(--bg2)"><td style="padding:7px 8px">Total</td><td style="text-align:right;padding:7px 8px;font-family:'DM Mono',monospace">${fmt(invest)}</td><td style="text-align:right;padding:7px 8px;font-family:'DM Mono',monospace">${fmt(valeur)}</td><td style="text-align:right;padding:7px 8px;font-family:'DM Mono',monospace;color:${col(gain)}">${fmts(gain)}</td><td style="text-align:right;padding:7px 8px;color:${col(gain)}">${pct(perf)}</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>`;
     });
-    html += `</div>`;
-    // Graphiques
-    html += `<div class="grid-2" style="grid-template-columns:1fr 1fr">
-        <div class="card"><h3>Valeur par enfant</h3><div class="sub">Répartition du patrimoine des enfants</div><div class="chart-wrap" style="height:260px"><canvas id="kidDonutChild"></canvas></div></div>
-        <div class="card"><h3>Valeur par compte</h3><div class="sub">Linxea (assurance-vie) vs SAXO</div><div class="chart-wrap" style="height:260px"><canvas id="kidDonutCompte"></canvas></div></div>
-      </div>
-      <div class="card" style="margin-top:14px"><h3>Investi vs valeur actuelle</h3><div class="sub">Par enfant</div><div class="chart-wrap" style="height:260px"><canvas id="kidBarInvVal"></canvas></div></div>`;
-    b.innerHTML=html;
-    // Donut par enfant
-    _kidCharts.push(new Chart(document.getElementById('kidDonutChild'),{type:'doughnut',
-      data:{labels:list, datasets:[{data:list.map(c=>A[c].valeur), backgroundColor:list.map(c=>COL[c]), borderWidth:0}]},
-      options:donutOpts()}));
-    // Donut par compte
-    const byC={}; holdSel().forEach(h=>{byC[h.c]=(byC[h.c]||0)+(+h.val||0);});
-    const clabels=Object.keys(byC);
-    _kidCharts.push(new Chart(document.getElementById('kidDonutCompte'),{type:'doughnut',
-      data:{labels:clabels, datasets:[{data:clabels.map(k=>byC[k]), backgroundColor:clabels.map(k=>COLC[k]||'#94a3b8'), borderWidth:0}]},
-      options:donutOpts()}));
-    // Bar investi vs valeur
-    _kidCharts.push(new Chart(document.getElementById('kidBarInvVal'),{type:'bar',
-      data:{labels:list, datasets:[
-        {label:'Investi net', data:list.map(c=>A[c].investi), backgroundColor:'#c9c2b6'},
-        {label:'Valeur', data:list.map(c=>A[c].valeur), backgroundColor:list.map(c=>COL[c])}
-      ]},
-      options:barOpts()}));
+    b.innerHTML=html || '<div class="card" style="color:var(--text2)">Aucune donnée.</div>';
+    // Donuts par type d'actif (un par enfant)
+    list.forEach(c=>{
+      const rows=rowsAll.filter(r=>r.e===c);
+      const byType={}; rows.forEach(r=>{ const t=r.t||'Autre'; if((+r.val||0)>0) byType[t]=(byType[t]||0)+(+r.val||0); });
+      const labels=Object.keys(byType);
+      const el=document.getElementById('kidSynDonut_'+c.replace(/[^a-zA-Z]/g,'')); if(!el)return;
+      _kidCharts.push(new Chart(el,{type:'doughnut',
+        data:{labels, datasets:[{data:labels.map(k=>Math.round(byType[k])), backgroundColor:labels.map((k,i)=>typePal[k]||PAL[i%PAL.length]), borderWidth:0}]},
+        options:donutOpts()}));
+    });
   }
 
   // ---- 2) PORTEFEUILLE ----------------------------------------------------
