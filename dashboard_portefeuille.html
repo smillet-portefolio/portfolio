@@ -10694,31 +10694,97 @@ window.addEventListener('load', () => {
 
   // ---- 2) PORTEFEUILLE ----------------------------------------------------
   function kidPortefeuille(b){
-    const rows = holdSel().slice().sort((a,b2)=>(b2.val||0)-(a.val||0));
-    const tot = rows.reduce((s,h)=>s+(+h.val||0),0);
-    let html=`<div class="card"><table><thead><tr>
-        <th>Enfant</th><th>Compte</th><th>Fonds / position</th><th>Type</th>
-        <th style="text-align:right">Qté</th><th style="text-align:right">Valeur</th>
-        <th style="text-align:right">Coût</th><th style="text-align:right">+/-</th><th style="text-align:right">%</th><th style="text-align:right">Poids</th></tr></thead><tbody>`;
-    rows.forEach(h=>{
-      const g = (h.cout!=null) ? (h.val-h.cout) : null;
-      const p = (h.cout) ? g/h.cout*100 : null;
-      html+=`<tr>
-        <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COL[h.e]};margin-right:6px"></span>${h.e}</td>
-        <td>${h.c}</td><td>${h.nom}${h.isin?` <span style="color:var(--text3);font-size:10px">${h.isin}</span>`:''}</td>
-        <td><span style="font-size:10px;padding:2px 7px;border-radius:8px;background:var(--bg3);color:var(--text2)">${h.t||''}</span></td>
-        <td style="text-align:right">${h.qty!=null?h.qty.toLocaleString('fr-FR'):'—'}</td>
-        <td style="text-align:right;font-weight:600">${fmt(h.val)}</td>
-        <td style="text-align:right;color:var(--text2)">${h.cout!=null?fmt(h.cout):'—'}</td>
-        <td style="text-align:right;color:${g!=null?col(g):'var(--text3)'}">${g!=null?fmts(g):'—'}</td>
-        <td style="text-align:right;color:${p!=null?col(p):'var(--text3)'}">${p!=null?pct(p):'—'}</td>
-        <td style="text-align:right;color:var(--text2)">${tot?(h.val/tot*100).toFixed(1).replace('.',',')+' %':'—'}</td></tr>`;
-    });
-    html+=`<tr style="border-top:2px solid var(--border2);font-weight:700"><td colspan="5">TOTAL${sel()!=='Tous'?' — '+sel():''}</td><td style="text-align:right">${fmt(tot)}</td><td colspan="4"></td></tr>`;
-    html+=`</tbody></table></div>
-      <p style="font-size:11px;color:var(--text2);margin-top:8px">Linxea : valeur par fonds (coût suivi au niveau du contrat, cf. Synthèse). SAXO : coût et +/- par position.</p>`;
-    b.innerHTML=html;
+    window._kidPfBox=b;
+    if(window._kidPfFilter==null) window._kidPfFilter={};
+    if(window._kidPfSort==null) window._kidPfSort={col:'valEur',dir:-1};
+    const f=window._kidPfFilter;
+    const th=(c,lab,al)=>`<th onclick="kidPfSort('${c}')" style="padding:8px 12px;cursor:pointer;user-select:none;white-space:nowrap;text-align:${al||'left'}">${lab} <span style="font-size:9px;opacity:.4">⇅</span></th>`;
+    const fin=(c,ph,al)=>`<td style="padding:3px 6px"><input type="text" value="${String(f[c]||'').replace(/"/g,'&quot;')}" placeholder="${ph}" oninput="kidPfFilter('${c}',this.value)" style="width:100%;box-sizing:border-box;padding:4px 7px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none${al==='right'?';text-align:right':''}"></td>`;
+    b.innerHTML=`
+      <h2 style="font-size:16px;font-weight:700;margin-bottom:2px">💼 Portefeuille — enfants</h2>
+      <p class="section-desc" style="margin-bottom:14px">Vue consolidée — une ligne par valeur (regroupée par fonds).</p>
+      <div id="kidPfKpi" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:18px"></div>
+      <div style="max-height:70vh;overflow:auto">
+        <table style="font-size:12px;width:100%;border-collapse:collapse;min-width:1050px">
+          <thead>
+            <tr style="background:var(--bg2);text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2)">
+              ${th('e','Enfant')}${th('name','Nom')}${th('typeInv','Type')}${th('brokers','Broker')}${th('isin','ISIN')}${th('ticker','Ticker')}${th('qty','Nb parts','right')}${th('pxRevient','Prix revient','right')}${th('costEur','Coût total €','right')}${th('valEur','Valeur actuelle €','right')}${th('pnl','+/- value €','right')}${th('pnlPct','+/- %','right')}
+            </tr>
+            <tr style="background:var(--bg3)">
+              <td></td>${fin('nom','Filtrer nom')}${fin('typeInv','Type…')}${fin('broker','Broker…')}${fin('isin','ISIN')}${fin('ticker','Ticker')}${fin('qty','≥ qté','right')}<td></td>${fin('costEur','≥ coût €','right')}${fin('valEur','≥ valeur €','right')}${fin('pnl','≥ P&L €','right')}<td></td>
+            </tr>
+          </thead>
+          <tbody id="kidPfBody"></tbody>
+          <tfoot><tr id="kidPfTot" style="font-weight:700;background:var(--bg2)"></tr></tfoot>
+        </table>
+      </div>`;
+    kidPfBuild();
   }
+  function kidPfBuild(){
+    const body=document.getElementById('kidPfBody'); if(!body) return;
+    const fmtE=n=>n==null?'—':Math.round(n).toLocaleString('fr')+' €';
+    const fmtF=n=>n==null?'—':n.toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const na=x=>String(x||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    const cP=n=>n==null?'var(--text2)':(n>=0?'#4caf82':'#e06c6c');
+    const s=sel(), f=window._kidPfFilter||{}, cs=window._kidPfSort||{col:'valEur',dir:-1};
+    const rows0=kidEdRows().filter(r=> s==='Tous'||r.e===s);
+    const map={};
+    rows0.forEach(r=>{ const key=r.e+'|'+(r.ticker||r.isin||r.nom||'');
+      if(!map[key]) map[key]={e:r.e,name:r.nom,typeInv:r.t,brokers:new Set(),isin:r.isin||'',ticker:r.ticker||'',qty:0,costEur:0,val:0,hasVal:false};
+      const m=map[key];
+      m.qty+=(r.qtyAct!=null?r.qtyAct:(r.qty||0)); m.costEur+=(r.coutEur||0);
+      if(r.val!=null){m.val+=r.val;m.hasVal=true;}
+      if(r.broker)m.brokers.add(r.broker); if(r.isin&&r.isin.length>5)m.isin=r.isin; if(r.t)m.typeInv=r.t;
+    });
+    let rows=Object.values(map).map(m=>{ const brokers=[...m.brokers].join(', ');
+      const valEur=m.hasVal?Math.round(m.val):null; const costEur=Math.round(m.costEur);
+      const pnl=valEur!=null?valEur-costEur:null; const pnlPct=valEur!=null&&costEur>0?pnl/costEur*100:null;
+      const pxRevient=m.qty>0?costEur/m.qty:0;
+      return {e:m.e,name:m.name,typeInv:m.typeInv,brokers,isin:m.isin,ticker:m.ticker,qty:m.qty,costEur,valEur,pnl,pnlPct,pxRevient};
+    });
+    rows=rows.filter(r=>{
+      if(f.nom && !na(r.name).includes(na(f.nom))) return false;
+      if(f.typeInv && !na(r.typeInv).includes(na(f.typeInv))) return false;
+      if(f.broker && !na(r.brokers).includes(na(f.broker))) return false;
+      if(f.isin && !na(r.isin).includes(na(f.isin))) return false;
+      if(f.ticker && !na(r.ticker).includes(na(f.ticker))) return false;
+      if(f.qty && !(r.qty>=parseFloat(f.qty))) return false;
+      if(f.costEur && !(r.costEur>=parseFloat(String(f.costEur).replace(/\s/g,'')))) return false;
+      if(f.valEur && !(r.valEur!=null&&r.valEur>=parseFloat(String(f.valEur).replace(/\s/g,'')))) return false;
+      if(f.pnl && !(r.pnl!=null&&r.pnl>=parseFloat(String(f.pnl).replace(/\s/g,'')))) return false;
+      return true;
+    });
+    rows.sort((a,b2)=>{ let x=a[cs.col],y=b2[cs.col]; if(x==null)x=cs.dir===1?Infinity:-Infinity; if(y==null)y=cs.dir===1?Infinity:-Infinity; if(typeof x==='string')return x.localeCompare(y)*cs.dir; return (x-y)*cs.dir; });
+    let tCost=0,tVal=0,hasVal=false;
+    rows.forEach(r=>{ tCost+=r.costEur; if(r.valEur!=null){tVal+=r.valEur;hasVal=true;} });
+    const tPnl=hasVal?tVal-tCost:null; const tPct=tPnl!=null&&tCost>0?tPnl/tCost*100:null;
+    body.innerHTML = rows.length? rows.map(r=>{ const sign=(r.pnl!=null&&r.pnl>=0)?'+':'';
+      return `<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px 12px;white-space:nowrap"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COL[r.e]};margin-right:5px"></span>${r.e}</td>
+        <td style="padding:8px 12px;font-weight:600">${r.name||''}</td>
+        <td style="padding:8px 10px">${r.typeInv?`<span style="font-size:10px;padding:2px 7px;border-radius:4px;background:var(--bg3);border:1px solid var(--border2);white-space:nowrap">${r.typeInv}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
+        <td style="padding:8px 10px;font-size:11px;color:var(--text2)">${r.brokers||'—'}</td>
+        <td style="padding:8px 12px;font-size:10px;color:var(--text2);font-family:'DM Mono',monospace">${r.isin||'—'}</td>
+        <td style="padding:8px 12px;font-size:11px;font-family:'DM Mono',monospace">${r.ticker||'—'}</td>
+        <td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">${fmtF(r.qty)}</td>
+        <td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${fmtF(r.pxRevient)} €</td>
+        <td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">${fmtE(r.costEur)}</td>
+        <td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">${r.valEur!=null?fmtE(r.valEur):'—'}</td>
+        <td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:${cP(r.pnl)}">${r.pnl!=null?sign+fmtE(r.pnl):'—'}</td>
+        <td style="padding:8px 12px;text-align:right;color:${cP(r.pnlPct)}">${r.pnlPct!=null?sign+r.pnlPct.toFixed(1)+'%':'—'}</td>
+      </tr>`; }).join('') : `<tr><td colspan="12" style="padding:16px;text-align:center;color:var(--text3)">Aucune ligne.</td></tr>`;
+    const tot=document.getElementById('kidPfTot');
+    if(tot) tot.innerHTML=`<td colspan="8" style="padding:9px 12px">Total portefeuille${s!=='Tous'?' — '+s:''}</td>
+      <td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace">${fmtE(tCost)}</td>
+      <td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace">${hasVal?fmtE(tVal):'—'}</td>
+      <td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace;color:${(tPnl==null||tPnl>=0)?'#4caf82':'#e06c6c'}">${tPnl!=null?((tPnl>=0?'+':'')+fmtE(tPnl)):'—'}</td>
+      <td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace;color:${(tPct==null||tPct>=0)?'#4caf82':'#e06c6c'}">${tPct!=null?((tPct>=0?'+':'')+tPct.toFixed(1)+'%'):'—'}</td>`;
+    const kpi=document.getElementById('kidPfKpi');
+    const card=(l,v,c)=>`<div class="card" style="padding:16px"><div class="kpi-label">${l}</div><div class="kpi-value" style="font-size:20px;color:${c||'var(--text)'}">${v}</div></div>`;
+    if(kpi) kpi.innerHTML=card('Coût total (€)',fmtE(tCost))+card('Valeur actuelle (€)',hasVal?fmtE(tVal):'—')+card('P&L (€)',tPnl!=null?((tPnl>=0?'+':'')+fmtE(tPnl)):'—',(tPnl==null||tPnl>=0)?'#4caf82':'#e06c6c')+card('P&L (%)',tPct!=null?((tPct>=0?'+':'')+tPct.toFixed(1)+'%'):'—',(tPct==null||tPct>=0)?'#4caf82':'#e06c6c');
+  }
+  window.kidPfFilter=function(c,val){ if(window._kidPfFilter==null)window._kidPfFilter={}; if(!val)delete window._kidPfFilter[c]; else window._kidPfFilter[c]=val; kidPfBuild(); };
+  window.kidPfSort=function(c){ const s=window._kidPfSort||{col:'valEur',dir:-1}; if(s.col===c)s.dir=-s.dir; else{s.col=c;s.dir=-1;} window._kidPfSort=s; kidPfBuild(); };
 
   // ---- 3) ACTIONS ETFs +/- (SAXO Estelle, avec ticker/prix) ---------------
   function kidActEtf(b){
