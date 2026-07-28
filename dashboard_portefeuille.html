@@ -11381,8 +11381,24 @@ window.addEventListener('load', () => {
     document.getElementById('knl_preview').style.display='none';
     document.getElementById('knl_error').style.display='none';
     const cur=sel(); if(cur && cur!=='Tous'){ const se=document.getElementById('knl_e'); if(se) se.value=cur; }
-    const noms=new Set(KIDS_HOLD.map(h=>h.nom).filter(Boolean)); document.getElementById('knl_nom_list').innerHTML=[...noms].sort().map(n=>`<option value="${String(n).replace(/"/g,'&quot;')}">`).join('');
+    // Répertoire des investissements déjà connus (enfants + portefeuille principal) : nom -> {isin, ticker, type, devise}
+    const known={};
+    KIDS_HOLD.forEach(h=>{ const n=(h.nom||'').trim(); if(!n) return; if(!known[n]) known[n]={isin:h.isin||'',ticker:h.ticker||'',t:h.t||'',devise:h.devise||'EUR'}; else { if(!known[n].isin&&h.isin)known[n].isin=h.isin; if(!known[n].ticker&&h.ticker)known[n].ticker=h.ticker; } });
+    if(typeof BOOK2_ROWS!=='undefined') BOOK2_ROWS.forEach(r=>{ const n=(r.name||'').trim(); if(!n||known[n]) return; known[n]={isin:r.isin||'',ticker:r.ticker||'',t:r.typeInv||'',devise:r.currency||'EUR'}; });
+    if(typeof ETF_META!=='undefined') Object.keys(ETF_META).forEach(tk=>{ const m=ETF_META[tk]; const n=(m&&m.name||'').trim(); if(!n||known[n]) return; known[n]={isin:(m.isin||''),ticker:tk,t:'ETF',devise:'EUR'}; });
+    window._kidKnownInvest=known;
+    document.getElementById('knl_nom_list').innerHTML=Object.keys(known).sort().map(n=>`<option value="${String(n).replace(/"/g,'&quot;')}">`).join('');
     const brs=new Set(KIDS_HOLD.map(h=>h.c).filter(Boolean)); document.getElementById('knl_broker_list').innerHTML=[...brs].sort().map(bx=>`<option value="${String(bx).replace(/"/g,'&quot;')}">`).join('');
+    // Auto-remplissage ISIN / ticker / type / devise quand on choisit un investissement connu
+    const nomEl=document.getElementById('knl_nom');
+    if(nomEl) nomEl.oninput=function(){
+      const k=window._kidKnownInvest[nomEl.value.trim()]; if(!k) return;
+      const ti=document.getElementById('knl_ticker'), is=document.getElementById('knl_isin'), ty=document.getElementById('knl_type'), dv=document.getElementById('knl_devise');
+      if(ti && k.ticker) ti.value=k.ticker;
+      if(is && k.isin) is.value=(k.isin||'').toUpperCase();
+      if(ty && !ty.value && k.t) ty.value=k.t;
+      if(dv && k.devise){ dv.value=k.devise; if(dv.onchange) dv.onchange(); }
+    };
     document.getElementById('kidNlModal').style.display='flex';
   };
   window.kidNlSubmit=function(){

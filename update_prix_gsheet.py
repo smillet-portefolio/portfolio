@@ -358,8 +358,21 @@ def tickers_enfants():
     return [(k, n) for k, n in seen.items()]
 
 
+# Correspondances ISIN -> ticker Yahoo forcees (priorite sur la recherche automatique)
+ENFANTS_ISIN_OVERRIDE = {
+    "IE00BMG6Z448": "MTPI.PA",   # iShares MSCI EM ex-China -> cotation Euronext Paris (EUR)
+}
+
+
 def resolve_isin(isin):
-    """Resout un ISIN en (symbole Yahoo, prix, devise) via l'endpoint de recherche Yahoo."""
+    """Resout un ISIN en (symbole Yahoo, prix, devise). Utilise d'abord une
+    correspondance forcee (ENFANTS_ISIN_OVERRIDE), sinon l'endpoint de recherche Yahoo."""
+    ov = ENFANTS_ISIN_OVERRIDE.get((isin or "").upper())
+    if ov:
+        p, c = prix_devise_yahoo(ov)
+        if p and p > 0:
+            print(f"    [isin->override] {isin} -> {ov} ({c})")
+            return ov, p, c
     try:
         url = "https://query2.finance.yahoo.com/v1/finance/search"
         r = requests.get(url, params={"q": isin, "quotesCount": 5, "newsCount": 0},
