@@ -11071,18 +11071,39 @@ window.addEventListener('load', () => {
           </div>
         </div>
       </div>
-      <div id="kidEdSellModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:20px">
-        <div class="card" style="max-width:460px;width:100%;padding:22px">
-          <h3 id="kidEdSellTitle" style="font-size:15px;font-weight:700;margin-bottom:14px">Vendre la position</h3>
-          <div style="display:flex;flex-direction:column;gap:10px">
-            <div><label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">Date de vente</label><input id="kidSellDate" type="date" style="width:100%;box-sizing:border-box;padding:7px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
-            <div><label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">Montant reçu (€)</label><input id="kidSellAmount" type="number" step="0.01" style="width:100%;box-sizing:border-box;padding:7px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
-            <div><label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">Commission / frais de vente (optionnel)</label><input id="kidSellComm" type="number" step="0.01" style="width:100%;box-sizing:border-box;padding:7px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
-            <div id="kidSellInfo" style="font-size:12px;color:var(--text2)"></div>
+      <div id="kidEdSellModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10000;align-items:center;justify-content:center;padding:20px">
+        <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:28px 32px;width:500px;max-width:95vw;max-height:90vh;overflow:auto;box-shadow:0 24px 60px rgba(0,0,0,.5)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px">
+            <h3 style="margin:0;font-size:16px;font-weight:700">📤 Vendre la position</h3>
+            <button onclick="kidEdSellClose()" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer">×</button>
           </div>
-          <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end">
-            <button onclick="kidEdSellClose()" style="padding:8px 16px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;cursor:pointer">Annuler</button>
-            <button onclick="kidEdSellConfirm()" style="padding:8px 16px;background:#e06c6c;border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:600;cursor:pointer">📤 Confirmer la vente</button>
+          <div id="ksl_info" style="padding:10px 14px;background:var(--bg3);border-radius:8px;font-size:13px;margin-bottom:18px;color:var(--text2)"></div>
+          <div style="margin-bottom:14px">
+            <label style="${_knlL}">Quantité à vendre <span id="ksl_qty_max" style="color:var(--text2);font-weight:400;text-transform:none"></span></label>
+            <input id="ksl_qty" type="number" step="any" oninput="kidSlPreview()" style="${_knlS}">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div><label style="${_knlL}">Date de vente</label><input id="ksl_date" type="date" style="${_knlS}"></div>
+            <div><label style="${_knlL}">Devise de vente</label><select id="ksl_devise" onchange="kidSlOnDeviseChange()" style="${_knlS}"><option value="EUR">EUR €</option><option value="USD">USD $</option><option value="GBP">GBP £</option><option value="CZK">CZK Kč</option></select></div>
+            <div><label style="${_knlL}">Prix de vente (devise)</label><input id="ksl_prix" type="number" step="any" oninput="kidSlPreview()" style="${_knlS}"></div>
+            <div id="ksl_fx_row" style="display:none"><label style="${_knlL}">Taux de change (1 devise = ? €)</label><input id="ksl_fx" type="number" step="any" oninput="kidSlPreview()" style="${_knlS}"></div>
+          </div>
+          <div style="margin-top:14px;display:grid;grid-template-columns:2fr 1fr;gap:10px">
+            <div><label style="${_knlL}">Commission / frais de vente (optionnel)</label><input id="ksl_comm" type="number" step="any" placeholder="optionnel" style="${_knlS}"></div>
+            <div><label style="${_knlL}">Devise</label><select id="ksl_commcur" style="${_knlS}"><option>EUR</option><option>USD</option><option>GBP</option><option>CZK</option></select></div>
+          </div>
+          <div id="ksl_preview" style="display:none;margin-top:18px;padding:14px 16px;background:var(--bg3);border-radius:8px;font-size:13px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <span style="color:var(--text2)">Valeur de vente (€)</span><strong id="ksl_val_eur" style="text-align:right">—</strong>
+              <span style="color:var(--text2)">Coût d'achat (€)</span><strong id="ksl_cost_eur" style="text-align:right">—</strong>
+              <span style="color:var(--text2);font-weight:700">P&amp;L (€)</span><strong id="ksl_pnl" style="text-align:right;font-size:15px">—</strong>
+              <span style="color:var(--text2)">P&amp;L (%)</span><strong id="ksl_pnl_pct" style="text-align:right">—</strong>
+            </div>
+          </div>
+          <div id="ksl_error" style="display:none;margin-top:12px;padding:10px 14px;background:#7f1d1d22;border:1px solid #ef444466;border-radius:6px;color:#f87171;font-size:12px"></div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:22px">
+            <button onclick="kidEdSellClose()" style="padding:9px 20px;background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:6px;font-size:13px;cursor:pointer">Annuler</button>
+            <button onclick="kidEdSellConfirm()" style="padding:9px 20px;background:#e06c6c;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600">✓ Confirmer la vente</button>
           </div>
         </div>
       </div>
@@ -11476,27 +11497,89 @@ window.addEventListener('load', () => {
   };
 
   // ---- Vente ----
+  function _kslFx(dev){ const R=(typeof FX_RATES!=='undefined'&&FX_RATES)?FX_RATES:(window.FX_RATES||{}); return {USD:R.USD,GBP:R.GBP,CZK:(R.CZK||(1/24.335))}[dev]; }
   window.kidEdSell=function(i){ const h=KIDS_HOLD[i]; if(!h)return; window._kidSellIdx=i;
-    document.getElementById('kidEdSellTitle').textContent='Vendre : '+(h.nom||'');
-    document.getElementById('kidSellDate').value=new Date().toISOString().slice(0,10);
-    document.getElementById('kidSellAmount').value=(h.val!=null?h.val:'');
-    { const _ksc=document.getElementById('kidSellComm'); if(_ksc)_ksc.value=''; }
-    const basis=(h.cout!=null?h.cout:h.val);
-    document.getElementById('kidSellInfo').textContent='Coût de revient : '+(h.cout!=null?Math.round(h.cout).toLocaleString('fr')+' €':'inconnu (base = valeur actuelle)');
+    const qa=kidCurQtyAct(h); const dev0=h.devise||'EUR';
+    const basis=(h.cout!=null)?+h.cout:(h.val!=null?+h.val:0);
+    document.getElementById('ksl_info').innerHTML=`<strong>${h.nom||''}</strong> &nbsp;·&nbsp; ${h.ticker||h.isin||''} &nbsp;·&nbsp; ${qa.toLocaleString('fr',{maximumFractionDigits:4})} parts &nbsp;·&nbsp; Coût: <strong>${Math.round(basis).toLocaleString('fr')} €</strong>`;
+    document.getElementById('ksl_qty').value=qa;
+    document.getElementById('ksl_qty_max').textContent='(max '+qa.toLocaleString('fr',{maximumFractionDigits:4})+')';
+    document.getElementById('ksl_date').value=new Date().toISOString().slice(0,10);
+    document.getElementById('ksl_devise').value=dev0;
+    document.getElementById('ksl_prix').value=(h.vl!=null?h.vl:'');
+    document.getElementById('ksl_comm').value=''; document.getElementById('ksl_commcur').value=dev0;
+    document.getElementById('ksl_fx').value='';
+    document.getElementById('ksl_preview').style.display='none';
+    document.getElementById('ksl_error').style.display='none';
+    const fxRow=document.getElementById('ksl_fx_row'); fxRow.style.display=dev0!=='EUR'?'block':'none';
+    if(dev0!=='EUR'){ const fx=_kslFx(dev0); if(fx&&fx>0) document.getElementById('ksl_fx').value=(+fx).toFixed(6); }
     document.getElementById('kidEdSellModal').style.display='flex';
+    kidSlPreview();
+  };
+  window.kidSlOnDeviseChange=function(){ const dev=(document.getElementById('ksl_devise')||{}).value; const row=document.getElementById('ksl_fx_row'); row.style.display=dev!=='EUR'?'block':'none'; if(dev!=='EUR'){ const fx=_kslFx(dev); if(fx&&fx>0) document.getElementById('ksl_fx').value=(+fx).toFixed(6); } kidSlPreview(); };
+  window.kidSlPreview=function(){ const h=KIDS_HOLD[window._kidSellIdx]; if(!h)return;
+    const prix=parseFloat((document.getElementById('ksl_prix')||{}).value); const dev=(document.getElementById('ksl_devise')||{}).value;
+    const fx=dev!=='EUR'?parseFloat((document.getElementById('ksl_fx')||{}).value):1; const prev=document.getElementById('ksl_preview');
+    if(isNaN(prix)||prix<=0){ prev.style.display='none'; return; }
+    const qa=kidCurQtyAct(h); let sellQ=parseFloat((document.getElementById('ksl_qty')||{}).value); if(isNaN(sellQ)||sellQ<=0)sellQ=qa; if(sellQ>qa)sellQ=qa;
+    const saleEur=(dev==='EUR'?sellQ*prix:sellQ*prix*(isNaN(fx)?1:fx));
+    const basis=(h.cout!=null)?+h.cout:(h.val!=null?+h.val:0); const costEur=qa>0?basis*(sellQ/qa):0;
+    const pnl=saleEur-costEur; const pct=costEur?pnl/costEur*100:0; const col=pnl>=0?'#4caf82':'#e06c6c'; const sign=pnl>=0?'+':'';
+    document.getElementById('ksl_val_eur').textContent=Math.round(saleEur).toLocaleString('fr')+' €';
+    document.getElementById('ksl_cost_eur').textContent=Math.round(costEur).toLocaleString('fr')+' €';
+    const p=document.getElementById('ksl_pnl'); p.textContent=sign+Math.round(pnl).toLocaleString('fr')+' €'; p.style.color=col;
+    const pp=document.getElementById('ksl_pnl_pct'); pp.textContent=sign+pct.toFixed(1)+'%'; pp.style.color=col;
+    prev.style.display='block';
   };
   window.kidEdSellClose=function(){ const m=document.getElementById('kidEdSellModal'); if(m)m.style.display='none'; };
   window.kidEdSellConfirm=function(){
     const i=window._kidSellIdx; const h=KIDS_HOLD[i]; if(!h)return;
-    const amt=parseFloat(String(document.getElementById('kidSellAmount').value).replace(',','.'));
-    if(isNaN(amt)){ alert('Montant reçu invalide.'); return; }
-    const basis=(h.cout!=null?h.cout:(h.val!=null?h.val:0));
-    const pnl=amt-basis;
-    const _kscEl=document.getElementById('kidSellComm'); const _csc=_kscEl?parseFloat(String(_kscEl.value).replace(',','.')):NaN;
-    const _cv=(!isNaN(_csc)&&_csc>0)?Math.round(_csc*100)/100:0;
-    KIDS_CLOSED.push({ e:h.e, c:h.c, nom:h.nom, isin:h.isin||'', pnl:Math.round(pnl*100)/100, comm:Math.round(((h.comm||0)+_cv)*100)/100, taxe:(h.taxe||0), devise:h.devise||'EUR' });
-    if(_cv>0 && h.c){ const cur=h.devise||'EUR'; if(!KIDS_CASH[h.c])KIDS_CASH[h.c]={}; KIDS_CASH[h.c][cur]=Math.round(((KIDS_CASH[h.c][cur]||0)-_cv)*100)/100; window.KIDS_CASH=KIDS_CASH; if(typeof kidsCashSave==='function')kidsCashSave(); }
-    KIDS_HOLD.splice(i,1);
+    const err=document.getElementById('ksl_error'); err.style.display='none';
+    const dateSell=(document.getElementById('ksl_date')||{}).value;
+    const dev=(document.getElementById('ksl_devise')||{}).value;
+    const prix=parseFloat((document.getElementById('ksl_prix')||{}).value);
+    const fx=dev!=='EUR'?parseFloat((document.getElementById('ksl_fx')||{}).value):1;
+    const qa=kidCurQtyAct(h);
+    let sellQ=parseFloat((document.getElementById('ksl_qty')||{}).value);
+    const errs=[];
+    if(!dateSell)errs.push('Date requise');
+    if(isNaN(prix)||prix<0)errs.push('Prix de vente invalide');
+    if(isNaN(sellQ)||sellQ<=0||sellQ>qa+1e-9)errs.push('Quantité invalide (max '+qa.toLocaleString('fr',{maximumFractionDigits:4})+')');
+    if(dev!=='EUR'&&(isNaN(fx)||fx<=0))errs.push('Taux de change requis');
+    if(errs.length){ err.innerHTML='⚠️ '+errs.join(' · '); err.style.display='block'; return; }
+    const basis=(h.cout!=null)?+h.cout:(h.val!=null?+h.val:0);
+    const factor=qa>0?sellQ/qa:1;
+    const saleDev=Math.round(sellQ*prix*100)/100;
+    const saleEur=Math.round((dev==='EUR'?saleDev:saleDev*fx)*100)/100;
+    const costEur=Math.round(basis*factor*100)/100;
+    const pnl=Math.round((saleEur-costEur)*100)/100;
+    const pct=costEur?Math.round(pnl/costEur*10000)/100:0;
+    const partial=sellQ<qa-1e-9;
+    const commVente=parseFloat((document.getElementById('ksl_comm')||{}).value);
+    const commV=(!isNaN(commVente)&&commVente>0)?Math.round(commVente*100)/100:0;
+    const feecur=(document.getElementById('ksl_commcur')||{}).value||dev;
+    const commAchatPortion=Math.round(((h.comm||0)*factor)*100)/100;
+    const taxePortion=Math.round(((h.taxe||0)*factor)*100)/100;
+    // Frais de vente : réduisent le cash du broker
+    if(commV>0 && h.c && typeof KIDS_CASH!=='undefined'){ if(!KIDS_CASH[h.c])KIDS_CASH[h.c]={}; KIDS_CASH[h.c][feecur]=Math.round(((KIDS_CASH[h.c][feecur]||0)-commV)*100)/100; window.KIDS_CASH=KIDS_CASH; if(typeof kidsCashSave==='function')kidsCashSave(); }
+    // Enregistrement clôturé (format riche + champs d'affichage de l'onglet Clôturées)
+    KIDS_CLOSED.push({
+      e:h.e, c:h.c, nom:h.nom, isin:h.isin||'', ticker:h.ticker||'',
+      dateAchat:h.date||'', dateSell:dateSell, qty:sellQ, pxAchat:(h.pxAchat!=null?+h.pxAchat:null), currencyAchat:h.devise||'EUR',
+      pxVente:prix, currencyVente:dev, fxVente:fx,
+      costEur:costEur, saleEur:saleEur, pnl:pnl, pnlPct:pct,
+      commAchat:commAchatPortion, taxe:taxePortion, commVente:commV, currencyFrais:feecur,
+      comm:Math.round((commAchatPortion+commV)*100)/100, devise:'€' });
+    if(partial){
+      if(h.cout!=null) h.cout=Math.round(basis*(1-factor)*100)/100;
+      else if(h.val!=null) h.val=Math.round(h.val*(1-factor)*100)/100;
+      if(h.comm!=null) h.comm=Math.round(((+h.comm)*(1-factor))*100)/100;
+      if(h.taxe!=null) h.taxe=Math.round(((+h.taxe)*(1-factor))*100)/100;
+      if(h.qty!=null) h.qty=Math.round(((+h.qty)-sellQ)*1e6)/1e6;
+      KIDS_HOLD[i]=h;
+    } else {
+      KIDS_HOLD.splice(i,1);
+    }
     window.KIDS_HOLD=KIDS_HOLD; window.KIDS_CLOSED=KIDS_CLOSED; kidsSave();
     window.kidEdSellClose(); kidEdBuild();
   };
