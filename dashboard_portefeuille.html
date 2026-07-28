@@ -11323,7 +11323,7 @@ window.addEventListener('load', () => {
     document.getElementById('knl_devise').onchange=function(){
       const dev=this.value, row=document.getElementById('knl_fx_row'), lab=document.getElementById('knl_fx_label');
       if(dev==='EUR'){ row.style.display='none'; document.getElementById('knl_fx').value=''; }
-      else { row.style.display='block'; const R=window.FX_RATES||{}; const fx={USD:R.USD,GBP:R.GBP,CZK:(R.CZK||(1/24.335))}[dev]; lab.textContent='(1 '+dev+' = ? €)'; if(fx&&fx>0){ document.getElementById('knl_fx').value=fx.toFixed(6); lab.textContent='(taux actuel: 1 '+dev+' = '+fx.toFixed(4)+' €)'; } }
+      else { row.style.display='block'; const R=(typeof FX_RATES!=='undefined'&&FX_RATES)?FX_RATES:(window.FX_RATES||{}); const fx={USD:R.USD,GBP:R.GBP,CZK:(R.CZK||(1/24.335))}[dev]; lab.textContent='(1 '+dev+' = ? €)'; if(fx&&fx>0){ document.getElementById('knl_fx').value=fx.toFixed(6); lab.textContent='(taux actuel: 1 '+dev+' = '+fx.toFixed(4)+' €)'; } }
       kidNlPreview();
     };
   }
