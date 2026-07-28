@@ -10786,32 +10786,80 @@ window.addEventListener('load', () => {
   window.kidPfFilter=function(c,val){ if(window._kidPfFilter==null)window._kidPfFilter={}; if(!val)delete window._kidPfFilter[c]; else window._kidPfFilter[c]=val; kidPfBuild(); };
   window.kidPfSort=function(c){ const s=window._kidPfSort||{col:'valEur',dir:-1}; if(s.col===c)s.dir=-s.dir; else{s.col=c;s.dir=-1;} window._kidPfSort=s; kidPfBuild(); };
 
-  // ---- 3) ACTIONS ETFs +/- (SAXO Estelle, avec ticker/prix) ---------------
+  // ---- 3) ACTIONS ETFs +/- (format identique au principal : variations 1D…YTD) ----
   function kidActEtf(b){
-    const rows = KIDS_HOLD.filter(h=>h.c==='SAXO' && h.cout!=null && h.t!=='Cash')
-                          .filter(h=>sel()==='Tous'||h.e===sel())
-                          .map(h=>({...h, g:h.val-h.cout, p:h.cout?(h.val-h.cout)/h.cout*100:0}))
-                          .sort((a,b2)=>b2.p-a.p);
-    if(!rows.length){ b.innerHTML=`<div class="card" style="color:var(--text2)">Aucune position cotée (ETF/action) pour cette sélection.<br>Ce sous-onglet concerne le compte SAXO d'Estelle (positions avec cotation).</div>`; return; }
-    let html=`<div class="card" style="margin-bottom:14px"><table><thead><tr>
-        <th>Position</th><th>ISIN</th><th style="text-align:right">Qté</th><th style="text-align:right">VL</th>
-        <th style="text-align:right">Valeur</th><th style="text-align:right">Coût</th><th style="text-align:right">+/-</th><th style="text-align:right">%</th></tr></thead><tbody>`;
-    rows.forEach(h=>{
-      html+=`<tr><td>${h.nom}</td><td style="color:var(--text3);font-size:10px">${h.isin||''}</td>
-        <td style="text-align:right">${h.qty!=null?h.qty:'—'}</td><td style="text-align:right">${h.vl!=null?h.vl:'—'}</td>
-        <td style="text-align:right;font-weight:600">${fmt(h.val)}</td><td style="text-align:right;color:var(--text2)">${fmt(h.cout)}</td>
-        <td style="text-align:right;color:${col(h.g)}">${fmts(h.g)}</td><td style="text-align:right;color:${col(h.p)};font-weight:600">${pct(h.p)}</td></tr>`;
-    });
-    html+=`</tbody></table></div>
-      <div class="card"><h3>+/- par position (%)</h3><div class="chart-wrap" style="height:300px"><canvas id="kidAeBar"></canvas></div></div>`;
-    b.innerHTML=html;
-    _kidCharts.push(new Chart(document.getElementById('kidAeBar'),{type:'bar',
-      data:{labels:rows.map(h=>h.nom.length>22?h.nom.slice(0,22)+'…':h.nom),
-        datasets:[{data:rows.map(h=>+h.p.toFixed(2)), backgroundColor:rows.map(h=>h.p>=0?'#4caf82':'#e06c6c')}]},
-      options:{indexAxis:'y', responsive:true, maintainAspectRatio:false,
-        plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>pct(c.parsed.x)}}},
-        scales:{x:{ticks:{callback:v=>v+' %'},grid:{color:'rgba(0,0,0,0.05)'}}, y:{grid:{display:false}}}}}));
+    window._kidAeBox=b;
+    if(window._kidAeFilter==null) window._kidAeFilter={};
+    if(window._kidAeSort==null) window._kidAeSort={col:'valEur',dir:-1};
+    const COLS=[{k:'e',lab:'Enfant',t:'str',al:'left'},{k:'name',lab:'Nom',t:'str',al:'left'},{k:'isin',lab:'ISIN',t:'str',al:'left'},{k:'ticker',lab:'Ticker',t:'str',al:'left'},{k:'qty',lab:'Qté',t:'num',al:'right'},{k:'pxAchat',lab:'Prix achat',t:'num',al:'right'},{k:'pxCurr',lab:'Prix actuel',t:'num',al:'right'},{k:'valEur',lab:'Valeur €',t:'num',al:'right'},{k:'pnl',lab:'P&L €',t:'num',al:'right'},{k:'pnlPct',lab:'P&L %',t:'num',al:'right'}];
+    const VARC=['YTD','1D','1W','1M','3M','6M','1Y'];
+    window._kidAeCols=COLS; window._kidAeVarc=VARC;
+    const f=window._kidAeFilter;
+    const th=(k,lab,al)=>`<th onclick="kidAeSort('${k}')" style="padding:6px 8px;cursor:pointer;user-select:none;white-space:nowrap;text-align:${al||'left'}">${lab} <span style="font-size:9px;opacity:.4">⇅</span></th>`;
+    const fin=(k,ph,al)=>k==='e'?'<td></td>':`<td style="padding:2px 6px"><input type="text" value="${String(f[k]||'').replace(/"/g,'&quot;')}" placeholder="${ph}" oninput="kidAeFilter('${k}',this.value)" style="width:100%;box-sizing:border-box;padding:3px 6px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:10px;outline:none${al==='right'?';text-align:right':''}"></td>`;
+    const head=COLS.map(c=>th(c.k,c.lab,c.al)).join('')+VARC.map(k=>th(k,k,'right')).join('');
+    const filt=COLS.map(c=>fin(c.k,c.t==='str'?'Filtrer…':'≥',c.al)).join('')+VARC.map(k=>fin(k,'≥ %','right')).join('');
+    b.innerHTML=`
+      <h2 style="font-size:16px;font-weight:700;margin-bottom:2px">📉 Actions & ETFs +/− — enfants</h2>
+      <p class="section-desc" style="margin-bottom:8px">Positions cotées (Action / ETF). Variations 1D…YTD depuis le feed quotidien.</p>
+      <div id="kidAeNote" style="font-size:12px;margin-bottom:12px"></div>
+      <div style="max-height:70vh;overflow:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:1300px">
+          <thead>
+            <tr style="background:var(--bg2);border-bottom:2px solid var(--border);color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.4px">${head}</tr>
+            <tr style="background:var(--bg3)">${filt}</tr>
+          </thead>
+          <tbody id="kidAeBody"></tbody>
+        </table>
+      </div>`;
+    kidAeBuild();
   }
+  function kidAeBuild(){
+    const body=document.getElementById('kidAeBody'); if(!body)return;
+    const COLS=window._kidAeCols||[], VARC=window._kidAeVarc||[];
+    const na=x=>String(x||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    const cP=n=>n==null?'var(--text2)':(n>=0?'#4caf82':'#e06c6c');
+    const fN=n=>n==null?'—':Number(n).toLocaleString('fr',{maximumFractionDigits:4});
+    const fE=n=>n==null?'—':Math.round(n).toLocaleString('fr')+' €';
+    const fPct=n=>n==null?'—':((n>=0?'+':'')+n.toFixed(1)+'%');
+    const s=sel(), f=window._kidAeFilter||{}, cs=window._kidAeSort||{col:'valEur',dir:-1};
+    const CV=(typeof CURRENT_VARIATIONS!=='undefined')?CURRENT_VARIATIONS:{};
+    const rows0=kidEdRows().filter(r=>{ const t=(r.t||'').toLowerCase(); return r.ticker && (t===''||t.includes('action')||t.includes('etf')||t.includes('crypto')); }).filter(r=> s==='Tous'||r.e===s);
+    const map={};
+    rows0.forEach(r=>{ const key=r.e+'|'+r.ticker+'|'+(r.isin||'');
+      if(!map[key]) map[key]={e:r.e,name:r.nom,isin:r.isin||'',ticker:r.ticker,qty:0,costEur:0,val:0,hasVal:false,pxQtySum:0,vl:r.vl};
+      const m=map[key]; const q=(r.qtyAct!=null?r.qtyAct:(r.qty||0));
+      m.qty+=q; m.costEur+=(r.coutEur||0); if(r.val!=null){m.val+=r.val;m.hasVal=true;} m.pxQtySum+=(r.px||0)*q; if(r.vl!=null)m.vl=r.vl;
+    });
+    let rows=Object.values(map).map(m=>{ const info=(typeof CURRENT_PRICES!=='undefined')?CURRENT_PRICES[m.ticker]:null;
+      const pxCurr=(info&&info.price!=null)?info.price:(m.vl!=null?m.vl:null);
+      const pxAchat=m.qty>0?m.pxQtySum/m.qty:0; const valEur=m.hasVal?Math.round(m.val):null; const costEur=Math.round(m.costEur);
+      const pnl=valEur!=null?valEur-costEur:null; const pnlPct=valEur!=null&&costEur>0?pnl/costEur*100:null;
+      return {e:m.e,name:m.name,isin:m.isin,ticker:m.ticker,qty:m.qty,pxAchat,pxCurr,valEur,costEur,pnl,pnlPct,vars:(CV[m.ticker]||{})};
+    });
+    const val=(r,c)=>VARC.includes(c)?(r.vars?r.vars[c]:null):r[c];
+    const strCols=new Set(COLS.filter(c=>c.t==='str').map(c=>c.k));
+    rows=rows.filter(r=>{ for(const[c,fv] of Object.entries(f)){ if(fv==null||fv==='')continue; const v=val(r,c);
+      if(strCols.has(c)){ if(!na(v).includes(na(fv)))return false; } else { const num=parseFloat(String(fv).replace(',','.')); if(!isNaN(num)&&(v==null||v<num))return false; } } return true; });
+    if(cs.col){ rows.sort((a,b2)=>{ let x=val(a,cs.col),y=val(b2,cs.col); if(x==null)x=cs.dir===1?Infinity:-Infinity; if(y==null)y=cs.dir===1?Infinity:-Infinity; if(typeof x==='string')return x.localeCompare(y)*cs.dir; return (x-y)*cs.dir; }); }
+    const hasVars=rows.some(r=>VARC.some(k=>r.vars[k]!=null));
+    const note=document.getElementById('kidAeNote'); if(note) note.innerHTML=hasVars?'<span style="color:var(--text2)">Cliquez un en-tête pour trier, utilisez les champs pour filtrer.</span>':'<span style="color:#f59e0b">⚠️ Variations non chargées — connectez Google puis relancez le feed (colonnes 1D…YTD).</span>';
+    body.innerHTML = rows.length? rows.map(r=>`<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:6px 8px;white-space:nowrap"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COL[r.e]};margin-right:5px"></span>${r.e}</td>
+      <td style="padding:6px 8px;font-weight:600">${r.name||''}</td>
+      <td style="padding:6px 8px;font-size:10px;color:var(--text2);font-family:'DM Mono',monospace">${r.isin||'—'}</td>
+      <td style="padding:6px 8px;font-size:11px;font-family:'DM Mono',monospace">${r.ticker||'—'}</td>
+      <td style="padding:6px 8px;text-align:right;font-family:'DM Mono',monospace">${fN(r.qty)}</td>
+      <td style="padding:6px 8px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${fN(r.pxAchat)}</td>
+      <td style="padding:6px 8px;text-align:right;font-family:'DM Mono',monospace">${r.pxCurr!=null?fN(r.pxCurr):'—'}</td>
+      <td style="padding:6px 8px;text-align:right;font-family:'DM Mono',monospace">${r.valEur!=null?fE(r.valEur):'—'}</td>
+      <td style="padding:6px 8px;text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:${cP(r.pnl)}">${r.pnl!=null?((r.pnl>=0?'+':'')+fE(r.pnl)):'—'}</td>
+      <td style="padding:6px 8px;text-align:right;color:${cP(r.pnlPct)}">${fPct(r.pnlPct)}</td>
+      ${VARC.map(k=>{const v=r.vars?r.vars[k]:null; return `<td style="padding:6px 8px;text-align:right;color:${cP(v)}">${fPct(v)}</td>`;}).join('')}
+    </tr>`).join('') : `<tr><td colspan="${COLS.length+VARC.length}" style="padding:16px;text-align:center;color:var(--text3)">Aucune position cotée (Action/ETF).</td></tr>`;
+  }
+  window.kidAeFilter=function(c,val){ if(window._kidAeFilter==null)window._kidAeFilter={}; if(!val)delete window._kidAeFilter[c]; else window._kidAeFilter[c]=val; kidAeBuild(); };
+  window.kidAeSort=function(c){ const s=window._kidAeSort||{col:'valEur',dir:-1}; if(s.col===c)s.dir=-s.dir; else{s.col=c;s.dir=-1;} window._kidAeSort=s; kidAeBuild(); };
 
   // ---- 4) DÉPÔTS & CASH (layout identique à l'onglet principal) ----------
   function kidCash(b){

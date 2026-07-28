@@ -64,6 +64,7 @@ TICKERS = [
     ("MWRE",     "Amundi Core MSCI World",        "EUR", "MWRE.DE"),
     ("C7A0.DE",  "CATL",                          "EUR", "C7A0.MU"),
     ("XMBR.DE",  "Xtrackers MSCI Brazil",         "EUR", "XMBR.DE"),
+    ("4BRZ.MI",  "iShares MSCI Brazil",           "EUR", "4BRZ.MI"),
     ("BTC/EUR",  "Bitcoin",                       "EUR", "BTC-EUR"),
     ("ETH/EUR",  "Ethereum",                      "EUR", "ETH-EUR"),
     ("EUR/CZK",  "Euro / Couronne tchèque",       "CZK", "EURCZK=X"),
@@ -361,6 +362,7 @@ def tickers_enfants():
 # Correspondances ISIN -> ticker Yahoo forcees (priorite sur la recherche automatique)
 ENFANTS_ISIN_OVERRIDE = {
     "IE00BMG6Z448": "MTPI.PA",   # iShares MSCI EM ex-China -> cotation Euronext Paris (EUR)
+    "DE000A0Q4R85": "4BRZ.MI",   # iShares MSCI Brazil -> Borsa Italiana (EUR)
 }
 
 
