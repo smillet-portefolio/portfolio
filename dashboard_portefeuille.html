@@ -10970,14 +10970,15 @@ window.addEventListener('load', () => {
       const qtyAch = (h.qty!=null)? +h.qty : null;              // Qté achetée
       const px   = (h.pxAchat!=null)? +h.pxAchat : ((cout!=null && qtyAch)? cout/qtyAch : null);
       const coutDev = (qtyAch!=null&&px!=null)? qtyAch*px : cout;
-      // Coût (€) automatique : EUR = coût devise ; sinon conversion FX (jour d'achat indisponible → FX courant)
+      // Coût (€) : coût stocké au FX du jour d'achat si présent, sinon calcul auto (EUR direct, sinon FX courant)
       let coutEur;
-      if(dev==='EUR') coutEur = (cout!=null? cout : coutDev);
-      else coutEur = (coutDev!=null? kidToEur(coutDev,dev) : (cout!=null? cout : null));
+      if(cout!=null) coutEur = cout;
+      else if(dev==='EUR') coutEur = coutDev;
+      else coutEur = (coutDev!=null? kidToEur(coutDev,dev) : null);
       // Commissions UC : réduisent la quantité et s'ajoutent aux frais
       const agg = kidCommAgg(h._id);
       const qtyAct = (qtyAch!=null)? (qtyAch - agg.qty) : null;   // Qté actuelle
-      const commBase = (h.comm!=null)? +h.comm : 0;
+      const commBase = (h.comm!=null)? (kidToEur(+h.comm, h.commCur||dev)||0) : 0;
       const commTot = (commBase + agg.coutEur) || null;
       const vl = (h.vl!=null?+h.vl:null);
       // Valeur actuelle basée sur la Qté actuelle (après frais)
@@ -10989,7 +10990,7 @@ window.addEventListener('load', () => {
       return { _i:i, _id:h._id, e:h.e, isin:h.isin||'', nom:h.nom||'', t:h.t||'', ticker:h.ticker||'',
         broker:h.c||'', date:h.date||'', devise:dev, qty:qtyAch, qtyAct:qtyAct, px:px,
         coutDev:coutDev, coutEur:coutEur, vl:vl,
-        comm:commTot, taxe:(h.taxe!=null?+h.taxe:null),
+        comm:commTot, taxe:(h.taxe!=null? kidToEur(+h.taxe, h.commCur||dev) : null),
         val:val, pnl:pnl, pct:pct };
     });
   }
@@ -11116,8 +11117,8 @@ window.addEventListener('load', () => {
       <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace">${fN(r.px)}</td>
       <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace">${r.coutDev!=null?Math.round(r.coutDev).toLocaleString('fr')+' '+r.devise:'—'}</td>
       <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;color:var(--text2)">${fE(r.coutEur)}</td>
-      <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;color:var(--text2)">${r.comm!=null?Math.round(r.comm).toLocaleString('fr')+' '+r.devise:'—'}</td>
-      <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;color:var(--text2)">${r.taxe!=null?Math.round(r.taxe).toLocaleString('fr')+' '+r.devise:'—'}</td>
+      <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;color:var(--text2)">${r.comm!=null?Math.round(r.comm).toLocaleString('fr')+' €':'—'}</td>
+      <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;color:var(--text2)">${r.taxe!=null?Math.round(r.taxe).toLocaleString('fr')+' €':'—'}</td>
       <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;${(r.qtyAct!=null&&r.qty!=null&&r.qtyAct<r.qty)?'color:#f0956e':'color:var(--text2)'}">${fN(r.qtyAct)}</td>
       <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;color:var(--text2)">${fN(r.vl)}</td>
       <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace">${fE(r.val)}</td>
@@ -11176,7 +11177,7 @@ window.addEventListener('load', () => {
       + kidEdField('kf_comm','Commission / frais (optionnel)',h.comm,'number') + kidEdField('kf_taxe','Taxe (optionnel)',h.taxe,'number');
     document.getElementById('kidEdModal').style.display='flex';
   }
-  window.kidEdAdd=function(){ kidEdOpenModal(null); };
+  window.kidEdAdd=function(){ window.kidNlOpen(); };
   window.kidEdEdit=function(i){ kidEdOpenModal(i); };
   window.kidEdModalClose=function(){ const m=document.getElementById('kidEdModal'); if(m)m.style.display='none'; };
   window.kidEdSave=function(){
@@ -11274,6 +11275,105 @@ window.addEventListener('load', () => {
     const hid=KIDS_COMM[idx].hid;
     KIDS_COMM.splice(idx,1); window.KIDS_COMM=KIDS_COMM; kidsSave();
     kidCommHistRender(hid); kidEdBuild();
+  };
+
+  // ---- Nouvelle ligne : réplique de la modale principale (+ sélecteur Enfant) --
+  const _knlS = "width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px;outline:none";
+  const _knlL = "font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px";
+  function kidNlEnsure(){
+    if(document.getElementById('kidNlModal')) return;
+    const typeOpts=['','Action','ETF','Fonds','Fonds €','Obligation d\'État','Obligation corporate','Produit structuré','Épargne','Crypto','Monétaire','Cash'];
+    const m=document.createElement('div');
+    m.id='kidNlModal';
+    m.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10000;align-items:center;justify-content:center;padding:20px';
+    m.innerHTML=`
+      <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:28px 32px;width:480px;max-width:95vw;max-height:90vh;overflow:auto;box-shadow:0 24px 60px rgba(0,0,0,.5)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px">
+          <h3 style="margin:0;font-size:16px;font-weight:700">➕ Nouvelle ligne d'investissement</h3>
+          <button onclick="kidNlClose()" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;line-height:1">×</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div style="grid-column:1/-1"><label style="${_knlL}">Enfant</label><select id="knl_e" style="${_knlS}">${KIDS.map(k=>`<option>${k}</option>`).join('')}</select></div>
+          <div style="grid-column:1/-1"><label style="${_knlL}">Type d'investissement</label><select id="knl_type" style="${_knlS}">${typeOpts.map(o=>`<option value="${o}">${o||'— Sélectionner —'}</option>`).join('')}</select></div>
+          <div style="grid-column:1/-1"><label style="${_knlL}">ISIN <span style="color:var(--text2);font-weight:400">(optionnel)</span></label><input id="knl_isin" type="text" placeholder="ex: IE00BJ0KDQ92" style="${_knlS};text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>
+          <div style="grid-column:1/-1"><label style="${_knlL}">Nom</label><input id="knl_nom" type="text" list="knl_nom_list" placeholder="ex: Amundi MSCI World" style="${_knlS}"><datalist id="knl_nom_list"></datalist></div>
+          <div><label style="${_knlL}">Ticker</label><input id="knl_ticker" type="text" placeholder="ex: XDWD.DE" style="${_knlS}"></div>
+          <div><label style="${_knlL}">Broker</label><input id="knl_broker" type="text" list="knl_broker_list" placeholder="ex: SAXO" style="${_knlS}"><datalist id="knl_broker_list"></datalist></div>
+          <div><label style="${_knlL}">Date d'achat</label><input id="knl_date" type="date" style="${_knlS}"></div>
+          <div><label style="${_knlL}">Devise</label><select id="knl_devise" style="${_knlS}"><option value="EUR">EUR €</option><option value="USD">USD $</option><option value="GBP">GBP £</option><option value="CZK">CZK Kč</option></select></div>
+          <div id="knl_fx_row" style="display:none"><label style="${_knlL}">Taux de change <span id="knl_fx_label" style="color:var(--text);font-weight:400"></span></label><input id="knl_fx" type="number" step="any" placeholder="ex: 0.8601" oninput="kidNlPreview()" style="${_knlS}"><div style="font-size:10px;color:var(--text2);margin-top:3px">Combien d'€ pour 1 unité de devise</div></div>
+          <div><label style="${_knlL}">Quantité</label><input id="knl_qte" type="number" step="any" placeholder="ex: 100" oninput="kidNlPreview()" style="${_knlS}"></div>
+          <div><label style="${_knlL}">Prix d'achat (devise)</label><input id="knl_prix" type="number" step="any" placeholder="ex: 28.34" oninput="kidNlPreview()" style="${_knlS}"></div>
+          <div><label style="${_knlL}">Commission / frais (devise)</label><input id="knl_comm" type="number" step="any" placeholder="optionnel, ex: 5" style="${_knlS}"></div>
+          <div><label style="${_knlL}">Taxe (devise)</label><input id="knl_taxe" type="number" step="any" placeholder="optionnel, ex: 2" style="${_knlS}"></div>
+          <div style="grid-column:1/-1"><label style="${_knlL}">Devise des frais / taxe</label><select id="knl_feecur" style="${_knlS}"><option>EUR</option><option>USD</option><option>GBP</option><option>CZK</option></select></div>
+        </div>
+        <div id="knl_preview" style="margin-top:18px;padding:12px 16px;background:var(--bg3);border-radius:8px;font-size:13px;display:none">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="color:var(--text2)">Coût en devise</span><strong id="knl_cost_devise">—</strong></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Coût en euros</span><strong id="knl_cost_eur">—</strong></div>
+        </div>
+        <div id="knl_error" style="display:none;margin-top:12px;padding:10px 14px;background:#7f1d1d22;border:1px solid #ef444466;border-radius:6px;color:#f87171;font-size:12px"></div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:22px">
+          <button onclick="kidNlClose()" style="padding:9px 20px;background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:6px;font-size:13px;cursor:pointer">Annuler</button>
+          <button onclick="kidNlSubmit()" style="padding:9px 20px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600">✓ Ajouter la ligne</button>
+        </div>
+      </div>`;
+    document.body.appendChild(m);
+    m.onclick=e=>{ if(e.target===m) kidNlClose(); };
+    document.getElementById('knl_devise').onchange=function(){
+      const dev=this.value, row=document.getElementById('knl_fx_row'), lab=document.getElementById('knl_fx_label');
+      if(dev==='EUR'){ row.style.display='none'; document.getElementById('knl_fx').value=''; }
+      else { row.style.display='block'; const R=window.FX_RATES||{}; const fx={USD:R.USD,GBP:R.GBP,CZK:(R.CZK||(1/24.335))}[dev]; lab.textContent='(1 '+dev+' = ? €)'; if(fx&&fx>0){ document.getElementById('knl_fx').value=fx.toFixed(6); lab.textContent='(taux actuel: 1 '+dev+' = '+fx.toFixed(4)+' €)'; } }
+      kidNlPreview();
+    };
+  }
+  window.kidNlClose=function(){ const m=document.getElementById('kidNlModal'); if(m)m.style.display='none'; };
+  window.kidNlToEur=function(amt,cur){ if(!amt||isNaN(amt))return 0; if(cur==='EUR')return amt; const fxf=parseFloat((document.getElementById('knl_fx')||{}).value); if(!isNaN(fxf)&&fxf>0)return amt*fxf; return kidToEur(amt,cur); };
+  window.kidNlPreview=function(){
+    const q=parseFloat((document.getElementById('knl_qte')||{}).value), p=parseFloat((document.getElementById('knl_prix')||{}).value);
+    const dev=(document.getElementById('knl_devise')||{}).value, pv=document.getElementById('knl_preview');
+    if(!isNaN(q)&&!isNaN(p)&&q>0&&p>0){ const cd=q*p, ce=window.kidNlToEur(cd,dev); const f=(n,c)=>n.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+c;
+      document.getElementById('knl_cost_devise').textContent=f(cd,dev); const ceEl=document.getElementById('knl_cost_eur'); ceEl.textContent=f(ce,'€'); ceEl.style.color='#4caf82'; pv.style.display='block';
+    } else pv.style.display='none';
+  };
+  window.kidNlOpen=function(){
+    kidNlEnsure();
+    ['knl_isin','knl_nom','knl_ticker','knl_broker','knl_qte','knl_prix','knl_fx','knl_comm','knl_taxe'].forEach(id=>{ const e=document.getElementById(id); if(e)e.value=''; });
+    document.getElementById('knl_type').value='';
+    document.getElementById('knl_devise').value='EUR';
+    document.getElementById('knl_feecur').value='EUR';
+    document.getElementById('knl_fx_row').style.display='none';
+    document.getElementById('knl_date').value=new Date().toISOString().slice(0,10);
+    document.getElementById('knl_preview').style.display='none';
+    document.getElementById('knl_error').style.display='none';
+    const cur=sel(); if(cur && cur!=='Tous'){ const se=document.getElementById('knl_e'); if(se) se.value=cur; }
+    const noms=new Set(KIDS_HOLD.map(h=>h.nom).filter(Boolean)); document.getElementById('knl_nom_list').innerHTML=[...noms].sort().map(n=>`<option value="${String(n).replace(/"/g,'&quot;')}">`).join('');
+    const brs=new Set(KIDS_HOLD.map(h=>h.c).filter(Boolean)); document.getElementById('knl_broker_list').innerHTML=[...brs].sort().map(bx=>`<option value="${String(bx).replace(/"/g,'&quot;')}">`).join('');
+    document.getElementById('kidNlModal').style.display='flex';
+  };
+  window.kidNlSubmit=function(){
+    const err=document.getElementById('knl_error'); err.style.display='none';
+    const g=id=>{ const e=document.getElementById(id); return e?e.value.trim():''; };
+    const e_=g('knl_e'), typ=g('knl_type'), isin=g('knl_isin').toUpperCase(), nom=g('knl_nom'), ticker=g('knl_ticker').toUpperCase(), broker=g('knl_broker'), date=g('knl_date'), dev=g('knl_devise');
+    const qte=parseFloat((document.getElementById('knl_qte')||{}).value), prix=parseFloat((document.getElementById('knl_prix')||{}).value);
+    const fx = dev!=='EUR'? parseFloat((document.getElementById('knl_fx')||{}).value) : 1;
+    const errs=[];
+    if(!nom) errs.push('Nom requis');
+    if(isNaN(qte)||qte<=0) errs.push('Quantité invalide');
+    if(isNaN(prix)||prix<=0) errs.push("Prix d'achat invalide");
+    if(dev!=='EUR' && (isNaN(fx)||fx<=0)) errs.push('Taux de change requis');
+    if(errs.length){ err.innerHTML='⚠️ '+errs.join(' · '); err.style.display='block'; return; }
+    const costDev=Math.round(qte*prix*100)/100;
+    const costEur=Math.round((dev==='EUR'?costDev:costDev*fx)*100)/100;
+    const comm=parseFloat((document.getElementById('knl_comm')||{}).value);
+    const taxe=parseFloat((document.getElementById('knl_taxe')||{}).value);
+    const feecur=(document.getElementById('knl_feecur')||{}).value||dev;
+    const obj={ _id:'kh'+Math.random().toString(36).slice(2,9), e:e_, c:broker||'', nom:nom, t:typ, isin:isin, ticker:ticker, date:date, devise:dev,
+      qty:qte, pxAchat:prix, cout:costEur, fxRate:(dev!=='EUR'?fx:1),
+      comm:(!isNaN(comm)&&comm>0)?Math.round(comm*100)/100:null, taxe:(!isNaN(taxe)&&taxe>0)?Math.round(taxe*100)/100:null, commCur:feecur };
+    let fees=0; if(!isNaN(comm)&&comm>0)fees+=comm; if(!isNaN(taxe)&&taxe>0)fees+=taxe;
+    if(fees>0 && obj.c && typeof KIDS_CASH!=='undefined'){ if(!KIDS_CASH[obj.c])KIDS_CASH[obj.c]={}; KIDS_CASH[obj.c][dev]=Math.round(((KIDS_CASH[obj.c][dev]||0)-fees)*100)/100; window.KIDS_CASH=KIDS_CASH; if(typeof kidsCashSave==='function')kidsCashSave(); }
+    KIDS_HOLD.push(obj); window.KIDS_HOLD=KIDS_HOLD; kidsSave(); kidNlClose(); kidEdBuild();
   };
 
   // ---- Vente ----
