@@ -10925,20 +10925,153 @@ window.addEventListener('load', () => {
 
   // ---- 5) CLÔTURÉES -------------------------------------------------------
   function kidClotures(b){
-    const rows = KIDS_CLOSED.filter(h=>sel()==='Tous'||h.e===sel());
-    const tot = rows.reduce((s,h)=>s+(+h.pnl||0),0);
-    let html=`<div class="card"><table><thead><tr><th>Enfant</th><th>Compte</th><th>Position</th><th>ISIN</th><th style="text-align:right">Comm./frais</th><th style="text-align:right">Taxe</th><th style="text-align:right">P&L réalisé</th></tr></thead><tbody>`;
-    rows.forEach(h=>{
-      html+=`<tr><td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COL[h.e]};margin-right:6px"></span>${h.e}</td>
-        <td>${h.c}</td><td>${h.nom}</td><td style="color:var(--text3);font-size:10px">${h.isin||''}</td>
-        <td style="text-align:right;color:var(--text2)">${h.comm?Math.round(h.comm).toLocaleString('fr')+' '+(h.devise||'€'):'—'}</td>
-        <td style="text-align:right;color:var(--text2)">${h.taxe?Math.round(h.taxe).toLocaleString('fr')+' '+(h.devise||'€'):'—'}</td>
-        <td style="text-align:right;font-weight:600;color:${col(h.pnl)}">${fmts(h.pnl)}</td></tr>`;
-    });
-    html+=`<tr style="border-top:2px solid var(--border2);font-weight:700"><td colspan="6">TOTAL réalisé</td><td style="text-align:right;color:${col(tot)}">${fmts(tot)}</td></tr>`;
-    html+=`</tbody></table></div>`;
-    b.innerHTML=html;
+    window._kidClBox=b;
+    if(window._kidClFilter==null) window._kidClFilter={};
+    if(window._kidClSort==null) window._kidClSort={col:'dateSell',dir:-1};
+    const f=window._kidClFilter;
+    const th=(c,lab,al)=>`<th onclick="kidClSort('${c}')" style="padding:8px 10px;cursor:pointer;user-select:none;white-space:nowrap;text-align:${al||'left'}">${lab} <span style="font-size:9px;opacity:.4">⇅</span></th>`;
+    const fin=(c,ph,al)=>`<td style="padding:3px 6px"><input type="text" value="${String(f[c]||'').replace(/"/g,'&quot;')}" placeholder="${ph}" oninput="kidClFilter('${c}',this.value)" style="width:100%;box-sizing:border-box;padding:4px 7px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none${al==='right'?';text-align:right':''}"></td>`;
+    b.innerHTML=`
+      <h2 style="font-size:16px;font-weight:700;margin-bottom:4px">Positions clôturées — enfants</h2>
+      <p class="section-desc" style="margin-bottom:14px">P&L réalisé archivé. Filtre, trie, modifie ou supprime une ligne.</p>
+      <div id="kidClKpi" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px"></div>
+      <div style="max-height:70vh;overflow:auto">
+        <table style="font-size:12px;width:100%;border-collapse:collapse;min-width:1200px">
+          <thead>
+            <tr style="background:var(--bg2);text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2)">
+              ${th('e','Enfant')}${th('nom','Nom')}${th('ticker','Ticker')}${th('c','Broker')}${th('dateAchat','Date achat')}${th('dateSell','Date vente')}${th('qty','Qté','right')}${th('pxAchat','Px achat','right')}${th('pxVente','Px vente','right')}${th('costEur','Coût €','right')}${th('saleEur','Vente €','right')}<th style="padding:8px 10px;text-align:right">Comm./frais</th><th style="padding:8px 10px;text-align:right">Taxe</th>${th('pnl','P&L €','right')}${th('pnlPct','P&L %','right')}<th style="padding:8px 10px;text-align:center">Actions</th>
+            </tr>
+            <tr style="background:var(--bg3)">
+              <td></td>${fin('nom','Filtrer nom')}${fin('ticker','Ticker')}${fin('broker','Broker')}${fin('dateAchat','AAAA-MM-JJ')}${fin('dateSell','AAAA-MM-JJ')}<td></td><td></td><td></td><td></td><td></td><td></td><td></td>${fin('pnl','≥ P&L','right')}<td></td><td></td>
+            </tr>
+          </thead>
+          <tbody id="kidClBody"></tbody>
+          <tfoot><tr id="kidClTot" style="font-weight:700;background:var(--bg2)"></tr></tfoot>
+        </table>
+      </div>`;
+    kidClBuild();
   }
+  function kidClBuild(){
+    const body=document.getElementById('kidClBody'); if(!body) return;
+    let _idAdded=false; KIDS_CLOSED.forEach(p=>{ if(p&&!p._id){ p._id='kc'+Math.random().toString(36).slice(2,9); _idAdded=true; } }); if(_idAdded){ window.KIDS_CLOSED=KIDS_CLOSED; kidsSave(); }
+    const _sym=c=>({EUR:'€',USD:'$',GBP:'£',CZK:'Kč',GBp:'p'}[c]||c||'€');
+    const fN=n=>n==null?'—':Number(n).toLocaleString('fr',{maximumFractionDigits:4});
+    const fE=n=>n==null?'—':Math.round(n).toLocaleString('fr')+' €';
+    const na=x=>String(x||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    const cP=n=>n==null?'var(--text2)':(n>=0?'#4caf82':'#e06c6c');
+    const s=sel(), f=window._kidClFilter||{}, cs=window._kidClSort||{col:'dateSell',dir:-1};
+    let rows=KIDS_CLOSED.map((p,idx)=>({p,idx})).filter(o=> s==='Tous'||o.p.e===s);
+    rows=rows.filter(o=>{ const p=o.p;
+      if(f.nom && !na(p.nom).includes(na(f.nom))) return false;
+      if(f.ticker && !na(p.ticker).includes(na(f.ticker))) return false;
+      if(f.broker && !na(p.c).includes(na(f.broker))) return false;
+      if(f.dateAchat && !String(p.dateAchat||'').includes(f.dateAchat)) return false;
+      if(f.dateSell && !String(p.dateSell||'').includes(f.dateSell)) return false;
+      if(f.pnl && !((+p.pnl||0)>=parseFloat(f.pnl))) return false;
+      return true; });
+    rows.sort((a,b2)=>{ let x=a.p[cs.col],y=b2.p[cs.col]; if(typeof x==='string'||typeof y==='string') return cs.dir*String(x==null?'':x).localeCompare(String(y==null?'':y)); if(x==null)x=-Infinity; if(y==null)y=-Infinity; return cs.dir*(x-y); });
+    let tCost=0,tVal=0,tPnl=0,tFees=0,hasCost=false,hasVal=false;
+    rows.forEach(o=>{ const p=o.p;
+      if(p.costEur!=null){tCost+=+p.costEur;hasCost=true;}
+      if(p.saleEur!=null){tVal+=+p.saleEur;hasVal=true;}
+      tPnl+=(+p.pnl||0);
+      const hasNew=(p.commAchat!=null||p.commVente!=null);
+      const ff=hasNew?((+p.commAchat||0)+(+p.commVente||0)+(+p.taxe||0)):((+p.comm||0)+(+p.taxe||0));
+      const cc=p.currencyFrais||'EUR'; tFees+=(cc==='EUR'?ff:(kidToEur(ff,cc)||ff));
+    });
+    const tPct=tCost>0?tPnl/tCost*100:null;
+    body.innerHTML = rows.length? rows.map(o=>{ const p=o.p; const sign=(+p.pnl>=0)?'+':'';
+      const commDisp=(p.commAchat!=null||p.commVente!=null)?((+p.commAchat||0)+(+p.commVente||0)):(p.comm!=null?+p.comm:null);
+      return `<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:6px 10px;white-space:nowrap"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COL[p.e]};margin-right:5px"></span>${p.e}</td>
+        <td style="padding:6px 10px"><strong>${p.nom||''}</strong></td>
+        <td style="padding:6px 10px;font-size:11px;font-family:'DM Mono',monospace">${p.ticker||'—'}</td>
+        <td style="padding:6px 10px;font-size:11px;color:var(--text2)">${p.c||'—'}</td>
+        <td style="padding:6px 10px;font-size:11px;color:var(--text2)">${p.dateAchat||'—'}</td>
+        <td style="padding:6px 10px;font-size:11px;color:var(--text2)">${p.dateSell||'—'}</td>
+        <td style="padding:6px 10px;text-align:right;font-family:'DM Mono',monospace">${p.qty!=null?fN(p.qty):'—'}</td>
+        <td style="padding:6px 10px;text-align:right;font-family:'DM Mono',monospace">${p.pxAchat!=null?fN(p.pxAchat)+' '+_sym(p.currencyAchat):'—'}</td>
+        <td style="padding:6px 10px;text-align:right;font-family:'DM Mono',monospace">${p.pxVente!=null?fN(p.pxVente)+' '+_sym(p.currencyVente):'—'}</td>
+        <td style="padding:6px 10px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${p.costEur!=null?fE(p.costEur):'—'}</td>
+        <td style="padding:6px 10px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${p.saleEur!=null?fE(p.saleEur):'—'}</td>
+        <td style="padding:6px 10px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${commDisp?Math.round(commDisp).toLocaleString('fr')+' '+_sym(p.currencyFrais||'EUR'):'—'}</td>
+        <td style="padding:6px 10px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${p.taxe?Math.round(p.taxe).toLocaleString('fr')+' '+_sym(p.currencyFrais||'EUR'):'—'}</td>
+        <td style="padding:6px 10px;text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:${cP(p.pnl)}">${sign}${Math.round(+p.pnl||0).toLocaleString('fr')} €</td>
+        <td style="padding:6px 10px;text-align:right;color:${cP(p.pnlPct)}">${p.pnlPct!=null?((+p.pnlPct>=0?'+':'')+(+p.pnlPct).toFixed(1)+'%'):'—'}</td>
+        <td style="padding:4px 8px;white-space:nowrap;text-align:center"><button onclick="kidClEdit(${o.idx})" title="Modifier" style="background:none;border:none;cursor:pointer;font-size:13px">✏️</button> <button onclick="kidClDel(${o.idx})" title="Supprimer" style="background:none;border:none;cursor:pointer;font-size:12px;color:#e06c6c">🗑</button></td>
+      </tr>`; }).join('') : `<tr><td colspan="16" style="padding:16px;text-align:center;color:var(--text3)">Aucune position clôturée.</td></tr>`;
+    const tot=document.getElementById('kidClTot');
+    if(tot) tot.innerHTML=`<td colspan="9" style="padding:8px 10px">Total réalisé (${rows.length})</td>
+      <td style="padding:8px 10px;text-align:right;font-family:'DM Mono',monospace">${hasCost?fE(tCost):'—'}</td>
+      <td style="padding:8px 10px;text-align:right;font-family:'DM Mono',monospace">${hasVal?fE(tVal):'—'}</td>
+      <td></td><td></td>
+      <td style="padding:8px 10px;text-align:right;font-family:'DM Mono',monospace;color:${tPnl>=0?'#4caf82':'#e06c6c'}">${(tPnl>=0?'+':'')+Math.round(tPnl).toLocaleString('fr')} €</td>
+      <td style="padding:8px 10px;text-align:right;font-family:'DM Mono',monospace;color:${(tPct==null||tPct>=0)?'#4caf82':'#e06c6c'}">${tPct!=null?((tPct>=0?'+':'')+tPct.toFixed(1).replace('.',',')+'%'):'—'}</td>
+      <td></td>`;
+    const kpi=document.getElementById('kidClKpi');
+    const card=(l,v,c)=>`<div class="card" style="padding:14px 16px"><div class="kpi-label">${l}</div><div class="kpi-value" style="font-size:20px;color:${c||'var(--text)'}">${v}</div></div>`;
+    if(kpi) kpi.innerHTML = card('Coût total', hasCost?fE(tCost):'—')+card('Vente totale', hasVal?fE(tVal):'—')+card('P&L réalisé',(tPnl>=0?'+':'')+fE(Math.abs(tPnl)).replace('-',''),tPnl>=0?'#4caf82':'#e06c6c')+card('P&L %',tPct!=null?((tPct>=0?'+':'')+tPct.toFixed(1).replace('.',',')+'%'):'—',(tPct==null||tPct>=0)?'#4caf82':'#e06c6c')+card('Frais / Taxe',tFees>0?fE(tFees):'—','#e06c6c');
+  }
+  window.kidClFilter=function(c,val){ if(window._kidClFilter==null)window._kidClFilter={}; if(!val)delete window._kidClFilter[c]; else window._kidClFilter[c]=val; kidClBuild(); };
+  window.kidClSort=function(c){ const s=window._kidClSort||{col:'dateSell',dir:-1}; if(s.col===c)s.dir=-s.dir; else{s.col=c;s.dir=1;} window._kidClSort=s; kidClBuild(); };
+  window.kidClDel=function(idx){ if(!KIDS_CLOSED[idx])return; if(!confirm('Supprimer cette position clôturée ?'))return; KIDS_CLOSED.splice(idx,1); window.KIDS_CLOSED=KIDS_CLOSED; kidsSave(); kidClBuild(); };
+  function kidClEnsureModal(){
+    if(document.getElementById('kidClEditModal')) return;
+    const m=document.createElement('div'); m.id='kidClEditModal';
+    m.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10001;align-items:center;justify-content:center;padding:20px';
+    const opt=(arr)=>arr.map(o=>`<option>${o}</option>`).join('');
+    m.innerHTML=`<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:28px 32px;width:560px;max-width:95vw;max-height:90vh;overflow:auto;box-shadow:0 24px 60px rgba(0,0,0,.5)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px"><h3 style="margin:0;font-size:16px;font-weight:700">✏️ Modifier la position clôturée</h3><button onclick="kidClClose()" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer">×</button></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><label style="${_knlL}">Enfant</label><select id="kce_e" style="${_knlS}">${opt(KIDS)}</select></div>
+        <div><label style="${_knlL}">Broker / compte</label><input id="kce_c" style="${_knlS}"></div>
+        <div style="grid-column:1/-1"><label style="${_knlL}">Nom</label><input id="kce_nom" style="${_knlS}"></div>
+        <div><label style="${_knlL}">ISIN</label><input id="kce_isin" style="${_knlS}"></div>
+        <div><label style="${_knlL}">Ticker</label><input id="kce_ticker" style="${_knlS}"></div>
+        <div><label style="${_knlL}">Date achat</label><input id="kce_dateAchat" type="date" style="${_knlS}"></div>
+        <div><label style="${_knlL}">Date vente</label><input id="kce_dateSell" type="date" style="${_knlS}"></div>
+        <div><label style="${_knlL}">Quantité</label><input id="kce_qty" type="number" step="any" style="${_knlS}"></div>
+        <div></div>
+        <div><label style="${_knlL}">Devise achat</label><select id="kce_curA" style="${_knlS}">${opt(['EUR','USD','GBP','CZK'])}</select></div>
+        <div><label style="${_knlL}">Prix achat</label><input id="kce_pxA" type="number" step="any" style="${_knlS}"></div>
+        <div><label style="${_knlL}">Devise vente</label><select id="kce_curV" style="${_knlS}">${opt(['EUR','USD','GBP','CZK'])}</select></div>
+        <div><label style="${_knlL}">Prix vente</label><input id="kce_pxV" type="number" step="any" style="${_knlS}"></div>
+        <div style="grid-column:1/-1"><label style="${_knlL}">Taux de change vente (1 devise = ? €)</label><input id="kce_fxV" type="number" step="any" style="${_knlS}"></div>
+        <div><label style="${_knlL}">Comm. achat</label><input id="kce_commA" type="number" step="any" style="${_knlS}"></div>
+        <div><label style="${_knlL}">Taxe</label><input id="kce_taxe" type="number" step="any" style="${_knlS}"></div>
+        <div><label style="${_knlL}">Comm. vente</label><input id="kce_commV" type="number" step="any" style="${_knlS}"></div>
+        <div><label style="${_knlL}">Devise frais</label><select id="kce_feecur" style="${_knlS}">${opt(['EUR','USD','GBP','CZK'])}</select></div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:22px"><button onclick="kidClClose()" style="padding:9px 20px;background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:6px;font-size:13px;cursor:pointer">Annuler</button><button onclick="kidClSaveEdit()" style="padding:9px 20px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600">💾 Enregistrer</button></div>
+    </div>`;
+    document.body.appendChild(m); m.onclick=e=>{ if(e.target===m) kidClClose(); };
+  }
+  window.kidClClose=function(){ const m=document.getElementById('kidClEditModal'); if(m)m.style.display='none'; };
+  window.kidClEdit=function(idx){ const p=KIDS_CLOSED[idx]; if(!p)return; kidClEnsureModal(); window._kidClEditIdx=idx;
+    const sv=(id,v)=>{ const e=document.getElementById(id); if(e)e.value=(v!=null?v:''); };
+    document.getElementById('kce_e').value=p.e||'Estelle'; sv('kce_c',p.c||''); sv('kce_nom',p.nom||''); sv('kce_isin',p.isin||''); sv('kce_ticker',p.ticker||'');
+    sv('kce_dateAchat',p.dateAchat||''); sv('kce_dateSell',p.dateSell||''); sv('kce_qty',p.qty!=null?p.qty:'');
+    document.getElementById('kce_curA').value=p.currencyAchat||'EUR'; sv('kce_pxA',p.pxAchat!=null?p.pxAchat:'');
+    document.getElementById('kce_curV').value=p.currencyVente||'EUR'; sv('kce_pxV',p.pxVente!=null?p.pxVente:'');
+    sv('kce_fxV',p.fxVente!=null?p.fxVente:''); sv('kce_commA',p.commAchat!=null?p.commAchat:(p.comm!=null?p.comm:'')); sv('kce_taxe',p.taxe!=null?p.taxe:''); sv('kce_commV',p.commVente!=null?p.commVente:'');
+    document.getElementById('kce_feecur').value=p.currencyFrais||'EUR';
+    document.getElementById('kidClEditModal').style.display='flex';
+  };
+  window.kidClSaveEdit=function(){ const idx=window._kidClEditIdx; const p=KIDS_CLOSED[idx]; if(!p)return;
+    const gv=id=>{ const e=document.getElementById(id); return e?e.value.trim():''; };
+    const gn=id=>{ const e=document.getElementById(id); const v=e?e.value:''; return v===''?null:parseFloat(String(v).replace(',','.')); };
+    const curA=gv('kce_curA'), curV=gv('kce_curV'), qty=gn('kce_qty'), pxA=gn('kce_pxA'), pxV=gn('kce_pxV');
+    let fxV=gn('kce_fxV'); if(curV==='EUR')fxV=1; if(fxV==null||!(fxV>0))fxV=1;
+    const costEur=(qty!=null&&pxA!=null)? Math.round((curA==='EUR'?qty*pxA:(kidToEur(qty*pxA,curA)||qty*pxA))*100)/100 : (p.costEur!=null?+p.costEur:0);
+    const saleEur=(qty!=null&&pxV!=null)? Math.round((curV==='EUR'?qty*pxV:qty*pxV*fxV)*100)/100 : (p.saleEur!=null?+p.saleEur:0);
+    const pnl=Math.round((saleEur-costEur)*100)/100; const pct=costEur?Math.round(pnl/costEur*10000)/100:0;
+    const commA=gn('kce_commA')||0, taxe=gn('kce_taxe')||0, commV=gn('kce_commV')||0; const feecur=gv('kce_feecur');
+    KIDS_CLOSED[idx]=Object.assign({}, p, { e:gv('kce_e'), c:gv('kce_c'), nom:gv('kce_nom'), isin:gv('kce_isin').toUpperCase(), ticker:gv('kce_ticker').toUpperCase(),
+      dateAchat:gv('kce_dateAchat'), dateSell:gv('kce_dateSell'), qty:qty, currencyAchat:curA, pxAchat:pxA, currencyVente:curV, pxVente:pxV, fxVente:fxV,
+      costEur:costEur, saleEur:saleEur, pnl:pnl, pnlPct:pct, commAchat:commA, taxe:taxe, commVente:commV, currencyFrais:feecur,
+      comm:Math.round((commA+commV)*100)/100, devise:'€' });
+    window.KIDS_CLOSED=KIDS_CLOSED; kidsSave(); kidClClose(); kidClBuild();
+  };
 
   // ---- 6) ÉVOLUTION (perf annuelle / valeur cumulée) ----------------------
   function kidEvolution(b){
