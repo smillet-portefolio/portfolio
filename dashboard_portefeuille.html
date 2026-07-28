@@ -10478,7 +10478,24 @@ window.addEventListener('load', () => {
     });
     return base.concat(man);
   }
-  function compteEnfant(c){ if(/Corentin/.test(c)) return 'Corentin'; if(/L[ée]andre/.test(c)) return 'Léandre'; return 'Estelle'; }
+  function compteEnfant(c){
+    if(/Corentin/.test(c)) return 'Corentin';
+    if(/L[ée]andre/.test(c)) return 'Léandre';
+    if(/Estelle/.test(c)) return 'Estelle';
+    // Nom de compte sans prénom : déduire l'enfant depuis une ligne / un dépôt utilisant ce broker
+    try{ const h=(window.KIDS_HOLD||[]).find(x=>x&&x.c===c); if(h&&h.e) return h.e; }catch(_){}
+    try{ const d=(window.KIDS_DEP||[]).find(x=>x&&x.c===c); if(d&&d.e) return d.e; }catch(_){}
+    return 'Estelle';
+  }
+  // Liste dynamique des comptes/brokers enfants : défauts + lignes + dépôts + cash
+  function kidComptes(){
+    const base = KID_COMPTES.slice();
+    const fromHold = (window.KIDS_HOLD||KIDS_HOLD||[]).map(h=>h&&h.c);
+    const fromDepB = (typeof KIDS_DEP_BASE!=='undefined'?KIDS_DEP_BASE:[]).map(d=>d&&d.c);
+    const fromDep  = (KIDS_DEP||[]).map(d=>d&&d.c);
+    const fromCash = Object.keys(KIDS_CASH||{});
+    return [...new Set([...base, ...fromHold, ...fromDepB, ...fromDep, ...fromCash])].filter(Boolean);
+  }
   function allDeps(){
     const base = KIDS_DEP_BASE.map(d=>({d:d.d,c:d.c,e:d.e,m:d.m,_i:null}));
     const man  = KIDS_DEP.map((d,i)=>({d:d.d,c:d.c,e:d.e,m:d.m,_i:i}));
@@ -10713,7 +10730,7 @@ window.addEventListener('load', () => {
   // ---- 4) DÉPÔTS & CASH (layout identique à l'onglet principal) ----------
   function kidCash(b){
     const sfl=sel();
-    const comptes = KID_COMPTES.filter(c=> sfl==='Tous' || compteEnfant(c)===sfl);
+    const comptes = kidComptes().filter(c=> sfl==='Tous' || compteEnfant(c)===sfl);
     const opt = comptes.map(c=>`<option value="${c}">${c}</option>`).join('');
     const today=new Date().toISOString().slice(0,10);
     const lc="font-size:11px;color:var(--text2);display:block;margin-bottom:4px";
@@ -10826,7 +10843,7 @@ window.addEventListener('load', () => {
     // Synthèse par broker
     const sb=document.getElementById('kidCashSummaryBody'); const sf=document.getElementById('kidCashSummaryFoot');
     if(!sb) return;
-    let brokers=[...new Set([...KID_COMPTES, ...all.map(d=>d.broker), ...Object.keys(KIDS_CASH)])].filter(bk=> sfl==='Tous' || compteEnfant(bk)===sfl);
+    let brokers=[...new Set([...kidComptes(), ...all.map(d=>d.broker), ...Object.keys(KIDS_CASH)])].filter(bk=> sfl==='Tous' || compteEnfant(bk)===sfl);
     let tD=0,tW=0,tCash=0;
     sb.innerHTML = brokers.map((bk,i)=>{
       const dep=all.filter(d=>d.broker===bk&&d.type==='dépôt').reduce((s2,d)=>s2+(d.amountEur!=null?d.amountEur:d.amount),0);
@@ -11388,7 +11405,7 @@ window.addEventListener('load', () => {
     if(typeof ETF_META!=='undefined') Object.keys(ETF_META).forEach(tk=>{ const m=ETF_META[tk]; const n=(m&&m.name||'').trim(); if(!n||known[n]) return; known[n]={isin:(m.isin||''),ticker:tk,t:'ETF',devise:'EUR'}; });
     window._kidKnownInvest=known;
     document.getElementById('knl_nom_list').innerHTML=Object.keys(known).sort().map(n=>`<option value="${String(n).replace(/"/g,'&quot;')}">`).join('');
-    const brs=new Set(KIDS_HOLD.map(h=>h.c).filter(Boolean)); document.getElementById('knl_broker_list').innerHTML=[...brs].sort().map(bx=>`<option value="${String(bx).replace(/"/g,'&quot;')}">`).join('');
+    document.getElementById('knl_broker_list').innerHTML=kidComptes().sort().map(bx=>`<option value="${String(bx).replace(/"/g,'&quot;')}">`).join('');
     // Auto-remplissage ISIN / ticker / type / devise quand on choisit un investissement connu
     const nomEl=document.getElementById('knl_nom');
     if(nomEl) nomEl.oninput=function(){
