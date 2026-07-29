@@ -43,6 +43,7 @@ TICKERS = [
     ("ENR.DE",   "Siemens Energy",                "EUR", "ENR.DE"),
     ("SGO.PA",   "Saint-Gobain",                  "EUR", "SGO.PA"),
     ("SU.PA",    "Schneider Electric",            "EUR", "SU.PA"),
+    ("SAN.MC",   "Banco Santander",               "EUR", "SAN.MC"),
     ("RR.L",     "Rolls-Royce",                   "GBp", "RR.L"),
     ("MSFT",     "Microsoft",                     "USD", "MSFT"),
     ("ORCL",     "Oracle",                        "USD", "ORCL"),
