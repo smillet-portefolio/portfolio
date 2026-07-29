@@ -2399,6 +2399,70 @@ const DIRECT_SECTOR = {
 const SECT_COLORS = null; // unused — on utilise SECTOR_UNIFIED_COLORS
 let _sectCharts = {};
 
+// ── Détail d'un segment (secteur / zone) : titres correspondants + valeur € ────
+function _geoLabelCovers(label, country){
+  if(country===label) return true;
+  const m = (typeof GEO_MAP!=='undefined') ? GEO_MAP[country] : null;
+  return !!m && (m.r===label || m.s===label);
+}
+function _expoBreakdown(kind, scope, label){
+  const wantAct = (scope==='act' || scope==='tot');
+  const wantEtf = (scope==='etf' || scope==='tot');
+  const items = [];
+  if(wantAct){
+    BOOK2_ROWS.forEach(r=>{
+      if(ETF_TICKERS.has(r.ticker)) return;
+      if(!isActiveInv(r)) return;
+      const info = CURRENT_PRICES[r.ticker]; if(!info || !info.price) return;
+      const valEur = Math.round(toEur(r.qty*info.price, info.currency||r.currency));
+      if(!valEur || valEur<=0) return;
+      const ok = (kind==='sect') ? (DIRECT_SECTOR[r.ticker]===label)
+                                  : _geoLabelCovers(label, DIRECT_COUNTRY[r.ticker]);
+      if(ok) items.push({ name:r.name, ticker:r.ticker, type:'Action', valEur });
+    });
+  }
+  if(wantEtf){
+    Object.keys(ETF_META).forEach(ticker=>{
+      const valEur = _compValMap[ticker] || 0; if(!valEur) return;
+      let pct = 0;
+      if(kind==='sect'){
+        const arr = (ETF_COMP_OVERRIDE[ticker]?.sectorsAll || ETF_META[ticker]?.sectors || []);
+        const f = arr.find(e=>e[0]===label); pct = f ? f[1] : 0;
+      } else {
+        const arr = (ETF_COMP_OVERRIDE[ticker]?.geoAll || ETF_META[ticker]?.geo || []);
+        arr.forEach(([c,p])=>{ if(_geoLabelCovers(label, c)) pct += p; });
+      }
+      if(pct>0){ const v = Math.round(valEur*pct/100); if(v>0) items.push({ name:(ETF_META[ticker]?.name||ticker), ticker, type:'ETF ('+pct.toFixed(1).replace('.',',')+'%)', valEur:v }); }
+    });
+  }
+  items.sort((a,b)=>b.valEur-a.valEur);
+  return items;
+}
+function _expoModal(title, list){
+  let m = document.getElementById('expoModal');
+  if(!m){ m=document.createElement('div'); m.id='expoModal';
+    m.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10001;align-items:center;justify-content:center;padding:20px';
+    m.addEventListener('click', e=>{ if(e.target===m) m.style.display='none'; });
+    document.body.appendChild(m);
+  }
+  const tot = list.reduce((s,i)=>s+i.valEur,0);
+  m.innerHTML = `<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:22px 26px;width:540px;max-width:95vw;max-height:85vh;overflow:auto;box-shadow:0 24px 60px rgba(0,0,0,.5)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><h3 style="margin:0;font-size:15px;font-weight:700">${title}</h3><button onclick="document.getElementById('expoModal').style.display='none'" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;line-height:1">×</button></div>
+    ${list.length ? `<table style="width:100%;border-collapse:collapse;font-size:12.5px">
+      <thead><tr style="color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.4px;border-bottom:1px solid var(--border)"><th style="text-align:left;padding:6px 8px">Titre</th><th style="text-align:left;padding:6px 8px">Type</th><th style="text-align:right;padding:6px 8px">Valeur actuelle (€)</th></tr></thead>
+      <tbody>${list.map(i=>`<tr style="border-bottom:1px solid var(--border)"><td style="padding:6px 8px"><strong>${i.name}</strong> <span style="color:var(--text3);font-size:10px;font-family:'DM Mono',monospace">${i.ticker}</span></td><td style="padding:6px 8px;color:var(--text2)">${i.type}</td><td style="padding:6px 8px;text-align:right;font-family:'DM Mono',monospace">${i.valEur.toLocaleString('fr')} €</td></tr>`).join('')}
+      <tr style="font-weight:700;border-top:2px solid var(--border2)"><td style="padding:7px 8px" colspan="2">Total</td><td style="padding:7px 8px;text-align:right;font-family:'DM Mono',monospace">${Math.round(tot).toLocaleString('fr')} €</td></tr></tbody></table>`
+      : '<p style="color:var(--text2);font-size:13px">Aucune position directe / ETF identifiée pour ce segment.</p>'}
+  </div>`;
+  m.style.display = 'flex';
+}
+window._expoShow = function(kind, scope, label){
+  const list = _expoBreakdown(kind, scope, label);
+  const scopeLbl = scope==='act' ? 'actions directes' : scope==='etf' ? 'ETFs (look-through)' : 'total (actions + ETFs)';
+  const title = (kind==='sect' ? '📊 Secteur' : '🌍 Zone') + ' — ' + label + '  ·  ' + scopeLbl;
+  _expoModal(title, list);
+};
+
 function buildSectExposure() {
   const etfMap = {};  // secteur → € (ETFs uniquement)
   const actMap = {};  // secteur → € (actions directes uniquement)
@@ -2517,6 +2581,7 @@ function renderSectCharts() {
   if (!grandTot) return;
 
   function drawDonut(canvasId, legendId, tableId, dataMap, tot) {
+    const _scope = canvasId==='secACT' ? 'act' : canvasId==='secETF' ? 'etf' : 'tot';
     if (!window._compTableSort[tableId]) window._compTableSort[tableId] = { col:'val', dir:-1 };
     const _st = window._compTableSort[tableId];
     const entries = Object.entries(dataMap).sort((a, b) => _st.col==='lab' ? _st.dir*String(a[0]).localeCompare(String(b[0])) : _st.dir*(a[1]-b[1]));
@@ -2533,6 +2598,8 @@ function renderSectCharts() {
       data: { labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 1, borderColor: 'rgba(0,0,0,0.07)' }] },
       options: {
         cutout: '62%',
+        onClick: (evt, els) => { if (els && els.length) window._expoShow('sect', _scope, labels[els[0].index]); },
+        onHover: (evt, els) => { evt.native.target.style.cursor = els && els.length ? 'pointer' : 'default'; },
         plugins: {
           legend: { display: false },
           tooltip: { callbacks: {
@@ -2557,7 +2624,8 @@ function renderSectCharts() {
       const _sumV = entries.reduce((s, e) => s + e[1], 0);
       tb.innerHTML = entries.map(([l, v]) => {
         const icon = SECTOR_ICONS[l] ? `${SECTOR_ICONS[l]} ` : '';
-        return `<tr><td>${icon}${l}</td><td class="mono">${Math.round(v).toLocaleString('fr')} €</td><td class="mono">${((v / grandTot) * 100).toFixed(1).replace('.', ',')}%</td></tr>`;
+        const _lab = String(l).replace(/'/g, "\\'");
+        return `<tr style="cursor:pointer" title="Voir les titres du secteur" onclick="window._expoShow('sect','${_scope}','${_lab}')"><td>${icon}${l}</td><td class="mono">${Math.round(v).toLocaleString('fr')} €</td><td class="mono">${((v / grandTot) * 100).toFixed(1).replace('.', ',')}%</td></tr>`;
       }).join('') +
         `<tr style="border-top:2px solid var(--border2);font-weight:700;background:var(--bg3)"><td>Total</td><td class="mono">${Math.round(_sumV).toLocaleString('fr')} €</td><td class="mono">${((_sumV / grandTot) * 100).toFixed(1).replace('.', ',')}%</td></tr>`;
       const _tbl = tb.closest('table');
@@ -2618,6 +2686,8 @@ function renderGeoCharts() {
       data: { labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 1, borderColor: 'rgba(0,0,0,0.07)' }] },
       options: {
         cutout: '62%',
+        onClick: (evt, els) => { if (els && els.length) window._expoShow('geo', 'tot', labels[els[0].index]); },
+        onHover: (evt, els) => { evt.native.target.style.cursor = els && els.length ? 'pointer' : 'default'; },
         plugins: {
           legend: { display: false },
           tooltip: { callbacks: {
@@ -2637,9 +2707,10 @@ function renderGeoCharts() {
     const tb = document.getElementById(tableId);
     if (tb) {
       const _sumV = entries.reduce((s, e) => s + e[1], 0);
-      tb.innerHTML = entries.map(([l, v]) =>
-        `<tr><td>${l}</td><td class="mono">${Math.round(v).toLocaleString('fr')} €</td><td class="mono">${((v/tot)*100).toFixed(1).replace('.',',')}%</td></tr>`
-      ).join('') +
+      tb.innerHTML = entries.map(([l, v]) => {
+        const _lab = String(l).replace(/'/g, "\\'");
+        return `<tr style="cursor:pointer" title="Voir les titres de la zone" onclick="window._expoShow('geo','tot','${_lab}')"><td>${l}</td><td class="mono">${Math.round(v).toLocaleString('fr')} €</td><td class="mono">${((v/tot)*100).toFixed(1).replace('.',',')}%</td></tr>`;
+      }).join('') +
         `<tr style="border-top:2px solid var(--border2);font-weight:700;background:var(--bg3)"><td>Total</td><td class="mono">${Math.round(_sumV).toLocaleString('fr')} €</td><td class="mono">${((_sumV/tot)*100).toFixed(1).replace('.',',')}%</td></tr>`;
       const _tbl = tb.closest('table');
       if (_tbl) _tbl.querySelectorAll('th[data-ovcol]').forEach(th => { const s = th.querySelector('.ov-arr'); if (s) { const on = th.dataset.ovcol === _st.col; s.textContent = on ? (_st.dir<0?' ▼':' ▲') : ' ⇅'; s.style.opacity = on ? '1' : '0.35'; } });
