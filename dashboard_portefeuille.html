@@ -2222,7 +2222,7 @@ function renderDashboard() {
                    : (typeof EVO_HISTORY !== 'undefined' ? EVO_HISTORY : [])) || [])
                    .filter(r => r && r.date && r.date <= today && r.inv_total)
                    .slice().sort((a, b) => a.date.localeCompare(b.date));
-  const BROKER_EVO = { 'KB':'kb','SAXO':'saxo','IBKR':'ibkr','TRADING 212':'t212','XTB':'xtb',
+  const BROKER_EVO = { 'KB':'kb','SAXO':'saxo','IBKR':'ibkr','TRADING 212':'t212','TRADING 212 JITO':'jito','XTB':'xtb',
                        'Ledger':'ledger','Binance':'binance','ENERFIP':'enerfip','LENDOSPHERE':'lendo','LUMO':'lumo','LINXEA':'linxea' };
   const YTD_CUT = today.slice(0,4) + '-01-01';
   const MTD_CUT = today.slice(0,7) + '-01';

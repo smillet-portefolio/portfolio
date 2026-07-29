@@ -223,6 +223,14 @@ def fmt_var(v):
 
 # Symbole Yahoo quand le ticker interne diffère du symbole Yahoo (ex. Q8Y0 -> Q8Y0.DE)
 YS_OVERRIDE = {t: y for (t, n, c, y) in TICKERS if t != y}
+# Symbole Yahoo dédié au CALCUL DES VARIATIONS (1D..YTD) quand la cotation utilisée
+# pour le prix n'a pas d'historique exploitable. Le prix reste inchangé ; seules les
+# variations % (indépendantes de la devise) sont lues sur ce symbole.
+# CATL (C7A0.DE/.MU en EUR) : cotation secondaire européenne récente, sans historique
+# Yahoo -> on lit les variations sur la ligne H de Hong Kong 3750.HK.
+VAR_OVERRIDE = {
+    "C7A0.DE": "3750.HK",
+}
 # Tickers internes "non actions" (crypto / FX) gérés en statique
 STATIC_TICKS = {"BTC/EUR", "ETH/EUR", "EUR/CZK", "USD/CZK", "GBP/CZK"}
 # Produits à prix MANUEL (épargne / structurés) — non cotés sur Yahoo, on les saute
@@ -478,8 +486,10 @@ def collecter_prix():
             ysym, prix, cur = resolve_yahoo(tick)   # repli multi-place automatique
         if not cur:
             cur = "EUR"
-        var = variations_yahoo(ysym)
-        print(f"  {'OK' if prix else 'KO'} {str(nom)[:40]:<40s} ({tick}) -> {prix} [{cur}]")
+        vsym = VAR_OVERRIDE.get(tick, ysym)     # variations depuis une cotation à historique
+        var = variations_yahoo(vsym)
+        print(f"  {'OK' if prix else 'KO'} {str(nom)[:40]:<40s} ({tick}) -> {prix} [{cur}]"
+              + (f"  var<-{vsym}" if vsym != ysym else ""))
         if prix and prix > 0:
             _e = _native_to_eur(prix, cur, cnb)
             if _e and _e > 0:
