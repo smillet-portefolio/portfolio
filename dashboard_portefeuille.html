@@ -2410,16 +2410,20 @@ function _expoBreakdown(kind, scope, label){
   const wantEtf = (scope==='etf' || scope==='tot');
   const items = [];
   if(wantAct){
+    const acc = {};  // cumul par action (ticker) : plusieurs lots → une seule ligne
     BOOK2_ROWS.forEach(r=>{
       if(ETF_TICKERS.has(r.ticker)) return;
       if(!isActiveInv(r)) return;
       const info = CURRENT_PRICES[r.ticker]; if(!info || !info.price) return;
-      const valEur = Math.round(toEur(r.qty*info.price, info.currency||r.currency));
-      if(!valEur || valEur<=0) return;
+      const v = toEur(r.qty*info.price, info.currency||r.currency);
+      if(!v || v<=0) return;
       const ok = (kind==='sect') ? (DIRECT_SECTOR[r.ticker]===label)
                                   : _geoLabelCovers(label, DIRECT_COUNTRY[r.ticker]);
-      if(ok) items.push({ name:r.name, ticker:r.ticker, type:'Action', valEur });
+      if(!ok) return;
+      if(!acc[r.ticker]) acc[r.ticker] = { name:r.name, ticker:r.ticker, type:'Action', valEur:0 };
+      acc[r.ticker].valEur += v;
     });
+    Object.values(acc).forEach(it=>{ it.valEur = Math.round(it.valEur); items.push(it); });
   }
   if(wantEtf){
     Object.keys(ETF_META).forEach(ticker=>{
