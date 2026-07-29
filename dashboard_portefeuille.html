@@ -1971,7 +1971,7 @@ function renderDashboard() {
   };
   var BROKER_PALETTE = ['#5a8dee','#4caf82','#f97316','#a78bfa','#f59e0b','#ec4899','#14b8a6','#84cc16','#e06c6c','#60a5fa','#34d399','#fb923c'];
 
-  function makeDonut(canvasId, legId, entries, palette) {
+  function makeDonut(canvasId, legId, entries, palette, onSlice) {
     var c = document.getElementById(canvasId);
     var legEl = document.getElementById(legId);
     if (!c) return;
@@ -1987,6 +1987,8 @@ function renderDashboard() {
       data: { labels: labels, datasets: [{ data: vals, backgroundColor: colors, borderWidth: 2, borderColor: 'rgba(255,255,255,0.06)' }] },
       options: {
         responsive: false, cutout: '60%',
+        onClick: function(evt, els){ if(onSlice && els && els.length) onSlice(labels[els[0].index]); },
+        onHover: function(evt, els){ if(evt && evt.native && evt.native.target) evt.native.target.style.cursor = (onSlice && els && els.length) ? 'pointer' : 'default'; },
         plugins: {
           legend: { display: false },
           tooltip: { callbacks: { label: function(ctx) { return ' ' + Math.round(ctx.parsed).toLocaleString('fr') + ' € (' + (total ? (ctx.parsed/total*100).toFixed(1) : 0) + '%)'; } } }
@@ -2039,7 +2041,7 @@ function renderDashboard() {
   // Couleurs stables par libellé (Actions bleu, ETFs bleu ciel) ; tri par valeur pour aligner la palette
   var _typeCol = { 'Actions':'#5a8dee', 'ETFs':'#38bdf8', 'Crypto':'#f59e0b', 'Produits structurés & Épargne':'#a78bfa', 'Obligations non cotées':'#4caf82' };
   typeEntries.sort(function(a,b) { return b[1]-a[1]; });
-  makeDonut('db_donut_type', 'db_donut_type_leg', typeEntries, typeEntries.map(function(e) { return _typeCol[e[0]] || '#6b7280'; }));
+  makeDonut('db_donut_type', 'db_donut_type_leg', typeEntries, typeEntries.map(function(e) { return _typeCol[e[0]] || '#6b7280'; }), function(l){ window._dbShow('type', l); });
 
   // Donut par broker
   var _pfBrokerMerged = {};
@@ -2047,7 +2049,7 @@ function renderDashboard() {
   var brokerEntries = Object.entries(_pfBrokerMerged)
     .filter(function(e) { return e[1] > 0; })
     .sort(function(a, b) { return b[1] - a[1]; });
-  makeDonut('db_donut_broker', 'db_donut_broker_leg', brokerEntries, BROKER_PALETTE);
+  makeDonut('db_donut_broker', 'db_donut_broker_leg', brokerEntries, BROKER_PALETTE, function(l){ window._dbShow('broker', l); });
 
   // Donut par grandes régions (données onglet Géographie)
   try {
@@ -2055,14 +2057,14 @@ function renderDashboard() {
     var _regionMap = {};
     Object.entries(_payMap).forEach(function(e){ var m=(typeof GEO_MAP!=='undefined'&&GEO_MAP[e[0]])?GEO_MAP[e[0]]:{r:'Autres'}; _regionMap[m.r]=(_regionMap[m.r]||0)+e[1]; });
     var _regSorted = Object.entries(_regionMap).filter(function(e){return e[1]>0;}).sort(function(a,b){return b[1]-a[1];});
-    makeDonut('db_donut_geo','db_donut_geo_leg', _regSorted, _regSorted.map(function(e){return (typeof GEO_R_COLORS!=='undefined'&&GEO_R_COLORS[e[0]])?GEO_R_COLORS[e[0]]:'#6b7280';}));
+    makeDonut('db_donut_geo','db_donut_geo_leg', _regSorted, _regSorted.map(function(e){return (typeof GEO_R_COLORS!=='undefined'&&GEO_R_COLORS[e[0]])?GEO_R_COLORS[e[0]]:'#6b7280';}), function(l){ window._expoShow('geo','tot', l); });
   } catch(e){}
 
   // Donut par secteur (exposition totale, onglet Secteurs)
   try {
     var _secTot = (typeof buildSectExposure === 'function') ? (buildSectExposure().totMap||{}) : {};
     var _secSorted = Object.entries(_secTot).filter(function(e){return e[1]>0;}).sort(function(a,b){return b[1]-a[1];});
-    makeDonut('db_donut_sec','db_donut_sec_leg', _secSorted, _secSorted.map(function(e){return (typeof SECTOR_UNIFIED_COLORS!=='undefined'&&SECTOR_UNIFIED_COLORS[e[0]])?SECTOR_UNIFIED_COLORS[e[0]]:'#9ca3af';}));
+    makeDonut('db_donut_sec','db_donut_sec_leg', _secSorted, _secSorted.map(function(e){return (typeof SECTOR_UNIFIED_COLORS!=='undefined'&&SECTOR_UNIFIED_COLORS[e[0]])?SECTOR_UNIFIED_COLORS[e[0]]:'#9ca3af';}), function(l){ window._expoShow('sect','tot', l); });
   } catch(e){}
 
   // Graph dividendes nets par année (remplace l'ancien bloc Signaux & Devises)
@@ -2227,10 +2229,21 @@ function renderDashboard() {
   const YTD_CUT = today.slice(0,4) + '-01-01';
   const MTD_CUT = today.slice(0,7) + '-01';
   const evoBaseRow = (cut) => { let base = null; for (const r of EVO_SRC) { if (r.date < cut) base = r; else break; } return base || EVO_SRC[0] || null; };
+  // Première ligne de l'historique où le broker/suffixe a une valeur > 0 (= date d'ouverture du compte)
+  const _firstPosRow = (s) => { for (const r of EVO_SRC) { const v = r['act_'+s]; if (typeof v === 'number' && v > 0) return r; } return null; };
   const evoBaseSum = (suffixes, cut) => {
-    const b = evoBaseRow(cut); if (!b) return null;
+    const before = evoBaseRow(cut);
     let act = 0, inv = 0, ok = false;
-    suffixes.forEach(s => { if (typeof b['act_'+s] === 'number') { act += b['act_'+s]; ok = true; } if (typeof b['inv_'+s] === 'number') { inv += b['inv_'+s]; } });
+    suffixes.forEach(s => {
+      // Référence normale = dernière valeur avant la date de coupe.
+      // Si le compte n'existait pas encore (pas de valeur avant la coupe), on prend
+      // sa 1re valeur disponible → YTD/MTD calculés « depuis l'origine » (ex. TRADING 212 JITO ouvert le 04/05/2026).
+      let row = (before && typeof before['act_'+s] === 'number' && before['act_'+s] > 0) ? before : _firstPosRow(s);
+      if (row && typeof row['act_'+s] === 'number') {
+        act += row['act_'+s]; ok = true;
+        if (typeof row['inv_'+s] === 'number') inv += row['inv_'+s];
+      }
+    });
     return ok ? { act, inv } : null;
   };
   const periodCell = (valNow, invNow, suffixes, cut) => {
@@ -2464,6 +2477,50 @@ window._expoShow = function(kind, scope, label){
   const list = _expoBreakdown(kind, scope, label);
   const scopeLbl = scope==='act' ? 'actions directes' : scope==='etf' ? 'ETFs (look-through)' : 'total (actions + ETFs)';
   const title = (kind==='sect' ? '📊 Secteur' : '🌍 Zone') + ' — ' + label + '  ·  ' + scopeLbl;
+  _expoModal(title, list);
+};
+
+// ── Détail des donuts du Dashboard (par type d'actif / par broker) ────────────
+function _dbHoldings(){
+  const out = [], acc = {};
+  const _nb = b => (typeof normBroker==='function') ? normBroker(b||'—') : ((b==='KB obligations')?'KB':(b||'—'));
+  BOOK2_ROWS.forEach(r=>{
+    if(!isActiveInv(r)) return;
+    const ti = (r.typeInv||'');
+    let cat = 'Actions';
+    if(ti==='Crypto') cat='Crypto';
+    else if(ti==='Produit structuré'||ti==='Produit structure'||ti==='Épargne'||ti==='Epargne') cat='Produits structurés & Épargne';
+    else if(ti.toLowerCase().includes('obligation')) cat='Obligations non cotées';
+    else if(ti==='ETF') cat='ETFs';
+    const info = CURRENT_PRICES[r.ticker];
+    const cost = r.costEur!=null ? r.costEur : (toEur(r.cost, r.currency)||0);
+    const val  = (info && info.price) ? (toEur(r.qty*info.price, info.currency||r.currency)||cost) : cost;
+    if(!val || val<=0) return;
+    const broker = _nb(r.broker);
+    const key = (r.ticker||r.name)+'|'+broker+'|'+cat;
+    if(!acc[key]) acc[key] = { name:r.name, ticker:r.ticker||'', cat, broker, valEur:0 };
+    acc[key].valEur += val;
+  });
+  Object.values(acc).forEach(h=>{ h.valEur=Math.round(h.valEur); out.push(h); });
+  const today = new Date().toISOString().slice(0,10);
+  (typeof OBLIG_DATA!=='undefined'?OBLIG_DATA:[]).forEach(p=>{
+    const val = (typeof obCapRestEur==='function') ? obCapRestEur(p, today) : (p.montant||0);
+    if(!val || val<=0) return;
+    out.push({ name:(p.nom||p.projet||p.plateforme||'Obligation'), ticker:'', cat:'Obligations non cotées', broker:_nb(p.plateforme), valEur:Math.round(val) });
+  });
+  return out;
+}
+function _dbBreakdown(kind, label){
+  const H = _dbHoldings();
+  let list;
+  if(kind==='type') list = H.filter(h=>h.cat===label).map(h=>({ name:h.name, ticker:h.ticker, type:h.broker, valEur:h.valEur }));
+  else               list = H.filter(h=>h.broker===label).map(h=>({ name:h.name, ticker:h.ticker, type:h.cat, valEur:h.valEur }));
+  list.sort((a,b)=>b.valEur-a.valEur);
+  return list;
+}
+window._dbShow = function(kind, label){
+  const list = _dbBreakdown(kind, label);
+  const title = (kind==='type' ? "📊 Type d'actif" : '🏦 Broker') + ' — ' + label;
   _expoModal(title, list);
 };
 
