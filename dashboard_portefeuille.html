@@ -10780,6 +10780,89 @@ window.addEventListener('load', () => {
   }
 
   // ---- 1) SYNTHÈSE --------------------------------------------------------
+  // ── Performance annuelle par enfant (source: fichier perfo annuelle) ─────────
+  const KIDS_PERF_YEARS = [2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023,2024,2025];
+  const KIDS_PERF_ANNUAL = {
+    "Corentin": { investi:[875,2075,3025,3875,5075,6275,7475,8675,9375,10075,11275,12475,13675,14875,12103,12103,12103,12103,12103], net:[866.51,1948.83,3057.56,4271.91,5242.24,6716.07,8038.67,10168.73,12622.96,13455.34,16081.41,16098.31,21781.44,26576.1894,25838.9277,20746.2784,22892.5062,25502.664,24507.7578] },
+    "Léandre": { investi:[875,2075,3025,3875,5075,6275,7475,8675,9875,11075,12275,13475,2590.25,3790.25,7762.25,7762.25,7762.25,7762.25,7762.25], net:[866.51,1948.83,3057.56,4269.39,5240.01,6713.67,8036.28,10166.44,12003.95,13118.93,15605.07,15986.18,7228.46,9306.3042,14245.474,11270.0401,12809.0272,14712.4384,14362.9976] },
+    "Estelle": { investi:[0,1300,2325,3225,4125,5025,5925,6825,7725,8625,9525,10425,11550,12750,13950,16650,20250,23850,27450], net:[null,1329.26,2431.42,3638.3,4552.64,5751.09,6702.06,8352.55,9781.12,10615.86,12611.65,12790.95,16249.91,19965.7715,22014.8806,19558.5743,24881.3905,31076.8716,33538.6557] },
+  };
+  function _kidLiveValue(child){
+    const rows=kidEdRows().filter(r=> child==null || r.e===child);
+    let v=rows.reduce((t,r)=>t+(+r.val||0),0);
+    const CASH=(window.KIDS_CASH||KIDS_CASH||{});
+    Object.keys(CASH).forEach(cpt=>{ if(child!=null && compteEnfant(cpt)!==child) return; const bc=CASH[cpt]||{}; Object.keys(bc).forEach(cur=>{ const a=+bc[cur]||0; v+=(cur==='EUR')?a:(te(a,cur)||a); }); });
+    return v;
+  }
+  function kidAnnualPerf(child){   // child = 'Corentin'|'Léandre'|'Estelle' ou null (total)
+    const kids = child ? [child] : ['Corentin','Léandre','Estelle'];
+    const yrs = KIDS_PERF_YEARS.slice();
+    const invCum={}, val={};
+    yrs.forEach((y,idx)=>{
+      let ic=0, vv=0, anyVal=false;
+      kids.forEach(c=>{ const d=KIDS_PERF_ANNUAL[c]; if(!d) return;
+        if(d.investi[idx]!=null) ic+=d.investi[idx];
+        if(d.net[idx]!=null){ vv+=d.net[idx]; anyVal=true; } });
+      invCum[y]=ic; val[y]= anyVal? vv : null;
+    });
+    const cy=new Date().getFullYear();
+    let inv2026=0; kids.forEach(c=>{ inv2026 += allDeps().filter(x=>x.e===c && x.d && x.d.slice(0,4)===String(cy)).reduce((s,x)=>s+(+x.m||0),0); });
+    const lastY=yrs[yrs.length-1];
+    invCum[cy]=(invCum[lastY]||0)+inv2026;
+    val[cy]=_kidLiveValue(child);
+    const allY=yrs.concat([cy]);
+    const rows=[]; let prevVal=null, prevYear=null;
+    allY.forEach(y=>{
+      const v=val[y]; if(v==null) return;
+      const ic=invCum[y];
+      const icPrev=(prevYear!=null)?invCum[prevYear]:0;
+      const invAnnee=ic-icPrev;
+      const begin=(prevVal!=null)?prevVal:0;
+      const pvAnnuelle=(v-begin)-invAnnee;
+      const pvCum=v-ic;
+      const perfCum=ic>0?pvCum/ic*100:null;
+      const base=begin+invAnnee;
+      const perfAnnuelle=base>0?pvAnnuelle/base*100:null;
+      let xirr=null;
+      try{
+        const flows=[]; kids.forEach(c=>{ allDeps().forEach(x=>{ if(x.e===c && x.d && x.d.slice(0,4)===String(y)) flows.push({t:new Date(x.d+'T00:00:00'),a:-(+x.m||0)}); }); });
+        const startD=new Date(y+'-01-01T00:00:00'); const endD=(y===cy)?new Date():new Date(y+'-12-31T00:00:00');
+        const cfs=[{t:startD,a:-begin}].concat(flows).concat([{t:endD,a:v}]).sort((a,b)=>a.t-b.t);
+        const r=(typeof _xirrAnnual==='function')?_xirrAnnual(cfs):null; if(r!=null&&isFinite(r)) xirr=r*100;
+      }catch(_){}
+      rows.push({year:y,isCur:(y===cy),invAnnee,invCum:ic,valeur:v,pvAnnuelle,pvCum,perfCum,perfAnnuelle,xirr});
+      prevVal=v; prevYear=y;
+    });
+    return rows.reverse();
+  }
+  function kidAnnualTable(label, child){
+    const rows=kidAnnualPerf(child); if(!rows.length) return '';
+    const fE=n=>Math.round(n).toLocaleString('fr');
+    const fS=n=>(n>=0?'+':'')+Math.round(n).toLocaleString('fr');
+    const fP=v=>v==null?'—':((v>=0?'+':'')+v.toFixed(1).replace('.',',')+'%');
+    const cP=v=>v==null?'var(--text2)':(v>=0?'var(--green)':'var(--red)');
+    const td="padding:7px 10px;text-align:right;font-family:'DM Mono',monospace";
+    const body=rows.map(r=>`<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:7px 10px;font-weight:700">${r.year}${r.isCur?' (actuel)':''}</td>
+      <td style="${td}">${fE(r.invAnnee)}</td>
+      <td style="${td}">${fE(r.invCum)}</td>
+      <td style="${td}">${fE(r.valeur)}</td>
+      <td style="${td};color:${cP(r.pvAnnuelle)}">${fS(r.pvAnnuelle)}</td>
+      <td style="${td};color:${cP(r.pvCum)}">${fS(r.pvCum)}</td>
+      <td style="padding:7px 10px;text-align:right;color:${cP(r.perfCum)}">${fP(r.perfCum)}</td>
+      <td style="padding:7px 10px;text-align:right;color:${cP(r.perfAnnuelle)}">${fP(r.perfAnnuelle)}</td>
+      <td style="padding:7px 10px;text-align:right;color:${cP(r.xirr)}">${fP(r.xirr)}</td>
+    </tr>`).join('');
+    return `<div class="card" style="padding:18px 20px;margin-bottom:20px">
+      <h3 style="font-size:14px;font-weight:700;margin:0 0 10px">📅 Performance par année — ${label}</h3>
+      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap">
+        <thead><tr style="color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.4px;border-bottom:1px solid var(--border)">
+          <th style="text-align:left;padding:6px 10px">Année</th><th style="text-align:right;padding:6px 10px">Investi (année)</th><th style="text-align:right;padding:6px 10px">Investi cumulé</th><th style="text-align:right;padding:6px 10px">Valeur</th><th style="text-align:right;padding:6px 10px">Plus-value annuelle</th><th style="text-align:right;padding:6px 10px">Plus-value cumulée</th><th style="text-align:right;padding:6px 10px">Perf. cumulée</th><th style="text-align:right;padding:6px 10px">Perf. annuelle</th><th style="text-align:right;padding:6px 10px" title="Rendement annualisé money-weighted (XIRR)">XIRR /an</th>
+        </tr></thead><tbody>${body}</tbody>
+      </table></div>
+    </div>`;
+  }
+
   function kidSynthese(b){
     const s=sel();
     const list = s==='Tous' ? KIDS : [s];
@@ -10851,6 +10934,9 @@ window.addEventListener('load', () => {
         </div>
       </div>`;
     });
+    // Tables « Performance par année » (Total + par enfant)
+    if(s==='Tous'){ html += kidAnnualTable('Total', null); KIDS.forEach(c=> html += kidAnnualTable(c, c)); }
+    else { html += kidAnnualTable(s, s); }
     b.innerHTML=html || '<div class="card" style="color:var(--text2)">Aucune donnée.</div>';
     // Donuts par type d'actif (un par enfant)
     list.forEach(c=>{
