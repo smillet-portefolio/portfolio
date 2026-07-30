@@ -10934,9 +10934,6 @@ window.addEventListener('load', () => {
         </div>
       </div>`;
     });
-    // Tables « Performance par année » (Total + par enfant)
-    if(s==='Tous'){ html += kidAnnualTable('Total', null); KIDS.forEach(c=> html += kidAnnualTable(c, c)); }
-    else { html += kidAnnualTable(s, s); }
     b.innerHTML=html || '<div class="card" style="color:var(--text2)">Aucune donnée.</div>';
     // Donuts par type d'actif (un par enfant)
     list.forEach(c=>{
@@ -11467,28 +11464,40 @@ window.addEventListener('load', () => {
 
   // ---- 6) ÉVOLUTION (perf annuelle / valeur cumulée) ----------------------
   function kidEvolution(b){
-    const s=sel(); const list = s==='Tous'?KIDS:[s];
+    const s=sel(); const child = s==='Tous' ? null : s;
+    const label = child || 'Total';
     let html=`<div style="display:flex;gap:8px;margin-bottom:12px">
-        <button id="kidEvoValBtn" class="sub-tab active" onclick="kidEvoMode('val')">Valeur cumulée (€)</button>
+        <button id="kidEvoValBtn" class="sub-tab active" onclick="kidEvoMode('val')">Valeur & investi cumulé (€)</button>
         <button id="kidEvoPctBtn" class="sub-tab" onclick="kidEvoMode('pct')">Performance annuelle (%)</button></div>
       <div class="card"><div class="chart-wrap" style="height:340px"><canvas id="kidEvoChart"></canvas></div></div>
-      <p style="font-size:11px;color:var(--text2);margin-top:8px">Historique Linxea depuis 2007 (assurance-vie). Le point 2026 reflète la valeur actuelle.</p>`;
+      <p style="font-size:11px;color:var(--text2);margin:8px 0 20px">Historique annuel depuis 2007. Le point 2026 (actuel) reflète la valeur actuelle (positions + cash). Graphique et tableau utilisent les mêmes données.</p>
+      ${kidAnnualTable(label, child)}`;
     b.innerHTML=html;
-    drawKidEvo(list);
+    drawKidEvo(child);
   }
   window.kidEvoMode=function(m){ window._kidEvoMode=m;
     document.getElementById('kidEvoValBtn').classList.toggle('active',m==='val');
     document.getElementById('kidEvoPctBtn').classList.toggle('active',m==='pct');
-    const s=sel(); drawKidEvo(s==='Tous'?KIDS:[s]); };
-  function drawKidEvo(list){
+    const s=sel(); drawKidEvo(s==='Tous'?null:s); };
+  function drawKidEvo(child){
     destroyCharts();
     const m=window._kidEvoMode||'val';
-    const src = m==='pct'?KIDS_PERF:KIDS_VALHIST;
-    const ds = list.map(c=>({label:c, data:src[c], borderColor:COL[c], backgroundColor:'transparent', tension:0.25, spanGaps:true, pointRadius:2, borderWidth:2}));
+    const rows=kidAnnualPerf(child).slice().reverse();   // ordre croissant pour le graph
+    const labels=rows.map(r=>String(r.year));
+    const accent = child ? (COL[child]||'#5a8dee') : '#5a8dee';
+    let ds;
+    if(m==='pct'){
+      ds=[{label:'Performance annuelle', data:rows.map(r=>r.perfAnnuelle), borderColor:accent, backgroundColor:'transparent', tension:0.25, spanGaps:true, pointRadius:2, borderWidth:2}];
+    } else {
+      ds=[
+        {label:'Valeur', data:rows.map(r=>Math.round(r.valeur)), borderColor:accent, backgroundColor:'transparent', tension:0.25, spanGaps:true, pointRadius:2, borderWidth:2},
+        {label:'Investi cumulé', data:rows.map(r=>Math.round(r.invCum)), borderColor:'#9aa0aa', backgroundColor:'transparent', borderDash:[5,4], tension:0.25, spanGaps:true, pointRadius:2, borderWidth:2}
+      ];
+    }
     const cvs=document.getElementById('kidEvoChart'); if(!cvs) return;
-    _kidCharts.push(new Chart(cvs,{type:'line', data:{labels:KIDS_YEARS, datasets:ds},
+    _kidCharts.push(new Chart(cvs,{type:'line', data:{labels, datasets:ds},
       options:{responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{display:list.length>1,position:'top'},
+        plugins:{legend:{display:m!=='pct',position:'top'},
           tooltip:{callbacks:{label:c=>c.dataset.label+': '+(m==='pct'?pct(c.parsed.y):fmt(c.parsed.y))}}},
         scales:{x:{grid:{display:false}},
           y:{ticks:{callback:v=>m==='pct'?v+' %':v.toLocaleString('fr-FR')},
