@@ -10790,7 +10790,12 @@ window.addEventListener('load', () => {
     list.forEach(c=>{
       const rows=rowsAll.filter(r=>r.e===c);
       const investCost=rows.reduce((t,r)=>t+(r.coutEur||0),0);        // coût des positions (tableau par broker)
-      const valeur=rows.reduce((t,r)=>t+(+r.val||0),0);
+      const holdVal=rows.reduce((t,r)=>t+(+r.val||0),0);
+      // Cash disponible du/des compte(s) de l'enfant (onglet Dépôts & Cash)
+      const _CASH=(window.KIDS_CASH||KIDS_CASH||{}); const cashByCpt={};
+      Object.keys(_CASH).forEach(cpt=>{ if(compteEnfant(cpt)!==c) return; let ce=0; const bc=_CASH[cpt]||{}; Object.keys(bc).forEach(cur=>{ const a=+bc[cur]||0; ce+=(cur==='EUR')?a:(te(a,cur)||a); }); if(ce) cashByCpt[cpt]=ce; });
+      const cash=Object.values(cashByCpt).reduce((s,v)=>s+v,0);
+      const valeur=holdVal + cash;   // Valeur actuelle = lignes investies + cash
       const gainCost=valeur-investCost; const perfCost=investCost?gainCost/investCost*100:null;
       // Montant investi = net déposé (onglet Dépôts & Cash : dépôts − retraits)
       const invest=allDeps().filter(x=>x.e===c).reduce((t,x)=>t+(+x.m||0),0);
@@ -10804,6 +10809,7 @@ window.addEventListener('load', () => {
       const ytdPct=(_ytdHas&&_ytdBase>0)?_ytdG/_ytdBase*100:null;
       const byType={}; rows.forEach(r=>{ const t=r.t||'Autre'; if((+r.val||0)>0) byType[t]=(byType[t]||0)+(+r.val||0); });
       const byBk={}; rows.forEach(r=>{ const k=r.broker||'—'; if(!byBk[k])byBk[k]={inv:0,val:0}; byBk[k].inv+=(r.coutEur||0); byBk[k].val+=(+r.val||0); });
+      Object.keys(cashByCpt).forEach(cpt=>{ if(!byBk[cpt])byBk[cpt]={inv:0,val:0}; byBk[cpt].val+=cashByCpt[cpt]; });   // cash ajouté à la valeur du compte
       const bkKeys=Object.keys(byBk).sort((a,b2)=>byBk[b2].val-byBk[a].val);
       const donutId='kidSynDonut_'+c.replace(/[^a-zA-Z]/g,'');
       html+=`<div class="card" style="border-left:4px solid ${COL[c]};margin-bottom:22px;padding:22px 24px">
