@@ -10786,6 +10786,9 @@ window.addEventListener('load', () => {
     const rowsAll = kidEdRows();
     const typePal = {'Action':'#5a8dee','ETF':'#38bdf8','Fonds':'#9b87d4','Fonds €':'#c084fc','Monétaire':'#e8a838','Cash':'#94a3b8','Crypto':'#f0956e','Action ':'#5a8dee'};
     const kid=c=>({rows:rowsAll.filter(r=>r.e===c)});
+    // Cartes format dashboard : % puis valeur € (à droite), + sous-titre
+    const kpiDual=(label,pctStr,eurStr,colr,sub)=>`<div class="card" style="padding:14px"><div class="kpi-label">${label}</div><div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-top:2px"><span class="kpi-value" style="font-size:18px;color:${colr}">${pctStr}</span>${eurStr?`<span class="kpi-value" style="font-size:18px;color:${colr};opacity:.72">${eurStr}</span>`:''}</div>${sub?`<div style="font-size:10px;color:var(--text2);margin-top:3px">${sub}</div>`:''}</div>`;
+    const kpiSub=(label,val,colr,sub)=>`<div class="card" style="padding:14px"><div class="kpi-label">${label}</div><div class="kpi-value" style="font-size:18px;color:${colr}">${val}</div>${sub?`<div style="font-size:10px;color:var(--text2);margin-top:3px">${sub}</div>`:''}</div>`;
     let html='';
     list.forEach(c=>{
       const rows=rowsAll.filter(r=>r.e===c);
@@ -10807,6 +10810,13 @@ window.addEventListener('load', () => {
         const y=(cv&&cv.YTD!=null)?+cv.YTD:null; if(y==null||isNaN(y)) return;
         const st=v/(1+y/100); _ytdG+=(v-st); _ytdBase+=st; _ytdHas=true; });
       const ytdPct=(_ytdHas&&_ytdBase>0)?_ytdG/_ytdBase*100:null;
+      // Performance annuelle moyenne = XIRR (money-weighted) des versements jusqu'à la valeur actuelle
+      let xirrPct=null;
+      try{
+        const _cf=allDeps().filter(x=>x.e===c&&x.d).map(x=>({t:new Date(x.d+'T00:00:00'),a:-(+x.m||0)}));
+        if(_cf.length && valeur>0){ _cf.push({t:new Date(),a:valeur}); _cf.sort((a,b)=>a.t-b.t);
+          const _r=(typeof _xirrAnnual==='function')?_xirrAnnual(_cf):null; if(_r!=null&&isFinite(_r)) xirrPct=_r*100; }
+      }catch(_){}
       const byType={}; rows.forEach(r=>{ const t=r.t||'Autre'; if((+r.val||0)>0) byType[t]=(byType[t]||0)+(+r.val||0); });
       const byBk={}; rows.forEach(r=>{ const k=r.broker||'—'; if(!byBk[k])byBk[k]={inv:0,val:0}; byBk[k].inv+=(r.coutEur||0); byBk[k].val+=(+r.val||0); });
       Object.keys(cashByCpt).forEach(cpt=>{ if(!byBk[cpt])byBk[cpt]={inv:0,val:0}; byBk[cpt].val+=cashByCpt[cpt]; });   // cash ajouté à la valeur du compte
@@ -10819,9 +10829,9 @@ window.addEventListener('load', () => {
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px">
           ${kpi('Montant investi', fmt(invest), 'var(--text)')}
           ${kpi('Valeur actuelle', fmt(valeur), 'var(--text)')}
-          ${kpi('Performance (€)', fmts(gain), col(gain))}
-          ${kpi('Performance (%)', pct(perf), col(gain))}
-          ${kpi('Performance YTD', _ytdHas ? (fmts(_ytdG)+' · '+pct(ytdPct)) : '—', _ytdHas ? col(_ytdG) : 'var(--text2)')}
+          ${kpiDual('Performance', pct(perf), fmts(gain), col(gain), 'Sur montant investi')}
+          ${kpiDual('Performance YTD', _ytdHas?pct(ytdPct):'—', _ytdHas?fmts(_ytdG):'', _ytdHas?col(_ytdG):'var(--text2)', 'Depuis le 1er janvier')}
+          ${kpiSub('Performance annuelle moyenne', xirrPct!=null?pct(xirrPct):'—', xirrPct!=null?col(xirrPct):'var(--text2)', 'XIRR money-weighted')}
         </div>
         <div style="display:grid;grid-template-columns:1fr 1.5fr;gap:20px;align-items:start">
           <div>
