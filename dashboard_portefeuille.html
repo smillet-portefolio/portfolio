@@ -2235,13 +2235,18 @@ function renderDashboard() {
     const before = evoBaseRow(cut);
     let act = 0, inv = 0, ok = false;
     suffixes.forEach(s => {
-      // Référence normale = dernière valeur avant la date de coupe.
-      // Si le compte n'existait pas encore (pas de valeur avant la coupe), on prend
-      // sa 1re valeur disponible → YTD/MTD calculés « depuis l'origine » (ex. TRADING 212 JITO ouvert le 04/05/2026).
-      let row = (before && typeof before['act_'+s] === 'number' && before['act_'+s] > 0) ? before : _firstPosRow(s);
-      if (row && typeof row['act_'+s] === 'number') {
-        act += row['act_'+s]; ok = true;
-        if (typeof row['inv_'+s] === 'number') inv += row['inv_'+s];
+      const hasBefore = before && typeof before['act_'+s] === 'number' && before['act_'+s] > 0;
+      const row = hasBefore ? before : _firstPosRow(s);
+      if (!row || typeof row['act_'+s] !== 'number') return;
+      const invS = (typeof row['inv_'+s] === 'number') ? row['inv_'+s] : row['act_'+s];
+      if (hasBefore) {
+        // Compte déjà ouvert avant la coupe → référence = valeur de marché à la coupe
+        act += row['act_'+s]; inv += invS; ok = true;
+      } else {
+        // Compte ouvert en cours d'année (ex. TRADING 212 JITO, 04/05/2026) → référence =
+        // montant investi à l'ouverture (gain de base = 0, dénominateur = capital investi),
+        // pour que le YTD reflète la performance depuis le 1er versement.
+        act += invS; inv += invS; ok = true;
       }
     });
     return ok ? { act, inv } : null;
