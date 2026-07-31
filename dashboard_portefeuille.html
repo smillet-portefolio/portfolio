@@ -9309,10 +9309,15 @@ function buildCompGeoTable(containerId) {
   const tickers = Object.keys(ETF_META)
     .sort((a, b) => (_compValMap[b] ?? 0) - (_compValMap[a] ?? 0));
 
-  // Récupérer les données géo (ETF_COMP_OVERRIDE ou ETF_META fallback)
+  // Canonicalisation des libellés pays : le fallback ETF_META utilise des libellés FR+drapeau
+  // (ex. « 🇵🇱 Pologne ») qu'il faut convertir en anglais pour s'aligner sur les colonnes GSheets
+  // (sinon la ligne — ex. LEER — tombe dans des colonnes séparées et paraît vide).
+  const _canonGeo = {}; try { Object.entries(COUNTRY_FR).forEach(([en, fr]) => { _canonGeo[fr] = en; }); } catch(e){}
+  // Récupérer les données géo (ETF_COMP_OVERRIDE ou ETF_META fallback), libellés normalisés en anglais
   const getGeo = t => {
     const ov = ETF_COMP_OVERRIDE[t]?.geoAll || [];
-    return ov.length > 0 ? ov : (ETF_META[t]?.geo || []);
+    const raw = ov.length > 0 ? ov : (ETF_META[t]?.geo || []);
+    return raw.map(([l, p]) => [(_canonGeo[l] || l), p]);
   };
 
   const hasData = tickers.some(t => getGeo(t).length > 0);
