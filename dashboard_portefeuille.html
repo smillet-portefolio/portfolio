@@ -1338,16 +1338,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (valEur > 0) _compValMap[r.ticker] = (_compValMap[r.ticker] || 0) + valEur;
   });
 
-  // 5b. Appliquer le seed de compositions ETF (dernier repartition_ETFs.xlsx) — une fois par version.
-  // Rafraîchit géo / secteurs / TOP 10, fiches détaillées, composition complète et donuts avec les
-  // nouveaux pays et sociétés, sans dépendre d'une reconnexion Google Sheets.
+  // 5b. Seed de compositions ETF (repartition_ETFs.xlsx embarqué) — COMBLE UNIQUEMENT LES MANQUES.
+  // N'écrase JAMAIS une composition déjà présente (chargée depuis Google Sheets = source de vérité).
+  // Ainsi, après « Connecter Google », tes vraies données priment et ne sont pas remplacées au rechargement.
   try {
-    if (localStorage.getItem('etf_comp_seed_v') !== ETF_COMP_SEED_V) {
-      Object.keys(ETF_COMP_SEED).forEach(t => {
-        ETF_COMP_OVERRIDE[t] = Object.assign({}, ETF_COMP_OVERRIDE[t] || {}, ETF_COMP_SEED[t]);
-      });
+    let _seedChanged = false;
+    Object.keys(ETF_COMP_SEED).forEach(t => {
+      const ex = ETF_COMP_OVERRIDE[t];
+      const hasData = ex && ((ex.geoAll&&ex.geoAll.length) || (ex.sectorsAll&&ex.sectorsAll.length) || (ex.positionsAll&&ex.positionsAll.length));
+      if (!hasData) { ETF_COMP_OVERRIDE[t] = Object.assign({}, ex||{}, ETF_COMP_SEED[t]); _seedChanged = true; }
+    });
+    if (_seedChanged) {
       try { localStorage.setItem('etf_comp_override', JSON.stringify(ETF_COMP_OVERRIDE)); } catch(e){}
-      localStorage.setItem('etf_comp_seed_v', ETF_COMP_SEED_V);
       if (typeof applyETFCompositionOverride === 'function') applyETFCompositionOverride();
       if (typeof renderETFFiches === 'function') renderETFFiches();
       if (typeof renderCompTables === 'function') renderCompTables();
