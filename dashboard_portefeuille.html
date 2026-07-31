@@ -4011,7 +4011,7 @@ function submitNewLine() {
   if (!ticker)           errors.push('Ticker requis');
   if (!date)             errors.push('Date requise');
   if (isNaN(qte) || qte <= 0)  errors.push('Quantité invalide (doit être > 0)');
-  if (isNaN(prix) || prix <= 0) errors.push("Prix d'achat invalide (doit être > 0)");
+  if (isNaN(prix) || prix < 0) errors.push("Prix d'achat invalide (doit être ≥ 0)");   // 0 autorisé (actions gratuites)
   if (devise !== 'EUR' && (isNaN(fx) || fx <= 0)) errors.push('Taux de change requis (doit être > 0)');
 
   if (errors.length) {
@@ -12060,7 +12060,7 @@ window.addEventListener('load', () => {
     const errs=[];
     if(!nom) errs.push('Nom requis');
     if(qte==null||qte<=0) errs.push('Quantité invalide');
-    if(prix==null||prix<=0) errs.push("Prix d'achat invalide");
+    if(prix==null||prix<0) errs.push("Prix d'achat invalide");   // 0 autorisé (actions gratuites)
     if(dev!=='EUR' && (fx==null||fx<=0)) errs.push('Taux de change requis');
     if(errs.length){ err.innerHTML='⚠️ '+errs.join(' · '); err.style.display='block'; return; }
     const costDev=Math.round(qte*prix*100)/100;
