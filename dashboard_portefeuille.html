@@ -404,16 +404,19 @@
         <div class="kpi-label">Volatilité annualisée</div>
         <div id="db_vol" class="kpi-value" style="font-size:22px">—</div>
         <div id="db_vol_sub" style="font-size:11px;color:var(--text2);margin-top:4px">Écart-type des rendements</div>
+        <div id="db_vol_bench" style="font-size:11px;color:var(--text2);margin-top:2px"></div>
       </div>
       <div class="card" style="padding:18px 16px">
         <div class="kpi-label">Max drawdown</div>
         <div id="db_mdd" class="kpi-value" style="font-size:22px">—</div>
         <div style="font-size:11px;color:var(--text2);margin-top:4px">Pire baisse pic → creux</div>
+        <div id="db_mdd_bench" style="font-size:11px;color:var(--text2);margin-top:2px"></div>
       </div>
       <div class="card" style="padding:18px 16px">
         <div class="kpi-label">Ratio de Sharpe</div>
         <div id="db_sharpe" class="kpi-value" style="font-size:22px">—</div>
         <div style="font-size:11px;color:var(--text2);margin-top:4px">Rendement / risque (taux sans risque ≈ 0)</div>
+        <div id="db_sharpe_bench" style="font-size:11px;color:var(--text2);margin-top:2px"></div>
       </div>
     </div>
 
@@ -2046,6 +2049,26 @@ function renderDashboard() {
     setR('db_vol', volA.toFixed(1).replace('.',',')+'%', 'var(--text)');
     setR('db_sharpe', sharpe!=null ? (sharpe>=0?'+':'')+sharpe.toFixed(2).replace('.',',') : '—', sharpe!=null?(sharpe>=0?'#4caf82':'#e06c6c'):'var(--text2)');
     const sub=document.getElementById('db_vol_sub'); if(sub) sub.textContent = n+' obs. · '+rows[0].date+' → '+rows[rows.length-1].date;
+
+    // Benchmark (MSCI World via XDWD, sinon Amundi Core World MWRE, sinon S&P 500 I500) — même période
+    (function(){
+      const setB=(id,v)=>{ const el=document.getElementById(id); if(el) el.innerHTML=v; };
+      const PH=(typeof PRICE_HISTORY!=='undefined')?PRICE_HISTORY:{};
+      const bp=[['XDWD.DE','MSCI World'],['MWRE.DE','MSCI World'],['I500.DE','S&P 500']].find(([t])=>PH[t]&&Object.keys(PH[t]).length>20);
+      if(!bp) return;
+      const bt=bp[0], blab=bp[1], first=rows[0].date, last=rows[rows.length-1].date;
+      const cl=Object.keys(PH[bt]).filter(d=>d>=first&&d<=last).sort().map(d=>({date:d,v:+PH[bt][d]})).filter(x=>x.v>0);
+      if(cl.length<10) return;
+      const br=[]; let bpeak=cl[0].v, bmdd=0;
+      for(let i=1;i<cl.length;i++){ const p=cl[i-1].v,c=cl[i].v; if(p>0){const r=(c-p)/p; if(isFinite(r)&&Math.abs(r)<0.6) br.push(r);} if(c>bpeak)bpeak=c; const dd=(c-bpeak)/bpeak; if(dd<bmdd)bmdd=dd; }
+      const bn=br.length; if(bn<10) return;
+      const bmean=br.reduce((s,x)=>s+x,0)/bn, bsd=Math.sqrt(br.reduce((s,x)=>s+(x-bmean)*(x-bmean),0)/(bn-1));
+      const bdays=(new Date(cl[cl.length-1].date)-new Date(cl[0].date))/86400000, bperYr=bn/Math.max(bdays/365.25,0.05);
+      const bvol=bsd*Math.sqrt(bperYr)*100, bret=bmean*bperYr*100, bsharpe=bvol>0?bret/bvol:null;
+      setB('db_vol_bench',    'vs '+blab+' : <strong>'+bvol.toFixed(1).replace('.',',')+'%</strong>');
+      setB('db_mdd_bench',    'vs '+blab+' : <strong>'+(bmdd*100).toFixed(1).replace('.',',')+'%</strong>');
+      setB('db_sharpe_bench', 'vs '+blab+' : <strong>'+(bsharpe!=null?((bsharpe>=0?'+':'')+bsharpe.toFixed(2).replace('.',',')):'—')+'</strong>');
+    })();
   })();
 
   // ── Donuts ──────────────────────────────────────────────────────────────────
@@ -2142,7 +2165,7 @@ function renderDashboard() {
   try {
     var _payMap = (typeof buildGeoExposure === 'function') ? buildGeoExposure() : {};
     var _regionMap = {};
-    Object.entries(_payMap).forEach(function(e){ var m=(typeof GEO_MAP!=='undefined'&&GEO_MAP[e[0]])?GEO_MAP[e[0]]:{r:'Autres'}; _regionMap[m.r]=(_regionMap[m.r]||0)+e[1]; });
+    Object.entries(_payMap).forEach(function(e){ var m=(typeof GEO_MAP!=='undefined'&&GEO_MAP[e[0]])?GEO_MAP[e[0]]:{r:'Other'}; _regionMap[m.r]=(_regionMap[m.r]||0)+e[1]; });
     var _regSorted = Object.entries(_regionMap).filter(function(e){return e[1]>0;}).sort(function(a,b){return b[1]-a[1];});
     makeDonut('db_donut_geo','db_donut_geo_leg', _regSorted, _regSorted.map(function(e){return (typeof GEO_R_COLORS!=='undefined'&&GEO_R_COLORS[e[0]])?GEO_R_COLORS[e[0]]:'#6b7280';}), function(l){ window._expoShow('geo','tot', l); });
   } catch(e){}
