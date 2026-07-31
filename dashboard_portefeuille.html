@@ -400,6 +400,21 @@
         </div>
         <div style="font-size:11px;color:var(--text2);margin-top:3px" id="db_journ_date">Aujourd'hui (hors dépôts)</div>
       </div>
+      <div class="card" style="padding:18px 16px">
+        <div class="kpi-label">Volatilité annualisée</div>
+        <div id="db_vol" class="kpi-value" style="font-size:22px">—</div>
+        <div id="db_vol_sub" style="font-size:11px;color:var(--text2);margin-top:4px">Écart-type des rendements</div>
+      </div>
+      <div class="card" style="padding:18px 16px">
+        <div class="kpi-label">Max drawdown</div>
+        <div id="db_mdd" class="kpi-value" style="font-size:22px">—</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px">Pire baisse pic → creux</div>
+      </div>
+      <div class="card" style="padding:18px 16px">
+        <div class="kpi-label">Ratio de Sharpe</div>
+        <div id="db_sharpe" class="kpi-value" style="font-size:22px">—</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px">Rendement / risque (taux sans risque ≈ 0)</div>
+      </div>
     </div>
 
     <!-- Graphiques donuts -->
@@ -1999,6 +2014,36 @@ function renderDashboard() {
     })();
     calc(today.slice(0,4) + '-01-01', 'db_kpi_ytd',   'db_ytd_val');
     calc(today.slice(0,7) + '-01',    'db_kpi_mtd',   'db_mtd_val');
+  })();
+
+  // ── Risque / variabilité : volatilité annualisée, max drawdown, ratio de Sharpe ──
+  (function(){
+    const setR = (id,v,c)=>{ const el=document.getElementById(id); if(el){ el.textContent=v; if(c) el.style.color=c; } };
+    const rows = ((typeof getEvoRows==='function' ? getEvoRows() : (typeof EVO_HISTORY!=='undefined'?EVO_HISTORY:[]))||[])
+      .filter(r=>r && r.date && typeof r.act_total==='number' && r.act_total>0)
+      .slice().sort((a,b)=>a.date.localeCompare(b.date));
+    if(rows.length<10){ setR('db_vol','—','var(--text2)'); setR('db_mdd','—','var(--text2)'); setR('db_sharpe','—','var(--text2)'); return; }
+    const rets=[]; let peak=rows[0].act_total, maxDD=0;
+    for(let i=1;i<rows.length;i++){
+      const p=rows[i-1], c=rows[i];
+      const flow=(typeof c.inv_total==='number'&&typeof p.inv_total==='number')?(c.inv_total-p.inv_total):0;   // dépôts/retraits du jour
+      if(p.act_total>0){ const r=((c.act_total-flow)-p.act_total)/p.act_total; if(isFinite(r)&&Math.abs(r)<0.6) rets.push(r); }
+      if(c.act_total>peak) peak=c.act_total;
+      const dd=(c.act_total-peak)/peak; if(dd<maxDD) maxDD=dd;
+    }
+    const n=rets.length;
+    setR('db_mdd', (maxDD*100).toFixed(1).replace('.',',')+'%', maxDD<-0.001?'#e06c6c':'var(--text2)');
+    if(n<10){ setR('db_vol','—','var(--text2)'); setR('db_sharpe','—','var(--text2)'); return; }
+    const mean=rets.reduce((s,x)=>s+x,0)/n;
+    const sd=Math.sqrt(rets.reduce((s,x)=>s+(x-mean)*(x-mean),0)/(n-1));
+    const days=(new Date(rows[rows.length-1].date)-new Date(rows[0].date))/86400000;
+    const perYr=n/Math.max(days/365.25, 0.05);          // observations par an (auto d'après l'échantillonnage réel)
+    const volA=sd*Math.sqrt(perYr)*100;
+    const retA=mean*perYr*100;
+    const sharpe=volA>0 ? retA/volA : null;
+    setR('db_vol', volA.toFixed(1).replace('.',',')+'%', 'var(--text)');
+    setR('db_sharpe', sharpe!=null ? (sharpe>=0?'+':'')+sharpe.toFixed(2).replace('.',',') : '—', sharpe!=null?(sharpe>=0?'#4caf82':'#e06c6c'):'var(--text2)');
+    const sub=document.getElementById('db_vol_sub'); if(sub) sub.textContent = n+' obs. · '+rows[0].date+' → '+rows[rows.length-1].date;
   })();
 
   // ── Donuts ──────────────────────────────────────────────────────────────────
