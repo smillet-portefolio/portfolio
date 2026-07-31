@@ -8721,10 +8721,31 @@ function renderAePnlChart(){
       + fb('En gain ('+nGain+')', "aePnlStatus('gain')", _sf==='gain', '#4caf82')
       + fb('En perte ('+nLoss+')', "aePnlStatus('loss')", _sf==='loss', '#e06c6c');
   }
-  // Ligne 2 : pastilles par titre
+  // Ligne 2 : pastilles par titre — actions groupées par secteur, ETFs (globaux → régions → sectoriels), crypto en dernier
   if(toolbar){
-    let html='';
-    tickers.forEach(t=>{
+    const _etfGroup = t => {
+      let ty = (typeof ETF_META!=='undefined' && ETF_META[t]) ? ETF_META[t].type : null;
+      if(!ty && typeof ETF_META!=='undefined'){ for(const k in ETF_META){ if(ETF_META[k].short===t){ ty=ETF_META[k].type; break; } } }
+      if(!ty && typeof ETF_META!=='undefined'){ if(ETF_META[t+'.DE']) ty=ETF_META[t+'.DE'].type; else if(ETF_META[t+'.PA']) ty=ETF_META[t+'.PA'].type; }
+      const g={'Cœur large':0,'Dividendes':0,'Complément':0,'Cœur USA':1,'Émergents':1,'Pays':1,'Thématique':2,'Risqué':2};
+      return (ty!=null && g[ty]!=null) ? g[ty] : 1;
+    };
+    const _key = t => {
+      const tp=window._aePnlTypes[t]||'Action';
+      if(tp==='Action'){
+        let s=(typeof DIRECT_SECTOR!=='undefined'&&DIRECT_SECTOR[t])?DIRECT_SECTOR[t]:null;
+        if(!s && typeof STOCK_SECTORS!=='undefined' && STOCK_SECTORS[t]) s=String(STOCK_SECTORS[t]).split('·')[0].trim();
+        return [0, s||'zzz', t];
+      }
+      if(tp==='ETF') return [1, String(_etfGroup(t)), t];
+      return [2, '', t];   // crypto en dernier
+    };
+    const ordered = tickers.slice().sort((a,b)=>{ const ka=_key(a),kb=_key(b); for(let i=0;i<3;i++){ if(ka[i]<kb[i])return -1; if(ka[i]>kb[i])return 1; } return 0; });
+    let html=''; let pType=null, pEtf=null;
+    ordered.forEach((t,idx)=>{
+      const tp=window._aePnlTypes[t]||'Action'; const eg = tp==='ETF'?_etfGroup(t):null;
+      if(idx>0 && (tp!==pType || (tp==='ETF' && eg!==pEtf))) html += '<span style="width:1px;height:18px;background:var(--border2);margin:0 3px;align-self:center;display:inline-block"></span>';
+      pType=tp; pEtf=eg;
       const on = window._aePnlSel.has(t); const c=colorOf(t);
       const short = (typeof ETF_META!=='undefined' && ETF_META[t] && ETF_META[t].short) ? ETF_META[t].short : t;
       const oc = 'aePnlToggle(' + "'" + t + "'" + ')';
