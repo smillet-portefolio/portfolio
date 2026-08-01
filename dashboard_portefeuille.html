@@ -405,18 +405,21 @@
         <div id="db_vol" class="kpi-value" style="font-size:22px">—</div>
         <div id="db_vol_sub" style="font-size:11px;color:var(--text2);margin-top:4px">Écart-type des rendements</div>
         <div id="db_vol_bench" style="font-size:11px;color:var(--text2);margin-top:2px"></div>
+        <div id="db_vol_excr" style="font-size:11px;color:var(--text2);margin-top:2px"></div>
       </div>
       <div class="card" style="padding:18px 16px">
         <div class="kpi-label">Max drawdown</div>
         <div id="db_mdd" class="kpi-value" style="font-size:22px">—</div>
         <div style="font-size:11px;color:var(--text2);margin-top:4px">Pire baisse pic → creux</div>
         <div id="db_mdd_bench" style="font-size:11px;color:var(--text2);margin-top:2px"></div>
+        <div id="db_mdd_excr" style="font-size:11px;color:var(--text2);margin-top:2px"></div>
       </div>
       <div class="card" style="padding:18px 16px">
         <div class="kpi-label">Ratio de Sharpe</div>
         <div id="db_sharpe" class="kpi-value" style="font-size:22px">—</div>
         <div style="font-size:11px;color:var(--text2);margin-top:4px">Rendement / risque (taux sans risque ≈ 0)</div>
         <div id="db_sharpe_bench" style="font-size:11px;color:var(--text2);margin-top:2px"></div>
+        <div id="db_sharpe_excr" style="font-size:11px;color:var(--text2);margin-top:2px"></div>
       </div>
     </div>
 
@@ -2068,6 +2071,31 @@ function renderDashboard() {
       setB('db_vol_bench',    'vs '+blab+' : <strong>'+bvol.toFixed(1).replace('.',',')+'%</strong>');
       setB('db_mdd_bench',    'vs '+blab+' : <strong>'+(bmdd*100).toFixed(1).replace('.',',')+'%</strong>');
       setB('db_sharpe_bench', 'vs '+blab+' : <strong>'+(bsharpe!=null?((bsharpe>=0?'+':'')+bsharpe.toFixed(2).replace('.',',')):'—')+'</strong>');
+    })();
+
+    // Variante HORS CRYPTO — même période, portefeuille privé de Ledger + Binance
+    (function(){
+      const setE=(id,v)=>{ const el=document.getElementById(id); if(el) el.innerHTML=v; };
+      const cryptoOf = r => (r.act_ledger||0) + (r.act_binance||0);
+      const invExOf  = r => (r.inv_total||0) - (r.inv_ledger||0) - (r.inv_binance||0);
+      const rx=[]; let xpeak=(rows[0].act_total-cryptoOf(rows[0])), xmdd=0;
+      for(let i=1;i<rows.length;i++){
+        const p=rows[i-1], c=rows[i];
+        const pv=p.act_total-cryptoOf(p), cv=c.act_total-cryptoOf(c);
+        const flow=invExOf(c)-invExOf(p);                                   // dépôts/retraits hors crypto
+        if(pv>0){ const r=((cv-flow)-pv)/pv; if(isFinite(r)&&Math.abs(r)<0.6) rx.push(r); }
+        if(cv>xpeak) xpeak=cv;
+        const dd=(cv-xpeak)/xpeak; if(dd<xmdd) xmdd=dd;
+      }
+      setE('db_mdd_excr', 'hors crypto : <strong>'+(xmdd*100).toFixed(1).replace('.',',')+'%</strong>');
+      const xn=rx.length; if(xn<10){ return; }
+      const xmean=rx.reduce((s,x)=>s+x,0)/xn;
+      const xsd=Math.sqrt(rx.reduce((s,x)=>s+(x-xmean)*(x-xmean),0)/(xn-1));
+      const xdays=(new Date(rows[rows.length-1].date)-new Date(rows[0].date))/86400000;
+      const xperYr=xn/Math.max(xdays/365.25,0.05);
+      const xvol=xsd*Math.sqrt(xperYr)*100, xret=xmean*xperYr*100, xsharpe=xvol>0?xret/xvol:null;
+      setE('db_vol_excr',    'hors crypto : <strong>'+xvol.toFixed(1).replace('.',',')+'%</strong>');
+      setE('db_sharpe_excr', 'hors crypto : <strong>'+(xsharpe!=null?((xsharpe>=0?'+':'')+xsharpe.toFixed(2).replace('.',',')):'—')+'</strong>');
     })();
   })();
 
