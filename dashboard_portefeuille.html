@@ -12429,9 +12429,10 @@ window.addEventListener('load', () => {
     var inpS='width:100%;box-sizing:border-box;padding:4px 7px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px';
     hv.innerHTML=
       '<div id="obligHistKpi" class="card" style="padding:16px 20px;margin:0 0 18px;max-width:360px"></div>'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:0 0 22px;align-items:start">'
-      + '<div class="card" style="padding:20px"><h3 style="font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text2)">Reçu par projet</h3><div style="display:flex;justify-content:center"><canvas id="obligHistChartProjet" width="300" height="260"></canvas></div></div>'
-      + '<div class="card" style="padding:20px"><h3 style="font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text2)">Reçu par plateforme</h3><div style="display:flex;justify-content:center"><canvas id="obligHistChartPlat" width="300" height="260"></canvas></div></div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin:0 0 22px;align-items:start">'
+      + '<div class="card" style="padding:20px"><h3 style="font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text2)">Reçu par projet</h3><div style="display:flex;justify-content:center"><canvas id="obligHistChartProjet" width="260" height="240"></canvas></div></div>'
+      + '<div class="card" style="padding:20px"><h3 style="font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text2)">Reçu par plateforme</h3><div style="display:flex;justify-content:center"><canvas id="obligHistChartPlat" width="260" height="240"></canvas></div></div>'
+      + '<div class="card" style="padding:20px"><h3 style="font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text2)">Reçu par année</h3><div style="display:flex;justify-content:center"><canvas id="obligHistChartYear" width="260" height="240"></canvas></div></div>'
     + '</div>'
     + '<div style="overflow:auto;max-height:520px;border:1px solid var(--border2);border-radius:8px">'
     + '<table id="obligHistTable" style="font-size:12px;width:100%;border-collapse:collapse">'
@@ -12532,11 +12533,11 @@ function renderObligHist(){
     +'<div style="font-size:26px;font-weight:700;color:#4caf82">'+f2(totAll)+' &#8364;</div>'
     +'<div style="font-size:11px;color:var(--text2);margin-top:3px">'+all.length+' paiement'+(all.length>1?'s':'')+' d\'intérêts encaissé'+(all.length>1?'s':'')+'</div>';
   // Donuts (global, non filtré)
-  var byProj={}, byPlat={};
-  all.forEach(function(r){ byProj[r.projet]=(byProj[r.projet]||0)+r.recu; byPlat[r.plateforme]=(byPlat[r.plateforme]||0)+r.recu; });
+  var byProj={}, byPlat={}, byYear={};
+  all.forEach(function(r){ byProj[r.projet]=(byProj[r.projet]||0)+r.recu; byPlat[r.plateforme]=(byPlat[r.plateforme]||0)+r.recu; var y=String(r.date).slice(0,4); byYear[y]=(byYear[y]||0)+r.recu; });
   var PLAT_COLORS={ LENDOSPHERE:'#4caf82', ENERFIP:'#5a8dee', LUMO:'#f97316', KB:'#9b87d4', 'KB obligations':'#7c6bbf' };
   var PALETTE=['#5a8dee','#4caf82','#f97316','#a78bfa','#f59e0b','#ec4899','#14b8a6','#84cc16','#e06c6c','#60a5fa','#34d399','#fb923c'];
-  ['obligHistChartProjet','obligHistChartPlat'].forEach(function(id){ if(_obligHistCharts[id]){try{_obligHistCharts[id].destroy();}catch(e){}delete _obligHistCharts[id];} });
+  ['obligHistChartProjet','obligHistChartPlat','obligHistChartYear'].forEach(function(id){ if(_obligHistCharts[id]){try{_obligHistCharts[id].destroy();}catch(e){}delete _obligHistCharts[id];} });
   if(typeof Chart==='undefined') return;
   var mkOpts={responsive:false,cutout:'60%',plugins:{legend:{display:true,position:'bottom',labels:{color:'#8b95a8',font:{size:10},boxWidth:10,padding:6}},tooltip:{callbacks:{label:function(ctx){return ctx.label+': '+Math.round(ctx.parsed).toLocaleString('fr')+' €';}}}}};
   var pe=Object.entries(byProj).sort(function(a,b){return b[1]-a[1];});
@@ -12545,6 +12546,9 @@ function renderObligHist(){
   var be=Object.entries(byPlat).sort(function(a,b){return b[1]-a[1];});
   var c2=document.getElementById('obligHistChartPlat');
   if(c2&&be.length) _obligHistCharts['obligHistChartPlat']=new Chart(c2,{type:'doughnut',data:{labels:be.map(function(e){return e[0];}),datasets:[{data:be.map(function(e){return Math.round(e[1]);}),backgroundColor:be.map(function(e,i){return PLAT_COLORS[e[0]]||PALETTE[i%PALETTE.length];}),borderWidth:0}]},options:mkOpts});
+  var ye=Object.entries(byYear).sort(function(a,b){return a[0]<b[0]?-1:1;});
+  var c3=document.getElementById('obligHistChartYear');
+  if(c3&&ye.length) _obligHistCharts['obligHistChartYear']=new Chart(c3,{type:'doughnut',data:{labels:ye.map(function(e){return e[0];}),datasets:[{data:ye.map(function(e){return Math.round(e[1]);}),backgroundColor:ye.map(function(e,i){return PALETTE[i%PALETTE.length];}),borderWidth:0}]},options:mkOpts});
   // flèches de tri
   var hv=document.getElementById('oblig_view_hist');
   if(hv) hv.querySelectorAll('.ohh').forEach(function(th){ var kk=th.getAttribute('data-k'); var a=th.querySelector('.oh-arr'); if(a){ a.innerHTML=(kk===st.sortKey)?(st.sortDir>0?'&#9650;':'&#9660;'):'&#8645;'; a.style.opacity=(kk===st.sortKey)?'1':'.5'; } });
