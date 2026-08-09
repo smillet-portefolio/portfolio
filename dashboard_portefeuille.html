@@ -955,7 +955,7 @@ const _reEUR   = n => _reGrp(n)+' €';
 function _reLoadEst(){ try{ return JSON.parse(localStorage.getItem('re_estimates')||'{}'); }catch(e){ return {}; } }
 function _reEst(a){ const m=_reLoadEst(); return (m[a.id]!=null)? m[a.id] : a.sellEst; }  // en CZK
 function reSetEstimate(id,val){ const m=_reLoadEst(); const v=parseFloat(String(val).replace(/[^\d.,-]/g,'').replace(/\s/g,'').replace(',','.')); if(isFinite(v)) m[id]=v; try{ localStorage.setItem('re_estimates',JSON.stringify(m)); }catch(e){} renderImmo(); if(typeof _gsToken!=='undefined' && _gsToken && typeof gsSaveAll==='function') gsSaveAll({silent:true}); }
-function _reSwitch(id){ window._reActive=id; document.querySelectorAll('#immo .re-tab').forEach(t=>{ const on=t.dataset.re===id; t.style.background=on?'var(--card)':'var(--bg2)'; t.style.borderBottom=on?'2px solid var(--blue)':'2px solid transparent'; }); document.querySelectorAll('#immo .re-pane').forEach(p=>{ p.style.display=(p.dataset.re===id?'':'none'); }); }
+function _reSwitch(id){ window._reActive=id; document.querySelectorAll('#immo .re-tab').forEach(t=>{ const on=t.dataset.re===id; t.style.background=on?'var(--card)':'var(--bg2)'; t.style.borderBottom=on?'2px solid var(--blue)':'2px solid transparent'; }); document.querySelectorAll('#immo .re-pane').forEach(p=>{ p.style.display=(p.dataset.re===id?'':'none'); }); if(id==='summary'){ try{ renderReRevChart(); }catch(e){} } }
 const RE_RENT2_SEED = { pec: [{"m": "2019-02", "ins": 8915, "fees": 0, "rev": 0}, {"m": "2019-05", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2019-06", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2019-07", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2019-08", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2019-09", "ins": 0, "fees": 21743, "rev": 73961}, {"m": "2019-10", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2019-11", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2019-12", "ins": 0, "fees": 3551, "rev": 10955}, {"m": "2020-01", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2020-02", "ins": 8915, "fees": 3551, "rev": 0}, {"m": "2020-03", "ins": 0, "fees": 14268, "rev": 50152}, {"m": "2020-04", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2020-05", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2020-06", "ins": 0, "fees": 3551, "rev": 8460}, {"m": "2020-07", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2020-08", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2020-09", "ins": 0, "fees": 14488, "rev": 54980}, {"m": "2020-10", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2020-11", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2020-12", "ins": 0, "fees": 3551, "rev": 12803}, {"m": "2021-01", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2021-02", "ins": 8915, "fees": 3551, "rev": 0}, {"m": "2021-03", "ins": 0, "fees": 24531, "rev": 31644}, {"m": "2021-04", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2021-05", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2021-06", "ins": 0, "fees": 8946, "rev": 18288}, {"m": "2021-07", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2021-08", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2021-09", "ins": 0, "fees": 13997, "rev": 67828}, {"m": "2021-10", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2021-11", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2021-12", "ins": 0, "fees": 14003, "rev": 71540}, {"m": "2022-01", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2022-02", "ins": 8915, "fees": 2951, "rev": 0}, {"m": "2022-03", "ins": 0, "fees": 23193, "rev": 97412}, {"m": "2022-04", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2022-05", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2022-06", "ins": 0, "fees": 15472, "rev": 33202}, {"m": "2022-07", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2022-08", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2022-09", "ins": 0, "fees": 9753, "rev": 47140}, {"m": "2022-10", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2022-11", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2022-12", "ins": 0, "fees": 13164, "rev": 31149}, {"m": "2023-01", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2023-02", "ins": 10140, "fees": 2951, "rev": 0}, {"m": "2023-03", "ins": 0, "fees": 24271, "rev": 52049}, {"m": "2023-04", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2023-05", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2023-06", "ins": 0, "fees": 10238, "rev": 28300}, {"m": "2023-07", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2023-08", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2023-09", "ins": 0, "fees": 18251, "rev": 54272}, {"m": "2023-10", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2023-11", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2023-12", "ins": 0, "fees": 16617, "rev": 36909}, {"m": "2024-01", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2024-02", "ins": 10140, "fees": 3979, "rev": 0}, {"m": "2024-03", "ins": 0, "fees": 27380, "rev": 32157}, {"m": "2024-04", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2024-05", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2024-06", "ins": 0, "fees": 18039, "rev": 13853}, {"m": "2024-07", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2024-08", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2024-09", "ins": 0, "fees": 17248, "rev": 33102}, {"m": "2024-10", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2024-11", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2024-12", "ins": 0, "fees": 16700, "rev": 30809}, {"m": "2025-01", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2025-02", "ins": 10557, "fees": 3979, "rev": 0}, {"m": "2025-03", "ins": 0, "fees": 21784, "rev": 117993}, {"m": "2025-04", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2025-05", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2025-06", "ins": 0, "fees": 10599, "rev": 46518}, {"m": "2025-07", "ins": 0, "fees": 4029, "rev": 0}, {"m": "2025-08", "ins": 0, "fees": 4029, "rev": 0}, {"m": "2025-09", "ins": 0, "fees": 10259, "rev": 67778}, {"m": "2025-10", "ins": 0, "fees": 4029, "rev": 0}, {"m": "2025-11", "ins": 0, "fees": 4029, "rev": 0}, {"m": "2025-12", "ins": 0, "fees": 13491, "rev": 102726}, {"m": "2026-01", "ins": 0, "fees": 4029, "rev": 0}, {"m": "2026-02", "ins": 11108, "fees": 4029, "rev": 0}, {"m": "2026-03", "ins": 0, "fees": 11403, "rev": 105574}, {"m": "2026-04", "ins": 0, "fees": 4029, "rev": 0}, {"m": "2026-05", "ins": 0, "fees": 4029, "rev": 0}] };
 function _reRent2List(id){ const m=_reLoadJSON('re_rental2'); return Array.isArray(m[id])? m[id] : ((RE_RENT2_SEED[id]||[]).map(x=>({...x}))); }
 function _reRent2Rev(id){ return _reRent2List(id).reduce((s,x)=>s+(+x.rev||0),0); }
@@ -1098,7 +1098,17 @@ function renderImmo(){
       <tfoot><tr style="border-top:2px solid var(--border2);font-weight:700"><td style="padding:9px 12px">TOTAL</td><td></td><td></td><td></td><td></td><td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(tI)}<div style="font-size:10px;color:var(--text2);font-weight:400">${_reEUR(tIe)}</div></td><td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(tT)}<div style="font-size:10px;color:var(--text2);font-weight:400">${_reEUR(tTe)}</div></td><td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace;color:#f0956e">${_reCZK(tCapDue)}</td><td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(tS)}<div style="font-size:10px;color:var(--text2);font-weight:400">${_reEUR(tSe)}</div></td><td style="padding:9px 12px;text-align:right;color:${tpc}">${tPv>=0?'+':''}${_reCZK(tPv)}<div style="font-size:10px;font-weight:400">${tPvE>=0?'+':''}${_reEUR(tPvE)}</div></td></tr></tfoot>
     </table></div>
     <p style="font-size:11px;color:var(--text2);margin-top:10px">💡 Devise principale : CZK. EUR des coûts au <strong>taux d'acquisition</strong> ; EUR de l'estimation au <strong>taux courant</strong> (${(1/_reFxNow()).toFixed(2)} CZK/€). Estimation éditable (indicative — Prague ≈ 145–150k Kč/m² en 2026).</p>
-  </div>`;
+      <div class="card" style="padding:18px;margin-top:18px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <p style="font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin:0">Revenus locatifs par bien (CZK)</p>
+        <div id="reRevFilters" style="display:flex;gap:6px">
+          <button class="filter-btn re-rev-btn active" data-g="year" onclick="reRevSetGran('year')">Ann&#233;e</button>
+          <button class="filter-btn re-rev-btn" data-g="month" onclick="reRevSetGran('month')">Mois</button>
+        </div>
+      </div>
+      <div style="position:relative;height:320px"><canvas id="reRevChart"></canvas></div>
+    </div>
+</div>`;
   let panes='';
   REAL_ESTATE.forEach(a=>{
     if(a.hasLedger){ panes += _reLedgerPane(a,act); return; }
@@ -1126,7 +1136,43 @@ function renderImmo(){
     </div>`;
   });
   cont.innerHTML = `<div style="display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--border);margin-bottom:18px">${tabs}</div>${summary}${panes}`;
+  try{ requestAnimationFrame(function(){ if((window._reActive||'summary')==='summary') renderReRevChart(); }); }catch(e){}
 }
+
+
+window._reRevGran = window._reRevGran || 'year';
+function _reRevSeries(gran){
+  var tisnoAcq=((typeof REAL_ESTATE!=='undefined'&&REAL_ESTATE.find(function(a){return a.id==='tisno';}))||{}).acq||24.87;
+  var props=[
+    {id:'nuselsky',name:'Nuselsky Pivovar',color:'#4caf82',list:(typeof _reRentList==='function'?_reRentList('nuselsky'):[]),key:'m',eur:false},
+    {id:'pec',name:'Pec',color:'#2e7d5b',list:(typeof _reRent2List==='function'?_reRent2List('pec'):[]),key:'m',eur:false},
+    {id:'tisno',name:'Tisno',color:'#8fd9b6',list:(typeof _reRent3List==='function'?_reRent3List('tisno'):[]),key:'d',eur:true}
+  ];
+  var byProp={},periods={};
+  props.forEach(function(p){
+    byProp[p.id]={};
+    (p.list||[]).forEach(function(x){
+      var per=null;
+      if(p.key==='m'){ if(!x.m)return; per=(gran==='year')?String(x.m).slice(0,4):String(x.m); }
+      else { var q=String(x.d||'').split('/'); if(q.length<3)return; per=(gran==='year')?q[2]:(q[2]+'-'+('0'+q[1]).slice(-2)); }
+      var rev=+x.rev||0; if(p.eur) rev=rev*tisnoAcq;
+      if(!rev)return;
+      byProp[p.id][per]=(byProp[p.id][per]||0)+rev; periods[per]=1;
+    });
+  });
+  return {labels:Object.keys(periods).sort(),props:props,byProp:byProp};
+}
+function renderReRevChart(){
+  var cv=document.getElementById('reRevChart'); if(!cv||typeof Chart==='undefined') return;
+  var gran=window._reRevGran||'year';
+  var d=_reRevSeries(gran);
+  var fb=document.getElementById('reRevFilters');
+  if(fb) fb.querySelectorAll('.re-rev-btn').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-g')===gran); });
+  var datasets=d.props.map(function(p){ return {label:p.name,data:d.labels.map(function(l){return Math.round(d.byProp[p.id][l]||0);}),backgroundColor:p.color,stack:'re',borderRadius:3,borderSkipped:false}; });
+  if(window._reRevChartInst){try{window._reRevChartInst.destroy();}catch(e){}}
+  window._reRevChartInst=new Chart(cv.getContext('2d'),{type:'bar',data:{labels:d.labels,datasets:datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom',labels:{color:'#8b95a8',font:{size:11},boxWidth:12,usePointStyle:true}},tooltip:{callbacks:{label:function(ctx){return ctx.dataset.label+': '+Math.round(ctx.parsed.y).toLocaleString('fr')+' Kc';}}}},scales:{x:{stacked:true,ticks:{color:'#8b95a8',font:{size:10},maxTicksLimit:16,autoSkip:true},grid:{display:false}},y:{stacked:true,ticks:{color:'#8b95a8',callback:function(v){return Math.round(v).toLocaleString('fr');}},grid:{color:'rgba(120,120,120,0.12)'}}}}});
+}
+function reRevSetGran(g){ window._reRevGran=(g==='month')?'month':'year'; renderReRevChart(); }
 
 function sw(id, btn) {
   document.querySelectorAll('.tabs .tab').forEach(t=>t.classList.remove('active'));
