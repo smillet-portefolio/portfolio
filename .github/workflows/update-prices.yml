@@ -76,10 +76,9 @@ jobs:
           RUN_MODE: ${{ steps.guard.outputs.mode }}
         run: python update_evolution_gsheet.py
 
-      - name: Compositions ETF (soir uniquement, 1x/jour)
-        if: steps.guard.outputs.proceed == 'true' && steps.guard.outputs.mode == 'evening'
-        env:
-          GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
-        run: |
-          python update_etf_compo.py
-          python upload_etf_to_gsheet.py
+      # ── Compositions ETF : PLUS de mise à jour automatique ────────────────────
+      # Les compositions ETF (secteurs / géographie / positions) sont désormais
+      # pilotées UNIQUEMENT par le fichier repartition_ETFs.xlsx manuel.
+      # Lancer manuellement `python upload_etf_to_gsheet.py` pour les mettre à jour
+      # (Google Sheets + compositions/fiches embarquées dans le HTML).
+      # L'ancien auto-refresh (update_etf_compo.py -> justETF/iShares) est désactivé.
