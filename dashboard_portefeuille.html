@@ -5434,7 +5434,7 @@ async function gsLoadETFComp() {
         const all = posData
           .filter(r => r[0] && !SKIP_NAMES.has(String(r[0]).toLowerCase().trim())
                     && r[colIdx+1] != null && r[colIdx+1] !== '' && parseFloat(String(r[colIdx+1]).replace(",",".")) > 0)
-          .map(r => [String(r[0]), Math.round(parseFloat(String(r[colIdx+1]).replace(",","."))*1000)/10])
+          .map(r => { var _raw=String(r[colIdx+1]); var _n=parseFloat(_raw.replace(",",".")); var _p=(_raw.indexOf('%')>=0)?_n:_n*100; return [String(r[0]), Math.round(_p*10)/10]; })
           .sort((a,b) => b[1]-a[1]);
         if (!result[ticker]) result[ticker] = {};
         result[ticker].positionsAll = all;
@@ -9170,11 +9170,11 @@ const ETF_META = {
   'XDWD.DE': { name:'Xtrackers MSCI World',        short:'XDWD', ter:0.12, index:'MSCI World (1 300 titres)',     type:'Cœur large',   badge:'badge-blue',
     geo:[['🇺🇸 États-Unis',67.3],['🇯🇵 Japon',5.8],['🇬🇧 Royaume-Uni',3.5]],
     sectors:[['Technologie',26.2],['Finance',14.6],['Industrie',11.0]],
-    positions:[['NVIDIA Corp.',5.2],['Apple',4.7],['Microsoft',3.3]] },
+    positions:[['NVIDIA Corp.',6.1],['Apple',5.0],['Microsoft',3.3]] },
   'EMXC.DE': { name:'Amundi Emerging ex China',     short:'EMXC', ter:0.20, index:'MSCI EM ex Chine',             type:'Émergents',    badge:'badge-purple',
     geo:[['🇹🇼 Taïwan',29.7],['🇰🇷 Corée du Sud',20.6],['🇮🇳 Inde',14.8]],
     sectors:[['Technologie',39.7],['Finance',20.5],['Matériaux',6.8]],
-    positions:[['Taiwan Semiconductor Mfg.',17.8],['Samsung Electronics',7.5],['SK hynix',3.8]] },
+    positions:[['Taiwan Semiconductor Manufacturing Co., Ltd.',17.8],['Samsung Electronics Co., Ltd.',7.5],['SK hynix, Inc.',3.8]] },
   'I500.DE': { name:'iShares S&P 500 Swap',         short:'I500', ter:0.05, index:'S&P 500',                      type:'Cœur USA',     badge:'badge-blue',
     geo:[['🇺🇸 États-Unis',94.7],['🇮🇪 Irlande',1.4]],
     sectors:[['Technologie',33.8],['Télécom',10.2],['Finance',10.1]],
@@ -9182,7 +9182,7 @@ const ETF_META = {
   'IQQH.DE': { name:'iShares Clean Energy',         short:'IQQH', ter:0.65, index:'S&P Global Clean Energy',      type:'Thématique',   badge:'badge-amber',
     geo:[['🇺🇸 États-Unis',29.8],['🇨🇳 Chine',16.6],['🇧🇷 Brésil',8.5]],
     sectors:[['Services publics',43.5],['Industrie',25.6],['Technologie',14.4]],
-    positions:[['Nextpower',10.2],['Bloom Energy',9.4],['First Solar',6.1]] },
+    positions:[['Bloom Energy',13.7],['Nextpower',7.3],['First Solar',7.2]] },
   'JEDI.DE': { name:'VanEck Space Innovators',      short:'JEDI', ter:0.55, index:'MarketVector Space',           type:'Thématique',   badge:'badge-amber',
     geo:[['🇺🇸 États-Unis',39.8],['🇯🇵 Japon',4.6],['🇹🇼 Taïwan',4.1]],
     sectors:[['Télécom',25.5],['Industrie',18.8],['Technologie',14.7]],
@@ -9198,27 +9198,27 @@ const ETF_META = {
   'D5BI.DE': { name:'Xtrackers MSCI Mexico',        short:'D5BI', ter:0.40, index:'MSCI Mexico',                  type:'Pays',         badge:'badge-amber',
     geo:[['🇲🇽 Mexique',89.2]],
     sectors:[['Conso. disc.',28.3],['Matériaux',27.2],['Finance',14.8]],
-    positions:[['Grupo México',15.2],['Grupo Financiero Banorte',13.0],['América Móvil',10.8]] },
+    positions:[['Grupo México S.A.B. de C.V.',15.2],['Grupo Financiero Banorte',13.0],['America Movil SAB de CV',10.8]] },
   'NUKL.DE': { name:'VanEck Uranium & Nuclear',     short:'NUKL', ter:0.55, index:'MarketVector Uranium',         type:'Thématique',   badge:'badge-amber',
     geo:[['🇨🇦 Canada',32.1],['🇯🇵 Japon',22.6],['🇺🇸 États-Unis',18.6]],
     sectors:[['Énergie',40.7],['Industrie',32.9],['Finance',6.7]],
-    positions:[['Cameco',15.5],['NexGen Energy',7.2],['Sprott Physical Uranium',6.7]] },
+    positions:[['Cameco',15.5],['NexGen Energy Ltd.',7.2],['Sprott Physical Uranium',6.7]] },
   'LSMC.DE': { name:'Amundi MSCI Semiconductors',   short:'LSMC', ter:0.35, index:'MSCI Semiconductors',          type:'Thématique',   badge:'badge-amber',
     geo:[['🇺🇸 États-Unis',64.3],['🇹🇼 Taïwan',17.1],['🇳🇱 Pays-Bas',6.8]],
     sectors:[['Technologie',96.9]],
-    positions:[['NVIDIA Corp.',27.4],['Taiwan Semiconductor Mfg.',15.0],['Broadcom Inc.',13.1]] },
+    positions:[['NVIDIA Corp.',27.4],['Taiwan Semiconductor Manufacturing Co., Ltd.',15.0],['Broadcom Inc.',13.1]] },
   'MTPI.PA': { name:'iShares MSCI ex China',        short:'MTPI', ter:0.25, index:'MSCI ACWI ex China',           type:'Complément',   badge:'badge-gray',
     geo:[['🇹🇼 Taïwan',29.7],['🇰🇷 Corée du Sud',20.6],['🇮🇳 Inde',14.8]],
     sectors:[['Technologie',39.7],['Finance',20.5],['Matériaux',6.8]],
-    positions:[['Taiwan Semiconductor Mfg.',17.8],['Samsung Electronics',7.5],['SK hynix',3.8]] },
-  'Q8Y0.DE': { name:'iShares Global Clean Energy Transition', short:'Q8Y0', isin:'IE000U58J0M1', ter:0.65, index:'S&P Global Clean Energy Transition', type:'Thématique', badge:'badge-amber',
+    positions:[['Taiwan Semiconductor Manufacturing Co., Ltd.',17.8],['Samsung Electronics Co., Ltd.',7.5],['SK hynix, Inc.',3.8]] },
+  'Q8Y0.DE': { name:'iShares Global Clean Energy Transition', short:'Q8Y0', isin:'IE000BI8OT95', ter:0.65, index:'S&P Global Clean Energy Transition', type:'Thématique', badge:'badge-amber',
     geo:[['🇺🇸 États-Unis',24.0],['🇨🇳 Chine',12.0],['🇧🇷 Brésil',11.0]],
     sectors:[['Services publics',36.0],['Industrie',31.6],['Technologie',30.65]],
-    positions:[['Bloom Energy',13.74],['Nextpower',7.28],['First Solar',7.16]] },
-  'MWRE.DE': { name:'Amundi Core MSCI World', short:'MWRE', isin:'IE000BI8OT95', ter:0.12, index:'MSCI World', type:'Cœur large', badge:'badge-blue',
+    positions:[['Bloom Energy',13.7],['Nextpower',7.3],['First Solar',7.2]] },
+  'MWRE.DE': { name:'Amundi Core MSCI World', short:'MWRE', isin:'IE000U58J0M1', ter:0.12, index:'MSCI World', type:'Cœur large', badge:'badge-blue',
     geo:[['🇺🇸 États-Unis',67.3],['🇯🇵 Japon',5.8],['🇬🇧 Royaume-Uni',3.5]],
     sectors:[['Technologie',26.2],['Finance',14.6],['Industrie',11.0]],
-    positions:[['NVIDIA Corp.',5.63],['Apple',4.66],['Microsoft',3.41]] },
+    positions:[['NVIDIA Corp.',5.6],['Apple',4.7],['Microsoft',3.4]] },
   'XDWH.DE': { name:'Xtrackers MSCI World Health Care', short:'XDWH', isin:'IE00BM67HK77', ter:0.25, index:'MSCI World Health Care', type:'Thématique', badge:'badge-amber',
     geo:[['🇺🇸 États-Unis',71.6],['🇨🇭 Suisse',6.0],['🇬🇧 Royaume-Uni',5.0],['🇩🇰 Danemark',4.5],['🇯🇵 Japon',3.5]],
     sectors:[['Santé',100.0]],
@@ -9246,6 +9246,7 @@ const ETF_ISIN_MAP = {
   'LU0476289466':'D5BI.DE','IE00BJ0KDQ92':'XDWD.DE','IE00BM67HK77':'XDWH.DE',
   'FR0010405431':'GRE.PA','LU1900066462':'LEER.DE',
   'LU0292109344':'XMBR.DE',
+  'IE000U58J0M1':'MWRE.DE','IE000BI8OT95':'Q8Y0.DE',
 };
 
 // Detection DYNAMIQUE : tout titre du portefeuille marque typeInv='ETF' est
@@ -9368,7 +9369,7 @@ function importETFComposition(file) {
         const all = posData
           .filter(r => r[0] && !SKIP_NAMES.has(String(r[0]).toLowerCase().trim())
                     && r[colIdx+1] != null && parseFloat(String(r[colIdx+1]).replace(",",".")) > 0)
-          .map(r => [String(r[0]), Math.round(parseFloat(String(r[colIdx+1]).replace(",","."))*1000)/10])
+          .map(r => { var _raw=String(r[colIdx+1]); var _n=parseFloat(_raw.replace(",",".")); var _p=(_raw.indexOf('%')>=0)?_n:_n*100; return [String(r[0]), Math.round(_p*10)/10]; })
           .sort((a,b) => b[1]-a[1]);
         if (!result[ticker]) result[ticker] = {};
         result[ticker].positionsAll = all;
