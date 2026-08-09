@@ -1144,9 +1144,9 @@ window._reRevGran = window._reRevGran || 'year';
 function _reRevSeries(gran){
   var tisnoAcq=((typeof REAL_ESTATE!=='undefined'&&REAL_ESTATE.find(function(a){return a.id==='tisno';}))||{}).acq||24.87;
   var props=[
-    {id:'nuselsky',name:'Nuselsky Pivovar',color:'#4caf82',list:(typeof _reRentList==='function'?_reRentList('nuselsky'):[]),key:'m',eur:false},
-    {id:'pec',name:'Pec',color:'#2e7d5b',list:(typeof _reRent2List==='function'?_reRent2List('pec'):[]),key:'m',eur:false},
-    {id:'tisno',name:'Tisno',color:'#8fd9b6',list:(typeof _reRent3List==='function'?_reRent3List('tisno'):[]),key:'d',eur:true}
+    {id:'nuselsky',name:'Nuselsky Pivovar',color:'#5a8dee',list:(typeof _reRentList==='function'?_reRentList('nuselsky'):[]),key:'m',eur:false},
+    {id:'pec',name:'Pec',color:'#4caf82',list:(typeof _reRent2List==='function'?_reRent2List('pec'):[]),key:'m',eur:false},
+    {id:'tisno',name:'Tisno',color:'#f0956e',list:(typeof _reRent3List==='function'?_reRent3List('tisno'):[]),key:'d',eur:true}
   ];
   var byProp={},periods={};
   props.forEach(function(p){
