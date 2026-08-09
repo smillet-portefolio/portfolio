@@ -9437,12 +9437,17 @@ function renderETFFiches() {
 
     // Rebuild geo / sectors / positions sections only
     // Keep h3, .sub, .etf-portfolio-bar and badge — replace the bar sections
+    // Source = Google Sheets (ETF_COMP_OVERRIDE) en priorité ; ETF_META = repli.
+    const _ov = (typeof ETF_COMP_OVERRIDE !== 'undefined' && ETF_COMP_OVERRIDE[ticker]) || {};
+    const _geo = (_ov.geo && _ov.geo.length) ? _ov.geo.slice(0,3) : (meta.geo||[]);
+    const _sec = (_ov.sectors && _ov.sectors.length) ? _ov.sectors.slice(0,3) : (meta.sectors||[]);
+    const _pos = (_ov.positionsAll && _ov.positionsAll.length) ? _ov.positionsAll.slice(0,3) : (meta.positions||[]).slice(0,3);
     let geoHTML = lbl('Top 3 Géographie') +
-      (meta.geo||[]).map(([l,p]) => bar(l, p, '#5a8dee')).join('');
+      _geo.map(([l,p]) => bar(l, p, '#5a8dee')).join('');
     let secHTML = lbl2('Top 3 Secteurs') +
-      (meta.sectors||[]).map(([l,p]) => bar(l, p, '#4caf82')).join('');
+      _sec.map(([l,p]) => bar(l, p, '#4caf82')).join('');
     let posHTML = lbl2('Top 3 Positions') +
-      (meta.positions||[]).map(([l,p]) => bar(l, p, '#f97316')).join('');
+      _pos.map(([l,p]) => bar(l, p, '#f97316')).join('');
 
     // Replace content between the first <p> heading and the badge div
     const cardHTML = card.innerHTML;
