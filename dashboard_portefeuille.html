@@ -3109,7 +3109,17 @@ function renderLTChart(filter) {
   }
 
   const data = buildLTData(filter);
-  const tot  = data.reduce((s, d) => s + d.v, 0);
+  // Dénominateur du % = valeur totale de/des ETF regardé(s) (PAS la somme des
+  // expositions affichées) -> le % du tooltip = vrai % de la position dans l'ETF,
+  // identique au tableau composition complète (non renormalisé à 100%).
+  let tot;
+  if (filter && filter !== 'all') {
+    const _tk = (typeof LT_SHORT_TO_TICKER !== 'undefined' && LT_SHORT_TO_TICKER[filter]) || filter;
+    tot = _compValMap[_tk] || 0;
+  } else {
+    tot = Object.keys(ETF_META).reduce((s, t) => s + (_compValMap[t] || 0), 0);
+  }
+  if (!tot) tot = data.reduce((s, d) => s + d.v, 0);
 
   // Ajuster hauteur
   wrap.style.height = Math.max(300, data.length * 34 + 40) + 'px';
