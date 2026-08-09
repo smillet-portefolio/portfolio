@@ -3553,7 +3553,7 @@ function buildPosTable(rebuild) {
       <td style="font-size:11px;color:var(--text2);padding:6px 14px">${r.broker}</td>
       <td style="font-size:11px;color:var(--text2);padding:6px 14px">${r.date}</td>
       <td style="padding:6px 14px"><span style="font-size:10px;font-weight:600;padding:2px 5px;border-radius:3px;background:var(--bg3);border:1px solid var(--border)">${r.currency}</span></td>
-      <td class="mono" style="text-align:right;padding:6px 14px">${fmtN(r.qty)}</td>
+      <td class="mono" style="text-align:right;padding:6px 14px">${Number(r.qty).toLocaleString('fr',{maximumFractionDigits:8})}</td>
       <td class="mono" style="text-align:right;padding:6px 14px">${fmtN(r.pxAchat)}</td>
       <td class="mono" style="text-align:right;padding:6px 14px">${Math.round(r.cost).toLocaleString('fr')} ${r.currency}</td>
       <td id="costeur-${i}" class="mono" style="text-align:right;padding:6px 14px;color:var(--text2)">${row.costEur ? Math.round(row.costEur).toLocaleString('fr') + ' €' : '—'}</td>
@@ -4423,7 +4423,7 @@ function openSellLine(i) {
 
   document.getElementById('sell_info').innerHTML =
     `<strong>${r.name}</strong> &nbsp;·&nbsp; ${r.ticker} &nbsp;·&nbsp; ` +
-    `${r.qty.toLocaleString('fr',{maximumFractionDigits:4})} titres &nbsp;·&nbsp; ` +
+    `${r.qty.toLocaleString('fr',{maximumFractionDigits:8})} titres &nbsp;·&nbsp; ` +
     `Coût: <strong>${Math.round(costEur).toLocaleString('fr')} €</strong>`;
 
   document.getElementById('sl_date').value   = new Date().toISOString().slice(0,10);
@@ -4432,7 +4432,7 @@ function openSellLine(i) {
   { const _slc=document.getElementById('sl_comm'); if(_slc) _slc.value=''; const _slcc=document.getElementById('sl_commcur'); if(_slcc) _slcc.value=(r.currency||'EUR'); }
   document.getElementById('sl_fx').value     = '';
   document.getElementById('sl_qty').value    = r.qty;
-  document.getElementById('sl_qty_max').textContent = '(max ' + r.qty.toLocaleString('fr',{maximumFractionDigits:4}) + ')';
+  document.getElementById('sl_qty_max').textContent = '(max ' + r.qty.toLocaleString('fr',{maximumFractionDigits:8}) + ')';
   document.getElementById('sl_preview').style.display  = 'none';
   document.getElementById('sl_error').style.display    = 'none';
 
@@ -4500,7 +4500,7 @@ function submitSellLine() {
   const errs  = [];
   if (!dateSell) errs.push('Date requise');
   if (isNaN(prix) || prix < 0) errs.push('Prix de vente invalide');
-  if (isNaN(sellQ) || sellQ <= 0 || sellQ > r.qty + 1e-9) errs.push('Quantité invalide (max '+r.qty.toLocaleString('fr',{maximumFractionDigits:4})+')');
+  if (isNaN(sellQ) || sellQ <= 0 || sellQ > r.qty + 1e-9) errs.push('Quantité invalide (max '+r.qty.toLocaleString('fr',{maximumFractionDigits:8})+')');
   if (dev!=='EUR'&&(isNaN(fx)||fx<=0)) errs.push('Taux de change requis');
   if (errs.length) { errEl.innerHTML='⚠️ '+errs.join(' · '); errEl.style.display='block'; return; }
 
@@ -4648,7 +4648,7 @@ function renderClosedPositions() {
       <td style="padding:7px 12px;font-size:11px;color:var(--text2)">${p.broker||'—'}</td>
       <td style="padding:7px 12px;font-size:11px;color:var(--text2)">${p.dateAchat}</td>
       <td style="padding:7px 12px;font-size:11px;color:var(--text2)">${p.dateSell}</td>
-      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${p.qty.toLocaleString('fr',{maximumFractionDigits:4})}</td>
+      <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${p.qty.toLocaleString('fr',{maximumFractionDigits:8})}</td>
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${p.pxAchat.toLocaleString('fr',{maximumFractionDigits:4})} ${_sym(p.currencyAchat)}</td>
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${p.pxVente.toLocaleString('fr',{maximumFractionDigits:4})} ${_sym(p.currencyVente)}</td>
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${Math.round(p.costEur).toLocaleString('fr')} €</td>
@@ -8773,7 +8773,7 @@ function _aeRenderRows() {
   const body = rows.map(r => `<tr>
       <td style="white-space:nowrap;padding:6px 8px"><strong>${r.name}</strong> ${typeBadge(r.typeInv)}</td>
       <td class="mono" style="color:var(--text2);font-size:11px;padding:6px 8px">${r.isin || '—'}</td>
-      <td style="text-align:right;padding:6px 8px;${mono}">${r.qty.toLocaleString('fr',{maximumFractionDigits:4})}</td>
+      <td style="text-align:right;padding:6px 8px;${mono}">${r.qty.toLocaleString('fr',{maximumFractionDigits:8})}</td>
       <td style="text-align:right;padding:6px 8px;${mono}">${pxTxt(r.pxAchat, r.currency)}</td>
       <td style="text-align:right;padding:6px 8px;${mono}">${pxTxt(r.pxCurr, r.pxCur)}</td>
       <td style="text-align:right;padding:6px 8px;${mono}"><strong>${eurTxt(r.valEur)}</strong></td>
@@ -9118,7 +9118,7 @@ function renderActions() {
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
         <div>
           <div style="font-size:15px;font-weight:700">${flag} ${r.name}</div>
-          <div style="font-size:10px;font-family:'DM Mono',monospace;color:var(--text2);margin-top:2px">${r.ticker} &nbsp;·&nbsp; ${r.qty.toLocaleString('fr',{maximumFractionDigits:4})} titres &nbsp;·&nbsp; dernier achat ${lastDate}</div>
+          <div style="font-size:10px;font-family:'DM Mono',monospace;color:var(--text2);margin-top:2px">${r.ticker} &nbsp;·&nbsp; ${r.qty.toLocaleString('fr',{maximumFractionDigits:8})} titres &nbsp;·&nbsp; dernier achat ${lastDate}</div>
           <div style="font-size:10px;color:var(--blue);margin-top:3px;font-weight:500">${STOCK_SECTORS[r.ticker] || DIRECT_SECTOR[r.ticker] || ''}</div>
         </div>
         <div style="text-align:right;flex-shrink:0;margin-left:8px">
@@ -12068,7 +12068,7 @@ window.addEventListener('load', () => {
     box.innerHTML=note+'<div style="font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:600">Commissions enregistrées</div>'
       +'<table style="width:100%;font-size:11px;border-collapse:collapse">'
       +'<tr style="color:var(--text2)"><th style="padding:3px 6px;text-align:left">Date</th><th style="padding:3px 6px;text-align:right">Qté totale</th><th style="padding:3px 6px;text-align:right">Coût total</th><th></th></tr>'
-      +rows.map(r=>`<tr style="border-top:1px solid var(--border)"><td style="padding:3px 6px">${r.date||'—'}</td><td style="padding:3px 6px;text-align:right;font-family:'DM Mono',monospace">${r.qty.toLocaleString('fr',{maximumFractionDigits:4})}</td><td style="padding:3px 6px;text-align:right;font-family:'DM Mono',monospace">${Math.round(r.cost).toLocaleString('fr')} ${r.devise}</td><td style="padding:3px 6px;text-align:right"><button onclick="${r.batch?`kidCommDelBatch('${r.batch}')`:`kidCommDel(${r.idx})`}" title="Supprimer" style="background:none;border:none;cursor:pointer;color:#e06c6c">🗑</button></td></tr>`).join('')
+      +rows.map(r=>`<tr style="border-top:1px solid var(--border)"><td style="padding:3px 6px">${r.date||'—'}</td><td style="padding:3px 6px;text-align:right;font-family:'DM Mono',monospace">${r.qty.toLocaleString('fr',{maximumFractionDigits:8})}</td><td style="padding:3px 6px;text-align:right;font-family:'DM Mono',monospace">${Math.round(r.cost).toLocaleString('fr')} ${r.devise}</td><td style="padding:3px 6px;text-align:right"><button onclick="${r.batch?`kidCommDelBatch('${r.batch}')`:`kidCommDel(${r.idx})`}" title="Supprimer" style="background:none;border:none;cursor:pointer;color:#e06c6c">🗑</button></td></tr>`).join('')
       +'</table>';
   };
   window.kidCommSave=function(){
@@ -12408,6 +12408,145 @@ window.addEventListener('load', () => {
     </div>
   </div>
 </div>
+
+<!-- ══ Sous-onglet HISTORIQUE des intérêts reçus (obligations non cotées) ══ -->
+<script>
+(function(){
+  function initObligHist(){
+    var sec=document.getElementById('oblig');
+    if(!sec){ return setTimeout(initObligHist,200); }
+    if(document.getElementById('oblig_view_hist')) return;
+    var btn=sec.querySelector('button[onclick^="obligOpenModal"]'); if(btn) btn.id='obligNewBtn';
+    // Nav sous-onglets
+    var nav=document.createElement('div'); nav.className='sub-tabs';
+    nav.innerHTML='<button class="sub-tab active" data-ov="projets" onclick="obligSwitchView(\'projets\')">Projets</button>'
+                 +'<button class="sub-tab" data-ov="hist" onclick="obligSwitchView(\'hist\')">Historique</button>';
+    if(btn && btn.parentElement===sec) sec.insertBefore(nav, btn);
+    else if(sec.children.length>2) sec.insertBefore(nav, sec.children[2]); else sec.appendChild(nav);
+    // Vue Historique
+    var hv=document.createElement('div'); hv.id='oblig_view_hist'; hv.style.display='none';
+    var thBase='position:sticky;top:0;background:var(--bg3);padding:9px 14px;cursor:pointer;z-index:2';
+    var inpS='width:100%;box-sizing:border-box;padding:4px 7px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px';
+    hv.innerHTML=
+      '<div id="obligHistKpi" class="card" style="padding:16px 20px;margin:0 0 18px;max-width:360px"></div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:0 0 22px;align-items:start">'
+      + '<div class="card" style="padding:20px"><h3 style="font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text2)">Reçu par projet</h3><div style="display:flex;justify-content:center"><canvas id="obligHistChartProjet" width="300" height="260"></canvas></div></div>'
+      + '<div class="card" style="padding:20px"><h3 style="font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text2)">Reçu par plateforme</h3><div style="display:flex;justify-content:center"><canvas id="obligHistChartPlat" width="300" height="260"></canvas></div></div>'
+    + '</div>'
+    + '<div style="overflow:auto;max-height:520px;border:1px solid var(--border2);border-radius:8px">'
+    + '<table id="obligHistTable" style="font-size:12px;width:100%;border-collapse:collapse">'
+      + '<thead>'
+      + '<tr style="background:var(--bg3);text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2)">'
+        + '<th class="ohh" data-k="projet" onclick="obligHistSort(\'projet\')" style="'+thBase+';text-align:left">Projet <span class="oh-arr" style="opacity:.5">&#8645;</span></th>'
+        + '<th class="ohh" data-k="plateforme" onclick="obligHistSort(\'plateforme\')" style="'+thBase+';text-align:left">Plateforme <span class="oh-arr" style="opacity:.5">&#8645;</span></th>'
+        + '<th class="ohh" data-k="type" onclick="obligHistSort(\'type\')" style="'+thBase+';text-align:left">Type <span class="oh-arr" style="opacity:.5">&#8645;</span></th>'
+        + '<th class="ohh" data-k="date" onclick="obligHistSort(\'date\')" style="'+thBase+';text-align:left">Date paiement <span class="oh-arr" style="opacity:.5">&#8645;</span></th>'
+        + '<th class="ohh" data-k="recu" onclick="obligHistSort(\'recu\')" style="'+thBase+';text-align:right">Reçu int. (&#8364;) <span class="oh-arr" style="opacity:.5">&#8645;</span></th>'
+      + '</tr>'
+      + '<tr style="background:var(--bg3)">'
+        + '<td style="padding:3px 8px"><input type="text" placeholder="Filtrer..." oninput="obligHistFilter(\'projet\',this.value)" style="'+inpS+'"></td>'
+        + '<td style="padding:3px 8px"><input type="text" placeholder="Plateforme..." oninput="obligHistFilter(\'plateforme\',this.value)" style="'+inpS+'"></td>'
+        + '<td style="padding:3px 8px"><input type="text" placeholder="Type..." oninput="obligHistFilter(\'type\',this.value)" style="'+inpS+'"></td>'
+        + '<td colspan="2"></td>'
+      + '</tr>'
+      + '</thead>'
+      + '<tbody id="obligHistBody"></tbody>'
+      + '<tfoot id="obligHistFoot"></tfoot>'
+    + '</table></div>';
+    sec.appendChild(hv);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', initObligHist);
+  else initObligHist();
+})();
+
+var _obligHistState={ sortKey:'date', sortDir:-1, f:{projet:'',plateforme:'',type:''} };
+var _obligHistCharts={};
+
+function obligSwitchView(v){
+  var sec=document.getElementById('oblig'); if(!sec) return;
+  var showP=(v!=='hist');
+  var tbl=document.getElementById('obligTable');
+  var els=[ document.getElementById('obligNewBtn'), document.getElementById('obligKpis'),
+            document.getElementById('obligChartsWrap'), (tbl?tbl.parentElement:null) ];
+  els.forEach(function(el){ if(el) el.style.display=showP?'':'none'; });
+  var hv=document.getElementById('oblig_view_hist'); if(hv) hv.style.display=showP?'none':'';
+  sec.querySelectorAll('.sub-tab').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-ov')===(showP?'projets':'hist')); });
+  if(!showP) renderObligHist();
+}
+
+function obligHistAllRows(){
+  var today=new Date().toISOString().slice(0,10), rows=[];
+  (typeof OBLIG_DATA!=='undefined'?OBLIG_DATA:[]).forEach(function(p){
+    (p.echeancier||[]).forEach(function(e){
+      if(!e || e.date>today) return;
+      var r=(typeof echIntEur==='function')?echIntEur(p,e):(e.interet||0);
+      if(!(r>0)) return;
+      rows.push({ projet:p.nom||'—', plateforme:p.plateforme||'—', type:p.typeProjet||'—', date:e.date, recu:r });
+    });
+  });
+  return rows;
+}
+
+function obligHistSort(k){
+  var st=_obligHistState;
+  if(st.sortKey===k) st.sortDir=-st.sortDir;
+  else { st.sortKey=k; st.sortDir=(k==='recu'||k==='date')?-1:1; }
+  renderObligHist();
+}
+function obligHistFilter(field,val){ _obligHistState.f[field]=(val||'').toLowerCase(); renderObligHist(); }
+
+function renderObligHist(){
+  var st=_obligHistState, all=obligHistAllRows();
+  var rows=all.filter(function(r){
+    return (!st.f.projet     || String(r.projet).toLowerCase().indexOf(st.f.projet)>=0)
+        && (!st.f.plateforme || String(r.plateforme).toLowerCase().indexOf(st.f.plateforme)>=0)
+        && (!st.f.type       || String(r.type).toLowerCase().indexOf(st.f.type)>=0);
+  });
+  var k=st.sortKey, d=st.sortDir;
+  rows.sort(function(a,b){
+    if(k==='recu') return (a.recu-b.recu)*d;
+    var va=String(a[k]), vb=String(b[k]); return va<vb?-d:(va>vb?d:0);
+  });
+  var f2=function(n){ return Number(n).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2}); };
+  var tb=document.getElementById('obligHistBody');
+  if(tb) tb.innerHTML=rows.map(function(r){
+    return '<tr style="border-bottom:1px solid var(--border)">'
+      +'<td style="padding:7px 14px;font-weight:600">'+r.projet+'</td>'
+      +'<td style="padding:7px 14px"><span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:var(--bg3);border:1px solid var(--border)">'+r.plateforme+'</span></td>'
+      +'<td style="padding:7px 14px;color:var(--text2)">'+r.type+'</td>'
+      +'<td class="mono" style="padding:7px 14px;color:var(--text2);font-size:11px">'+r.date+'</td>'
+      +'<td class="mono" style="padding:7px 14px;text-align:right;color:#4caf82;font-weight:600">'+f2(r.recu)+' &#8364;</td>'
+    +'</tr>';
+  }).join('');
+  var tot=rows.reduce(function(s,r){return s+r.recu;},0);
+  var tf=document.getElementById('obligHistFoot');
+  if(tf) tf.innerHTML='<tr style="border-top:2px solid var(--border2);font-weight:700;background:var(--bg3)">'
+    +'<td colspan="4" style="padding:8px 14px;text-align:right">Total ('+rows.length+' paiement'+(rows.length>1?'s':'')+')</td>'
+    +'<td class="mono" style="padding:8px 14px;text-align:right;color:#4caf82">'+f2(tot)+' &#8364;</td></tr>';
+  var totAll=all.reduce(function(s,r){return s+r.recu;},0);
+  var kp=document.getElementById('obligHistKpi');
+  if(kp) kp.innerHTML='<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:6px">Montant total reçu</div>'
+    +'<div style="font-size:26px;font-weight:700;color:#4caf82">'+f2(totAll)+' &#8364;</div>'
+    +'<div style="font-size:11px;color:var(--text2);margin-top:3px">'+all.length+' paiement'+(all.length>1?'s':'')+' d\'intérêts encaissé'+(all.length>1?'s':'')+'</div>';
+  // Donuts (global, non filtré)
+  var byProj={}, byPlat={};
+  all.forEach(function(r){ byProj[r.projet]=(byProj[r.projet]||0)+r.recu; byPlat[r.plateforme]=(byPlat[r.plateforme]||0)+r.recu; });
+  var PLAT_COLORS={ LENDOSPHERE:'#4caf82', ENERFIP:'#5a8dee', LUMO:'#f97316', KB:'#9b87d4', 'KB obligations':'#7c6bbf' };
+  var PALETTE=['#5a8dee','#4caf82','#f97316','#a78bfa','#f59e0b','#ec4899','#14b8a6','#84cc16','#e06c6c','#60a5fa','#34d399','#fb923c'];
+  ['obligHistChartProjet','obligHistChartPlat'].forEach(function(id){ if(_obligHistCharts[id]){try{_obligHistCharts[id].destroy();}catch(e){}delete _obligHistCharts[id];} });
+  if(typeof Chart==='undefined') return;
+  var mkOpts={responsive:false,cutout:'60%',plugins:{legend:{display:true,position:'bottom',labels:{color:'#8b95a8',font:{size:10},boxWidth:10,padding:6}},tooltip:{callbacks:{label:function(ctx){return ctx.label+': '+Math.round(ctx.parsed).toLocaleString('fr')+' €';}}}}};
+  var pe=Object.entries(byProj).sort(function(a,b){return b[1]-a[1];});
+  var c1=document.getElementById('obligHistChartProjet');
+  if(c1&&pe.length) _obligHistCharts['obligHistChartProjet']=new Chart(c1,{type:'doughnut',data:{labels:pe.map(function(e){return e[0];}),datasets:[{data:pe.map(function(e){return Math.round(e[1]);}),backgroundColor:pe.map(function(e,i){return PALETTE[i%PALETTE.length];}),borderWidth:0}]},options:mkOpts});
+  var be=Object.entries(byPlat).sort(function(a,b){return b[1]-a[1];});
+  var c2=document.getElementById('obligHistChartPlat');
+  if(c2&&be.length) _obligHistCharts['obligHistChartPlat']=new Chart(c2,{type:'doughnut',data:{labels:be.map(function(e){return e[0];}),datasets:[{data:be.map(function(e){return Math.round(e[1]);}),backgroundColor:be.map(function(e,i){return PLAT_COLORS[e[0]]||PALETTE[i%PALETTE.length];}),borderWidth:0}]},options:mkOpts});
+  // flèches de tri
+  var hv=document.getElementById('oblig_view_hist');
+  if(hv) hv.querySelectorAll('.ohh').forEach(function(th){ var kk=th.getAttribute('data-k'); var a=th.querySelector('.oh-arr'); if(a){ a.innerHTML=(kk===st.sortKey)?(st.sortDir>0?'&#9650;':'&#9660;'):'&#8645;'; a.style.opacity=(kk===st.sortKey)?'1':'.5'; } });
+}
+</script>
 
 </body>
 </html>
