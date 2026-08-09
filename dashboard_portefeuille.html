@@ -12432,7 +12432,7 @@ window.addEventListener('load', () => {
     + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin:0 0 22px;align-items:start">'
       + '<div class="card" style="padding:20px"><h3 style="font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text2)">Reçu par projet</h3><div style="display:flex;justify-content:center"><canvas id="obligHistChartProjet" width="260" height="240"></canvas></div></div>'
       + '<div class="card" style="padding:20px"><h3 style="font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text2)">Reçu par plateforme</h3><div style="display:flex;justify-content:center"><canvas id="obligHistChartPlat" width="260" height="240"></canvas></div></div>'
-      + '<div class="card" style="padding:20px"><h3 style="font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text2)">Reçu par année</h3><div style="max-height:260px;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2)"><th style="text-align:left;padding:7px 10px;position:sticky;top:0;background:var(--bg2);border-bottom:1px solid var(--border2)">Année</th><th style="text-align:right;padding:7px 10px;position:sticky;top:0;background:var(--bg2);border-bottom:1px solid var(--border2)">Reçu int. (&#8364;)</th></tr></thead><tbody id="obligHistYearBody"></tbody><tfoot id="obligHistYearFoot"></tfoot></table></div></div>'
+      + '<div class="card" style="padding:20px"><h3 style="font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text2)">Reçu par année</h3><div style="position:relative;height:240px"><canvas id="obligHistChartYear"></canvas></div></div>'
     + '</div>'
     + '<div style="overflow:auto;max-height:520px;border:1px solid var(--border2);border-radius:8px">'
     + '<table id="obligHistTable" style="font-size:12px;width:100%;border-collapse:collapse">'
@@ -12547,11 +12547,10 @@ function renderObligHist(){
   var c2=document.getElementById('obligHistChartPlat');
   if(c2&&be.length) _obligHistCharts['obligHistChartPlat']=new Chart(c2,{type:'doughnut',data:{labels:be.map(function(e){return e[0];}),datasets:[{data:be.map(function(e){return Math.round(e[1]);}),backgroundColor:be.map(function(e,i){return PLAT_COLORS[e[0]]||PALETTE[i%PALETTE.length];}),borderWidth:0}]},options:mkOpts});
   var ye=Object.entries(byYear).sort(function(a,b){return a[0]<b[0]?-1:1;});
-  var _f2y=function(n){ return Number(n).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2}); };
-  var yb=document.getElementById('obligHistYearBody');
-  if(yb) yb.innerHTML=ye.map(function(e){ return '<tr style="border-bottom:1px solid var(--border)"><td style="padding:6px 10px;font-weight:600">'+e[0]+'</td><td class="mono" style="padding:6px 10px;text-align:right;color:#4caf82;font-weight:600">'+_f2y(e[1])+' &#8364;</td></tr>'; }).join('');
-  var yf=document.getElementById('obligHistYearFoot');
-  if(yf){ var _yt=ye.reduce(function(s,e){return s+e[1];},0); yf.innerHTML='<tr style="border-top:2px solid var(--border2);font-weight:700;background:var(--bg3)"><td style="padding:8px 10px;text-align:right">Total</td><td class="mono" style="padding:8px 10px;text-align:right;color:#4caf82">'+_f2y(_yt)+' &#8364;</td></tr>'; }
+  var c3=document.getElementById('obligHistChartYear');
+  if(c3&&ye.length) _obligHistCharts['obligHistChartYear']=new Chart(c3,{type:'bar',
+    data:{labels:ye.map(function(e){return e[0];}),datasets:[{label:'Reçu',data:ye.map(function(e){return Math.round(e[1]);}),backgroundColor:'rgba(76,175,130,0.8)',borderRadius:4,borderSkipped:false}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return Math.round(ctx.parsed.y).toLocaleString('fr')+' €';}}}},scales:{x:{ticks:{color:'#8b95a8',font:{size:10}},grid:{display:false}},y:{ticks:{color:'#8b95a8',callback:function(v){return Math.round(v).toLocaleString('fr');}},grid:{color:'rgba(120,120,120,0.12)'}}}}});
   // flèches de tri
   var hv=document.getElementById('oblig_view_hist');
   if(hv) hv.querySelectorAll('.ohh').forEach(function(th){ var kk=th.getAttribute('data-k'); var a=th.querySelector('.oh-arr'); if(a){ a.innerHTML=(kk===st.sortKey)?(st.sortDir>0?'&#9650;':'&#9660;'):'&#8645;'; a.style.opacity=(kk===st.sortKey)?'1':'.5'; } });
