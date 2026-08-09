@@ -12466,9 +12466,12 @@ function obligSwitchView(v){
   var sec=document.getElementById('oblig'); if(!sec) return;
   var showP=(v!=='hist');
   var tbl=document.getElementById('obligTable');
-  var els=[ document.getElementById('obligNewBtn'), document.getElementById('obligKpis'),
-            document.getElementById('obligChartsWrap'), (tbl?tbl.parentElement:null) ];
-  els.forEach(function(el){ if(el) el.style.display=showP?'':'none'; });
+  var set=function(el,disp){ if(el) el.style.display= showP ? disp : 'none'; };
+  // restaure explicitement le display d'origine (grid pour KPI/charts) au retour sur Projets
+  set(document.getElementById('obligNewBtn'), '');
+  set(document.getElementById('obligKpis'), 'grid');
+  set(document.getElementById('obligChartsWrap'), 'grid');
+  set(tbl ? tbl.parentElement : null, '');
   var hv=document.getElementById('oblig_view_hist'); if(hv) hv.style.display=showP?'none':'';
   sec.querySelectorAll('.sub-tab').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-ov')===(showP?'projets':'hist')); });
   if(!showP) renderObligHist();
