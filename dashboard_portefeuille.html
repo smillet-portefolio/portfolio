@@ -8997,7 +8997,7 @@ function renderAePnlChart(){
   // sélection contient de la crypto (qui cote 24/7 -> on garde les week-ends).
   const _hasCrypto = _axisT.some(t => (window._aePnlTypes[t]||'') === 'Crypto');
   if(!_hasCrypto){
-    dates = dates.filter(d=>{ const _wd=new Date(d+'T00:00:00').getUTCDay(); return _wd!==0 && _wd!==6; });
+    dates = dates.filter(d=>{ const _wd=new Date(d+'T00:00:00Z').getUTCDay(); return _wd!==0 && _wd!==6; });
   }
   const datasets = [];
   tickers.forEach(t=>{
