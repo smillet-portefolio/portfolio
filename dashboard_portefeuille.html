@@ -11440,7 +11440,7 @@ window.addEventListener('load', () => {
         <td style="padding:8px 10px;font-size:11px;color:var(--text2)">${r.brokers||'—'}</td>
         <td style="padding:8px 12px;font-size:10px;color:var(--text2);font-family:'DM Mono',monospace">${r.isin||'—'}</td>
         <td style="padding:8px 12px;font-size:11px;font-family:'DM Mono',monospace">${r.ticker||'—'}</td>
-        <td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">${fmtF(r.qty)}</td>
+        <td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">${r.qty==null?'—':Number(r.qty).toLocaleString('fr',{maximumFractionDigits:8})}</td>
         <td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${fmtF(r.pxRevient)} €</td>
         <td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">${fmtE(r.costEur)}</td>
         <td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">${r.valEur!=null?fmtE(r.valEur):'—'}</td>
@@ -11523,7 +11523,7 @@ window.addEventListener('load', () => {
       <td style="padding:6px 8px;font-weight:600">${r.name||''}</td>
       <td style="padding:6px 8px;font-size:10px;color:var(--text2);font-family:'DM Mono',monospace">${r.isin||'—'}</td>
       <td style="padding:6px 8px;font-size:11px;font-family:'DM Mono',monospace">${r.ticker||'—'}</td>
-      <td style="padding:6px 8px;text-align:right;font-family:'DM Mono',monospace">${fN(r.qty)}</td>
+      <td style="padding:6px 8px;text-align:right;font-family:'DM Mono',monospace">${r.qty==null?'—':Number(r.qty).toLocaleString('fr',{maximumFractionDigits:8})}</td>
       <td style="padding:6px 8px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${fN(r.pxAchat)}</td>
       <td style="padding:6px 8px;text-align:right;font-family:'DM Mono',monospace">${r.pxCurr!=null?fN(r.pxCurr):'—'}</td>
       <td style="padding:6px 8px;text-align:right;font-family:'DM Mono',monospace">${r.valEur!=null?fE(r.valEur):'—'}</td>
@@ -12132,13 +12132,13 @@ window.addEventListener('load', () => {
       <td style="font-size:11px;color:var(--text2);padding:6px 14px">${r.broker||'—'}</td>
       <td style="font-size:11px;color:var(--text2);padding:6px 14px">${r.date||'—'}</td>
       <td style="padding:6px 14px"><span style="font-size:10px;font-weight:600;padding:2px 5px;border-radius:3px;background:var(--bg3);border:1px solid var(--border)">${r.devise}</span></td>
-      <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace">${fN(r.qty)}</td>
+      <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace">${r.qty==null?'—':Number(r.qty).toLocaleString('fr',{maximumFractionDigits:8})}</td>
       <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace">${fN(r.px)}</td>
       <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace">${r.coutDev!=null?Math.round(r.coutDev).toLocaleString('fr')+' '+r.devise:'—'}</td>
       <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;color:var(--text2)">${fE(r.coutEur)}</td>
       <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;color:var(--text2)">${r.comm!=null?Math.round(r.comm).toLocaleString('fr')+' €':'—'}</td>
       <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;color:var(--text2)">${r.taxe!=null?Math.round(r.taxe).toLocaleString('fr')+' €':'—'}</td>
-      <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;${(r.qtyAct!=null&&r.qty!=null&&r.qtyAct<r.qty)?'color:#f0956e':'color:var(--text2)'}">${fN(r.qtyAct)}</td>
+      <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;${(r.qtyAct!=null&&r.qty!=null&&r.qtyAct<r.qty)?'color:#f0956e':'color:var(--text2)'}">${r.qtyAct==null?'—':Number(r.qtyAct).toLocaleString('fr',{maximumFractionDigits:8})}</td>
       <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;color:var(--text2)">${fN(r.vl)}</td>
       <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace">${fE(r.val)}</td>
       <td style="text-align:right;padding:6px 14px;font-family:'DM Mono',monospace;font-weight:600;color:${cP(r.pnl)}">${fE(r.pnl)}</td>
