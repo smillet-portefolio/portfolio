@@ -2419,7 +2419,11 @@ function renderDashboard() {
     const before = evoBaseRow(cut);
     let act = 0, inv = 0, ok = false;
     suffixes.forEach(s => {
-      const hasBefore = before && typeof before['act_'+s] === 'number' && before['act_'+s] > 0;
+      // Compte "présent dans l'historique à la coupe" = son suffixe act_ existe (nombre),
+    // MÊME si sa valeur de marché est 0 (compte vidé, ex. Binance transféré vers Ledger).
+    // Il faut alors compter son investi dans la base, sinon il apparaît comme une perte
+    // sèche dans le YTD/MTD (l'investi actuel l'inclut) -> % trop négatif.
+    const hasBefore = before && typeof before['act_'+s] === 'number';
       const row = hasBefore ? before : _firstPosRow(s);
       if (!row || typeof row['act_'+s] !== 'number') return;
       const invS = (typeof row['inv_'+s] === 'number') ? row['inv_'+s] : row['act_'+s];
@@ -2674,24 +2678,39 @@ window._expoShow = function(kind, scope, label){
 function _dbHoldings(){
   const out = [], acc = {};
   const _nb = b => (typeof normBroker==='function') ? normBroker(b||'—') : ((b==='KB obligations')?'KB':(b||'—'));
+  const _isEtf = r => (r && (r.typeInv==='ETF')) || (r && typeof ETF_TICKERS!=='undefined' && ETF_TICKERS.has(r.ticker));
+  // Catégorie = celle du DONUT : par broker (BROKER_TO_CAT), et 'Actions & ETFs' est
+  // affiné en 'Actions'/'ETFs' selon le type de l'instrument.
+  const _catOf = (broker, r) => {
+    const bc = (typeof BROKER_TO_CAT!=='undefined' && BROKER_TO_CAT[broker]) ? BROKER_TO_CAT[broker] : 'Actions & ETFs';
+    if(bc==='Actions & ETFs') return _isEtf(r) ? 'ETFs' : 'Actions';
+    return bc;
+  };
+  // 1) Instruments détenus (BOOK2)
   BOOK2_ROWS.forEach(r=>{
     if(!isActiveInv(r)) return;
-    const ti = (r.typeInv||'');
-    let cat = 'Actions';
-    if(ti==='Crypto') cat='Crypto';
-    else if(ti==='Produit structuré'||ti==='Produit structure'||ti==='Épargne'||ti==='Epargne') cat='Produits structurés & Épargne';
-    else if(ti.toLowerCase().includes('obligation')) cat='Obligations non cotées';
-    else if(ti==='ETF') cat='ETFs';
     const info = CURRENT_PRICES[r.ticker];
     const cost = r.costEur!=null ? r.costEur : (toEur(r.cost, r.currency)||0);
     const val  = (info && info.price) ? (toEur(r.qty*info.price, info.currency||r.currency)||cost) : cost;
     if(!val || val<=0) return;
     const broker = _nb(r.broker);
+    const cat = _catOf(broker, r);
     const key = (r.ticker||r.name)+'|'+broker+'|'+cat;
-    if(!acc[key]) acc[key] = { name:r.name, ticker:r.ticker||'', cat, broker, valEur:0 };
+    if(!acc[key]) acc[key] = { name:r.name||r.ticker, ticker:r.ticker||'', cat, broker, valEur:0 };
     acc[key].valEur += val;
   });
-  Object.values(acc).forEach(h=>{ h.valEur=Math.round(h.valEur); out.push(h); });
+  Object.values(acc).forEach(h=>{ h.valEur=Math.round(h.valEur); if(h.valEur>0) out.push(h); });
+  // 2) Cash / dépôts (CASH_DATA) par broker : KB -> Produits structurés & Épargne,
+  //    Ledger/Binance -> Crypto, brokers actions -> Actions. (source onglet Dépôts & Cash)
+  if(typeof CASH_DATA!=='undefined' && CASH_DATA && CASH_DATA.cash){
+    Object.entries(CASH_DATA.cash).forEach(([b,c])=>{
+      const cashEur = (c.EUR||0) + toEur(c.USD||0,'USD') + toEur(c.CZK||0,'CZK');
+      if(!cashEur || cashEur<=0) return;
+      const broker=_nb(b), cat=_catOf(broker, null);
+      out.push({ name:'Cash / dépôt — '+broker, ticker:'', cat, broker, valEur:Math.round(cashEur) });
+    });
+  }
+  // 3) Obligations non cotées (capital restant)
   const today = new Date().toISOString().slice(0,10);
   (typeof OBLIG_DATA!=='undefined'?OBLIG_DATA:[]).forEach(p=>{
     const val = (typeof obCapRestEur==='function') ? obCapRestEur(p, today) : (p.montant||0);
