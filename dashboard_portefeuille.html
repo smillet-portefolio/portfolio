@@ -8432,7 +8432,7 @@ function renderPortfolio() {
       <td style="padding:8px 10px;font-size:11px;color:var(--text2)">${row.brokers || '—'}</td>
       <td style="padding:8px 14px;font-size:10px;color:var(--text2);font-family:'DM Mono',monospace">${row.isin||'—'}</td>
       <td style="padding:8px 14px;font-size:11px;font-family:'DM Mono',monospace">${row.ticker}</td>
-      <td style="padding:8px 14px;text-align:right;font-family:'DM Mono',monospace">${fmtF(row.qty)}</td>
+      <td style="padding:8px 14px;text-align:right;font-family:'DM Mono',monospace">${row.qty==null?'—':Number(row.qty).toLocaleString('fr',{maximumFractionDigits:8})}</td>
       <td style="padding:8px 14px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${fmtF(row.pxRevient)} €</td>
       <td style="padding:8px 14px;text-align:right;font-family:'DM Mono',monospace">${fmt(row.costEur)} €</td>
       <td style="padding:8px 14px;text-align:right;font-family:'DM Mono',monospace">${row.valEur != null ? fmt(row.valEur)+' €' : '—'}</td>
