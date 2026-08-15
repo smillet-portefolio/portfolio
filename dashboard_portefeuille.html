@@ -1993,39 +1993,33 @@ function renderDashboard() {
   });
   pfByCat['Obligations non cotées'] = (pfByCat['Obligations non cotées'] || 0) + obligCapRest;
 
-  // ── Détail par item pour les modales de clic sur les donuts (type / broker) ──
-  // MÊMES sources que pfByBroker ci-dessus (BOOK2 + cash + obligations) -> chaque euro
-  // du donut apparaît dans le détail. BROKER_TO_CAT/normBroker sont locaux ici, on
-  // capture donc dans renderDashboard. 'Actions & ETFs' est affiné en Actions/ETFs ;
-  // les placements KB (produits structurés/épargne saisis en OBLIG_DATA plateforme 'KB')
-  // sont catégorisés via BROKER_TO_CAT[plateforme].
+  // ── Détail par item pour le donut « Par type d'actif » (et le clic) ──────────
+  // Construit ICI, à partir des MÊMES sources que les onglets :
+  //   • instruments valorisés  -> onglet Portefeuille (valeur actuelle)
+  //   • cash converti en €      -> onglet Dépôts & Cash (une tuile 'Cash', détail/broker)
+  //   • capital restant         -> onglet Obligations non cotées
+  // BROKER_TO_CAT / normBroker sont locaux à renderDashboard. NB : on n'utilise PAS
+  // isActiveInv (qui ne garde que Action/ETF et exclurait Crypto/Épargne).
   window._dbHoldingsData = (function(){
-    // Catégorie d'un broker (pour le cash) : 'Actions & ETFs' affiné en Actions/ETFs.
-    const _catOf = (rawBroker, r) => {
-      const bc = BROKER_TO_CAT[rawBroker] || 'Actions & ETFs';
-      if (bc === 'Actions & ETFs') return ((r && r.typeInv==='ETF') || (r && typeof ETF_TICKERS!=='undefined' && ETF_TICKERS.has(r.ticker))) ? 'ETFs' : 'Actions';
-      return bc;
-    };
-    // Catégorie d'une LIGNE d'instrument par son TYPE (comme l'onglet Portefeuille) :
-    // crypto / produit structuré / épargne / obligation / ETF / action.
+    // Catégorie d'une LIGNE d'instrument par son TYPE (comme l'onglet Portefeuille),
+    // avec repli sur le broker si le Type est vide. Produits structurés et Épargne
+    // sont DEUX catégories distinctes.
     const _catOfRow = r => {
       const ti = String(r.typeInv||'').toLowerCase();
       if (ti.includes('crypto')) return 'Crypto';
-      if (ti.includes('structur') || ti.includes('pargne')) return 'Produits structurés & Épargne';
+      if (ti.includes('structur')) return 'Produits structurés';
+      if (ti.includes('pargne')) return 'Épargne';
       if (ti.includes('obligation')) return 'Obligations non cotées';
-      // Repli sur le BROKER (le donut « Par type d'actif » est basé broker) :
-      // ex. produits structurés/épargne saisis sous KB, crypto sous Ledger/Binance,
-      // même si le champ Type est vide.
       const bc = BROKER_TO_CAT[normBroker(r.broker || '—')] || 'Actions & ETFs';
       if (bc === 'Crypto') return 'Crypto';
-      if (bc === 'Produits structurés & Épargne') return 'Produits structurés & Épargne';
+      if (bc === 'Produits structurés & Épargne') return 'Épargne';   // KB sans Type = épargne
       if (bc === 'Obligations non cotées') return 'Obligations non cotées';
       if (ti === 'etf' || (typeof ETF_TICKERS!=='undefined' && ETF_TICKERS.has(r.ticker))) return 'ETFs';
       return 'Actions';
     };
     const items = [], acc = {};
+    // 1) Instruments (onglet Portefeuille) — valeur actuelle (coût si pas de prix)
     BOOK2_ROWS.forEach(r => {
-      if (!isActiveInv(r)) return;
       const info = CURRENT_PRICES[r.ticker];
       const costEur = r.costEur != null ? r.costEur : (toEur(r.cost, r.currency) || 0);
       const val = info?.price ? (toEur(r.qty*info.price, info.currency||r.currency) || costEur) : costEur;
@@ -2036,16 +2030,17 @@ function renderDashboard() {
       acc[key].valEur += val;
     });
     Object.values(acc).forEach(h => { h.valEur = Math.round(h.valEur); if (h.valEur>0) items.push(h); });
+    // 2) Cash (onglet Dépôts & Cash) — une entrée par broker, catégorie 'Cash'
     Object.entries(CASH_DATA?.cash || {}).forEach(([bb0, c]) => {
       const cashEur = (c.EUR||0) + toEur(c.USD||0,'USD') + toEur(c.CZK||0,'CZK');
       if (!cashEur || cashEur <= 0) return;
-      items.push({ name:'Cash / dépôt — '+normBroker(bb0), ticker:'', cat:_catOf(bb0, null), broker:normBroker(bb0), valEur:Math.round(cashEur) });
+      items.push({ name:'Cash — '+normBroker(bb0), ticker:'', cat:'Cash', broker:normBroker(bb0), valEur:Math.round(cashEur) });
     });
+    // 3) Obligations non cotées (onglet dédié) — capital restant
     (typeof OBLIG_DATA !== 'undefined' ? OBLIG_DATA : []).forEach(p => {
       const val = (typeof obCapRestEur==='function') ? obCapRestEur(p, today) : (p.montant||0);
       if (!val || val <= 0) return;
-      const cat = BROKER_TO_CAT[p.plateforme] || 'Obligations non cotées';
-      items.push({ name:(p.nom||p.projet||p.plateforme||'Placement'), ticker:'', cat, broker:normBroker(p.plateforme||'—'), valEur:Math.round(val) });
+      items.push({ name:(p.nom||p.projet||p.plateforme||'Obligation'), ticker:'', cat:'Obligations non cotées', broker:normBroker(p.plateforme||'—'), valEur:Math.round(val) });
     });
     return items;
   })();
@@ -2249,38 +2244,18 @@ function renderDashboard() {
     }).join(''); }
   }
 
-  // Donut par type — la catégorie 'Actions & ETFs' est séparée en 'Actions' et 'ETFs'
-  var _etfVal = 0, _actVal = 0;
-  BOOK2_ROWS.forEach(function(r) {
-    var _c = 'Actions & ETFs';
-    if (r.typeInv === 'Crypto') _c = 'Crypto';
-    else if (r.typeInv === 'Produit structuré' || r.typeInv === 'Produit structure' || r.typeInv === 'Épargne' || r.typeInv === 'Epargne') _c = 'Produits structurés & Épargne';
-    else if (r.typeInv && r.typeInv.toLowerCase().includes('obligation')) _c = 'Obligations non cotées';
-    if (_c !== 'Actions & ETFs') return;
-    var _info = CURRENT_PRICES[r.ticker];
-    var _cost = r.costEur != null ? r.costEur : (toEur(r.cost, r.currency) || 0);
-    var _val  = _info && _info.price ? (toEur(r.qty * _info.price, _info.currency || r.currency) || _cost) : _cost;
-    if (r.typeInv === 'ETF') _etfVal += _val; else _actVal += _val;
-  });
-  var _aeTot = valueByCat['Actions & ETFs'] || 0;   // valeur catégorie (instruments + cash brokers actions)
-  var _instr = _etfVal + _actVal;
-  var typeEntries = [];
-  CATS.forEach(function(c) {
-    if (c === 'Actions & ETFs') {
-      if (_instr > 0) {
-        // le cash éventuel des brokers actions est réparti au prorata Actions/ETFs
-        typeEntries.push(['ETFs',    _aeTot * _etfVal / _instr]);
-        typeEntries.push(['Actions', _aeTot * _actVal / _instr]);
-      } else if (_aeTot > 0) {
-        typeEntries.push(['Actions', _aeTot]);
-      }
-    } else if ((valueByCat[c] || 0) > 0) {
-      typeEntries.push([c, valueByCat[c]]);
-    }
-  });
-  typeEntries = typeEntries.filter(function(e) { return e[1] > 0; });
-  // Couleurs stables par libellé (Actions bleu, ETFs bleu ciel) ; tri par valeur pour aligner la palette
-  var _typeCol = { 'Actions':'#5a8dee', 'ETFs':'#38bdf8', 'Crypto':'#f59e0b', 'Produits structurés & Épargne':'#a78bfa', 'Obligations non cotées':'#4caf82' };
+  // Donut par type — construit à partir de window._dbHoldingsData (mêmes items que le
+  // détail affiché au clic). Catégories : Actions / ETFs / Produits structurés / Épargne
+  // / Crypto (onglet Portefeuille), Obligations non cotées (onglet dédié) et une tuile
+  // Cash (détail par broker au clic). Une catégorie sans ligne (valeur 0) n'apparaît pas.
+  var _typeAgg = {};
+  (window._dbHoldingsData || []).forEach(function(h){ _typeAgg[h.cat] = (_typeAgg[h.cat] || 0) + h.valEur; });
+  var _typeOrder = ['Actions', 'ETFs', 'Produits structurés', 'Épargne', 'Crypto', 'Obligations non cotées', 'Cash'];
+  var typeEntries = _typeOrder
+    .filter(function(c) { return (_typeAgg[c] || 0) > 0; })
+    .map(function(c) { return [c, _typeAgg[c]]; });
+  // Couleurs stables par libellé ; tri par valeur pour aligner la palette
+  var _typeCol = { 'Actions':'#5a8dee', 'ETFs':'#38bdf8', 'Crypto':'#f59e0b', 'Produits structurés':'#a78bfa', 'Épargne':'#c4b5fd', 'Obligations non cotées':'#4caf82', 'Cash':'#94a3b8' };
   typeEntries.sort(function(a,b) { return b[1]-a[1]; });
   makeDonut('db_donut_type', 'db_donut_type_leg', typeEntries, typeEntries.map(function(e) { return _typeCol[e[0]] || '#6b7280'; }), function(l){ window._dbShow('type', l); });
 
