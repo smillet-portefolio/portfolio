@@ -778,6 +778,11 @@
         style="padding:8px 16px;background:#2563eb;color:#fff;border:none;border-radius:var(--radius-sm);font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;font-weight:600">
         ＋ Nouvelle ligne
       </button>
+
+      <button onclick="mainCommAdd()" title="Frais UC LINXEA qui consomment des parts (réduit la quantité actuelle)"
+        style="padding:8px 16px;background:#7c3aed;color:#fff;border:none;border-radius:var(--radius-sm);font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;font-weight:600">
+        ＋ Nouvelle commission
+      </button>
     </div>
 
 
@@ -1386,7 +1391,7 @@ document.addEventListener('DOMContentLoaded', () => {
   BOOK2_ROWS.forEach(r => {
     const info = CURRENT_PRICES[r.ticker];
     if (!info?.price) return;
-    const valEur = Math.round(toEur(r.qty * info.price, info.currency || r.currency));
+    const valEur = Math.round(toEur(effCurQty(r) * info.price, info.currency || r.currency));
     if (valEur > 0) _compValMap[r.ticker] = (_compValMap[r.ticker] || 0) + valEur;
   });
 
@@ -1952,7 +1957,7 @@ function renderDashboard() {
   BOOK2_ROWS.forEach(r => {
     const info    = CURRENT_PRICES[r.ticker];
     const costEur = r.costEur != null ? r.costEur : (toEur(r.cost, r.currency) || 0);
-    const val     = info?.price ? (toEur(r.qty * info.price, info.currency || r.currency) || costEur) : costEur;
+    const val     = info?.price ? (toEur(effCurQty(r) * info.price, info.currency || r.currency) || costEur) : costEur;
 
     // Catégorie d'après typeInv
     let cat = 'Actions & ETFs';
@@ -2022,7 +2027,7 @@ function renderDashboard() {
     BOOK2_ROWS.forEach(r => {
       const info = CURRENT_PRICES[r.ticker];
       const costEur = r.costEur != null ? r.costEur : (toEur(r.cost, r.currency) || 0);
-      const val = info?.price ? (toEur(r.qty*info.price, info.currency||r.currency) || costEur) : costEur;
+      const val = info?.price ? (toEur(effCurQty(r)*info.price, info.currency||r.currency) || costEur) : costEur;
       if (!val || val <= 0) return;
       const bb = normBroker(r.broker || '—');
       const key = (r.ticker||r.name)+'|'+bb;
@@ -2309,11 +2314,11 @@ function renderDashboard() {
     const t = r.ticker;
     if (!riskMap[t]) riskMap[t] = { name: r.name, ticker: t, typeInv: r.typeInv||'', currency: r.currency, costEur: 0, qty: 0 };
     riskMap[t].costEur += r.costEur != null ? r.costEur : (toEur(r.cost, r.currency)||0);
-    riskMap[t].qty     += r.qty;
+    riskMap[t].qty     += effCurQty(r);
   });
   const riskRows = Object.values(riskMap).map(function(r) {
     const info    = CURRENT_PRICES[r.ticker];
-    const valEur  = info?.price ? Math.round(toEur(r.qty * info.price, info.currency || r.currency)) : r.costEur;
+    const valEur  = info?.price ? Math.round(toEur(effCurQty(r) * info.price, info.currency || r.currency)) : r.costEur;
     const pnl     = (valEur && r.costEur) ? valEur - r.costEur : null;
     const pnlPct  = (pnl != null && r.costEur > 0) ? pnl / r.costEur * 100 : null;
     return Object.assign({}, r, { valEur, pnl, pnlPct });
@@ -2604,7 +2609,7 @@ function buildGeoExposure() {
     if (!pays) return;                          // ignorer si pays inconnu
     const info = CURRENT_PRICES[r.ticker];
     if (!info?.price) return;
-    const valEur = toEur(r.qty * info.price, info.currency || r.currency);
+    const valEur = toEur(effCurQty(r) * info.price, info.currency || r.currency);
     if (!valEur || valEur <= 0) return;
     const _k = _canonPays(pays);
     payMap[_k] = (payMap[_k] || 0) + valEur;
@@ -2654,7 +2659,7 @@ function _expoBreakdown(kind, scope, label){
       if(ETF_TICKERS.has(r.ticker)) return;
       if(!isActiveInv(r)) return;
       const info = CURRENT_PRICES[r.ticker]; if(!info || !info.price) return;
-      const v = toEur(r.qty*info.price, info.currency||r.currency);
+      const v = toEur(effCurQty(r)*info.price, info.currency||r.currency);
       if(!v || v<=0) return;
       const ok = (kind==='sect') ? (DIRECT_SECTOR[r.ticker]===label)
                                   : _geoLabelCovers(label, DIRECT_COUNTRY[r.ticker]);
@@ -2749,7 +2754,7 @@ function buildSectExposure() {
     if (!sect) return;
     const info = CURRENT_PRICES[r.ticker];
     if (!info?.price) return;
-    const valEur = toEur(r.qty * info.price, info.currency || r.currency);
+    const valEur = toEur(effCurQty(r) * info.price, info.currency || r.currency);
     if (!valEur || valEur <= 0) return;
     actMap[sect] = (actMap[sect] || 0) + valEur;
   });
@@ -2781,7 +2786,7 @@ function _equityKpis() {
     const t = r.ticker;
     if (!map[t]) map[t] = { ticker:t, qty:0, costEur:0, currency:r.currency };
     const eur = r.costEur != null ? r.costEur : (toEur(r.cost, r.currency)||0);
-    map[t].qty += r.qty; map[t].costEur += Math.round(eur);
+    map[t].qty += effCurQty(r); map[t].costEur += Math.round(eur);
   });
   let totCost=0, totVal=0, nGain=0, nLoss=0, nLines=0, hasPrices=false;
   Object.values(map).forEach(row => {
@@ -3019,7 +3024,7 @@ function renderPosChart() {
     if (!isActiveInv(r)) return;
     const info   = CURRENT_PRICES[r.ticker];
     const valEur = info?.price != null
-      ? Math.round(toEur(r.qty * info.price, info.currency || r.currency))
+      ? Math.round(toEur(effCurQty(r) * info.price, info.currency || r.currency))
       : (r.costEur != null ? Math.round(r.costEur) : 0);
     if (!map[r.ticker]) {
       const isETF = ETF_TICKERS.has(r.ticker);
@@ -3245,7 +3250,7 @@ function buildEffData() {
     if (!isActiveInv(r)) return;
     const info   = CURRENT_PRICES[r.ticker];
     const valEur = info?.price != null
-      ? Math.round(toEur(r.qty * info.price, info.currency || r.currency))
+      ? Math.round(toEur(effCurQty(r) * info.price, info.currency || r.currency))
       : (r.costEur != null ? Math.round(r.costEur) : 0);
     if (!directMap[r.ticker]) directMap[r.ticker] = { v: 0, l: r.name || r.ticker };
     directMap[r.ticker].v += valEur;
@@ -3524,12 +3529,13 @@ function refreshEditerTotals() {
     c += costEur || 0;
     const info = CURRENT_PRICES[r.ticker];
     if (info && info.price) {
-      const valEur = toEur(r.qty * info.price, info.currency || r.currency);
+      const valEur = toEur(effCurQty(r) * info.price, info.currency || r.currency);
       if (valEur != null) { v += valEur; hasVal = true; if (costEur != null) p += valEur - costEur; }
     }
     const fc = r.commCur || r.currency || 'EUR';
     if (r.comm) comm += (fc === 'EUR' ? r.comm : (toEur(r.comm, fc) || r.comm));
     if (r.taxe) taxe += (fc === 'EUR' ? r.taxe : (toEur(r.taxe, fc) || r.taxe));
+    const _uc = mainCommAgg(r._id).coutEur; if (_uc) comm += _uc;   // frais UC (parts prélevées)
   });
   const fmtT = n => Math.round(n).toLocaleString('fr') + ' €';
   const set = (id, txt, col) => { const e = document.getElementById(id); if (e) { e.textContent = txt; e.style.fontWeight = '700'; if (col !== undefined) e.style.color = col; } };
@@ -3543,7 +3549,131 @@ function refreshEditerTotals() {
   set('totTaxe', taxe > 0 ? fmtT(taxe) : '—', 'var(--text2)');
 }
 
+// ── Commissions UC (frais qui consomment des parts) — lignes LINXEA ───────────
+// Même mécanisme que les commissions enfants (KIDS_COMM) : chaque commission prélève
+// des parts (qty) à une VL (px). La quantité ACTUELLE = quantité achetée − Σ parts
+// prélevées ; le coût € des parts consommées s'ajoute aux frais de la ligne. La
+// déduction s'applique PARTOUT via effCurQty(r) (valorisations), donc réduit la
+// valeur de la position dans tout le dashboard. r.qty reste la quantité ACHETÉE.
+var MAIN_COMM = (function(){ try{ var a=JSON.parse(localStorage.getItem('book2_comm')); return Array.isArray(a)?a:[]; }catch(e){ return []; } })();
+window.MAIN_COMM = MAIN_COMM;
+try{ ensureBook2Ids(); }catch(e){}   // _id dès le chargement (avant tout rendu du dashboard)
+function mainToEur(amt,cur){ cur=cur||'EUR'; if(amt==null) return null; if(cur==='EUR') return amt; if(typeof toEur==='function'){ var r=toEur(amt,cur); if(r!=null) return r; } return amt; }
+function mainCommAgg(id){ var q=0,cEur=0; (MAIN_COMM||[]).forEach(function(cm){ if(cm && cm.hid===id){ q+=(+cm.qty||0); var cd=(cm.cout!=null)?+cm.cout:((+cm.qty||0)*(+cm.px||0)); cEur+=mainToEur(cd,cm.devise||'EUR')||0; } }); return {qty:q, coutEur:cEur}; }
+// Quantité effective (actuelle) d'une ligne = achetée − parts prélevées par commissions.
+function effCurQty(r){ if(!r) return 0; var base=(r.qty!=null?+r.qty:0); if(!r._id || typeof MAIN_COMM==='undefined' || !MAIN_COMM || !MAIN_COMM.length) return base; return base - mainCommAgg(r._id).qty; }
+function mainCommSave(){ try{ localStorage.setItem('book2_comm', JSON.stringify(MAIN_COMM)); }catch(e){} try{ if(typeof BOOK2_ROWS!=='undefined') localStorage.setItem('book2_all_rows', JSON.stringify(BOOK2_ROWS)); }catch(e){} window.MAIN_COMM=MAIN_COMM; }
+// Recharge MAIN_COMM depuis localStorage (après un chargement Google Sheets) + re-render.
+function mainCommReload(){ try{ var a=JSON.parse(localStorage.getItem('book2_comm')); MAIN_COMM = Array.isArray(a)?a:[]; }catch(e){ MAIN_COMM=[]; } window.MAIN_COMM=MAIN_COMM; ensureBook2Ids(); }
+// _id stables sur les lignes BOOK2 (persistés dans book2_all_rows), pour rattacher les commissions.
+function ensureBook2Ids(){ try{ if(typeof BOOK2_ROWS!=='undefined'){ BOOK2_ROWS.forEach(function(r){ if(r && !r._id) r._id='b2_'+Math.random().toString(36).slice(2,10); }); } }catch(e){} }
+function _linxeaRows(){ ensureBook2Ids(); return (typeof BOOK2_ROWS!=='undefined'?BOOK2_ROWS:[]).map(function(r,i){ return {r:r,i:i}; }).filter(function(o){ return String(o.r.broker||'').toUpperCase()==='LINXEA'; }); }
+
+// ── Modale « Nouvelle commission » (frais UC) pour les lignes LINXEA ───────────
+const _mfi   = "width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px;outline:none";
+const _mfiRO = _mfi + ";background:var(--bg2);color:var(--text2)";
+function _mcRO(id,label){ return `<div><label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">${label}</label><input id="${id}" type="text" readonly style="${_mfiRO}"></div>`; }
+function _mcIn(id,label,type,attrs){ return `<div><label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">${label}</label><input id="${id}" type="${type||'text'}" ${attrs||''} style="${_mfi}"></div>`; }
+function _mcLine(){ const id=(document.getElementById('mc_line')||{}).value; return (typeof BOOK2_ROWS!=='undefined'?BOOK2_ROWS:[]).find(function(r){ return r._id===id; })||null; }
+function mainCommEnsure(){
+  if(document.getElementById('mainCommModal')) return;
+  const m=document.createElement('div');
+  m.id='mainCommModal';
+  m.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:20px';
+  m.innerHTML=`<div class="card" style="max-width:660px;width:100%;max-height:90vh;overflow:auto;padding:22px">
+      <h3 style="font-size:15px;font-weight:700;margin-bottom:6px">Nouvelle commission (frais UC — LINXEA)</h3>
+      <p class="section-desc" style="margin-bottom:14px;font-size:12px">Les frais prélèvent des parts : le coût s'ajoute aux frais de la ligne et réduit la quantité actuelle (et la valeur) partout dans le dashboard.</p>
+      <div style="margin-bottom:12px">
+        <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">Ligne d'investissement LINXEA concernée</label>
+        <select id="mc_line" onchange="mainCommLineChange()" style="${_mfi}"></select>
+      </div>
+      <div id="mainCommForm" style="display:grid;grid-template-columns:1fr 1fr;gap:10px"></div>
+      <div id="mainCommHist" style="margin-top:16px"></div>
+      <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end">
+        <button onclick="mainCommModalClose()" style="padding:8px 16px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;cursor:pointer">Fermer</button>
+        <button onclick="mainCommSaveEntry()" style="padding:8px 16px;background:#7c3aed;border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:600;cursor:pointer">💾 Ajouter la commission</button>
+      </div>
+    </div>`;
+  m.addEventListener('click', function(e){ if(e.target===m) m.style.display='none'; });
+  document.body.appendChild(m);
+}
+window.mainCommModalClose=function(){ const m=document.getElementById('mainCommModal'); if(m) m.style.display='none'; };
+window.mainCommAdd=function(){
+  mainCommEnsure();
+  const lines=_linxeaRows();
+  if(!lines.length){ alert('Aucune ligne LINXEA à sélectionner. Les commissions UC ne s\'appliquent qu\'aux lignes dont le broker est LINXEA.'); return; }
+  const sel=document.getElementById('mc_line');
+  if(sel) sel.innerHTML=lines.map(function(o){ return `<option value="${o.r._id}">${o.r.name||'(sans nom)'}${o.r.isin?' · '+o.r.isin:''}</option>`; }).join('');
+  document.getElementById('mainCommForm').innerHTML =
+      _mcRO('mc_broker','Broker') + _mcRO('mc_nom','Nom') + _mcRO('mc_isin','ISIN') + _mcRO('mc_ticker','Ticker')
+    + _mcIn('mc_date','Date commission','date','') + _mcRO('mc_devise','Devise')
+    + _mcIn('mc_qty','Qté (parts prélevées)','number','step="any" oninput="mainCommRecalc()"')
+    + _mcIn('mc_px','Prix (VL unitaire)','number','step="any" oninput="mainCommRecalc()"')
+    + _mcRO('mc_coutDev','Coût total (devise)') + _mcRO('mc_coutEur','Coût total (€)');
+  document.getElementById('mainCommModal').style.display='flex';
+  mainCommLineChange();
+};
+window.mainCommLineChange=function(){
+  const r=_mcLine()||{};
+  const sv=function(fid,v){ const e=document.getElementById(fid); if(e) e.value=(v!=null?v:''); };
+  sv('mc_broker',r.broker); sv('mc_nom',r.name); sv('mc_isin',r.isin); sv('mc_ticker',r.ticker); sv('mc_devise',r.currency||'EUR');
+  mainCommRecalc(); mainCommHistRender((document.getElementById('mc_line')||{}).value);
+};
+window.mainCommRecalc=function(){
+  const gn=function(fid){ const e=document.getElementById(fid); const v=e?e.value:''; return v===''?null:parseFloat(String(v).replace(',','.')); };
+  const q=gn('mc_qty'), px=gn('mc_px'); const dev=((document.getElementById('mc_devise')||{}).value)||'EUR';
+  const cd=(q!=null&&px!=null)?q*px:null; const ce=(cd!=null)?mainToEur(cd,dev):null;
+  const a=document.getElementById('mc_coutDev'); if(a) a.value=(cd!=null?Math.round(cd*100)/100+' '+dev:'');
+  const b=document.getElementById('mc_coutEur'); if(b) b.value=(ce!=null?Math.round(ce*100)/100+' €':'');
+};
+window.mainCommHistRender=function(id){
+  const box=document.getElementById('mainCommHist'); if(!box) return;
+  const recs=(MAIN_COMM||[]).map(function(cm,idx){ return {cm:cm,idx:idx}; }).filter(function(o){ return o.cm && o.cm.hid===id; });
+  if(!recs.length){ box.innerHTML='<div style="font-size:11px;color:var(--text3)">Aucune commission enregistrée pour cette ligne.</div>'; return; }
+  const batches={};
+  recs.forEach(function(o){ const b=o.cm.batch||('i'+o.idx); if(!batches[b]) batches[b]={date:o.cm.date,devise:o.cm.devise||'EUR',qty:0,cost:0,batch:o.cm.batch||null,idx:o.idx}; batches[b].qty+=(+o.cm.qty||0); batches[b].cost+=((o.cm.cout!=null)?+o.cm.cout:((+o.cm.qty||0)*(+o.cm.px||0))); });
+  const rows=Object.values(batches).sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); });
+  box.innerHTML='<div style="font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:600">Commissions enregistrées</div>'
+    +'<table style="width:100%;font-size:11px;border-collapse:collapse">'
+    +'<tr style="color:var(--text2)"><th style="padding:3px 6px;text-align:left">Date</th><th style="padding:3px 6px;text-align:right">Qté prélevée</th><th style="padding:3px 6px;text-align:right">Coût</th><th></th></tr>'
+    +rows.map(function(r){ return `<tr style="border-top:1px solid var(--border)"><td style="padding:3px 6px">${r.date||'—'}</td><td style="padding:3px 6px;text-align:right;font-family:'DM Mono',monospace">${r.qty.toLocaleString('fr',{maximumFractionDigits:8})}</td><td style="padding:3px 6px;text-align:right;font-family:'DM Mono',monospace">${Math.round(r.cost).toLocaleString('fr')} ${r.devise}</td><td style="padding:3px 6px;text-align:right"><button onclick="${r.batch?`mainCommDelBatch('${r.batch}')`:`mainCommDel(${r.idx})`}" title="Supprimer" style="background:none;border:none;cursor:pointer;color:#e06c6c">🗑</button></td></tr>`; }).join('')
+    +'</table>';
+};
+window.mainCommSaveEntry=function(){
+  const r=_mcLine(); if(!r){ alert('Ligne introuvable.'); return; }
+  const gn=function(fid){ const e=document.getElementById(fid); const v=e?e.value:''; return v===''?null:parseFloat(String(v).replace(',','.')); };
+  const gv=function(fid){ const e=document.getElementById(fid); return e?e.value:''; };
+  const q=gn('mc_qty'), px=gn('mc_px'), dev=((document.getElementById('mc_devise')||{}).value)||'EUR';
+  if(q==null||q<=0){ alert('Indique une quantité de parts prélevées (> 0).'); return; }
+  if(px==null){ alert('Indique le prix (VL) de la part.'); return; }
+  const date=gv('mc_date');
+  const batch='mcb'+Math.random().toString(36).slice(2,9);
+  MAIN_COMM.push({ hid:r._id, batch:batch, broker:r.broker, nom:r.name, isin:r.isin, ticker:r.ticker, date:date, devise:dev, qty:q, px:px, cout:q*px, coutEur:mainToEur(q*px,dev) });
+  mainCommSave();
+  const rq=document.getElementById('mc_qty'); if(rq) rq.value='';
+  const rp=document.getElementById('mc_px'); if(rp) rp.value='';
+  mainCommRecalc(); mainCommHistRender(r._id); mainCommRefresh();
+};
+window.mainCommDelBatch=function(batch){
+  if(!confirm('Supprimer cette commission ?')) return;
+  const ref=(MAIN_COMM||[]).find(function(cm){ return cm.batch===batch; });
+  const hid=ref?ref.hid:((document.getElementById('mc_line')||{}).value);
+  MAIN_COMM = (MAIN_COMM||[]).filter(function(cm){ return cm.batch!==batch; });
+  mainCommSave(); mainCommHistRender(hid); mainCommRefresh();
+};
+window.mainCommDel=function(idx){
+  if(!MAIN_COMM[idx]) return; if(!confirm('Supprimer cette commission ?')) return;
+  const hid=MAIN_COMM[idx].hid;
+  MAIN_COMM.splice(idx,1); mainCommSave(); mainCommHistRender(hid); mainCommRefresh();
+};
+function mainCommRefresh(){
+  try{ if(typeof buildPosTable==='function') buildPosTable(true); }catch(e){}
+  try{ if(typeof refreshEditerTotals==='function') refreshEditerTotals(); }catch(e){}
+  try{ if(typeof renderDashboard==='function') renderDashboard(); }catch(e){}
+}
+
 function buildPosTable(rebuild) {
+  ensureBook2Ids();
   const tbody = document.getElementById('posTableBody');
   if (!tbody) return;
   if (!rebuild && tbody.children.length > 0) return;
@@ -3553,7 +3683,7 @@ function buildPosTable(rebuild) {
     const info     = CURRENT_PRICES[r.ticker];
     const costEur  = r.costEur != null ? r.costEur : toEur(r.cost, r.currency);
     const pxActuel = info?.price ?? null;
-    const valEur   = pxActuel != null ? toEur(r.qty * pxActuel, info.currency || r.currency) : null;
+    const valEur   = pxActuel != null ? toEur(effCurQty(r) * pxActuel, info.currency || r.currency) : null;
     const pnl      = valEur != null && costEur != null ? valEur - costEur : null;
     const pnlPct   = pnl != null && costEur > 0 ? pnl / costEur * 100 : null;
     return {
@@ -3566,6 +3696,7 @@ function buildPosTable(rebuild) {
       valEur, pnl, pnlPct,
       typeInv: r.typeInv || '',
       comm: (r.comm!=null?r.comm:null), taxe: (r.taxe!=null?r.taxe:null),
+      qtyCur: effCurQty(r), commUcEur: mainCommAgg(r._id).coutEur,
       _r: r,
     };
   });
@@ -3621,11 +3752,11 @@ function buildPosTable(rebuild) {
       <td style="font-size:11px;color:var(--text2);padding:6px 14px">${r.broker}</td>
       <td style="font-size:11px;color:var(--text2);padding:6px 14px">${r.date}</td>
       <td style="padding:6px 14px"><span style="font-size:10px;font-weight:600;padding:2px 5px;border-radius:3px;background:var(--bg3);border:1px solid var(--border)">${r.currency}</span></td>
-      <td class="mono" style="text-align:right;padding:6px 14px">${Number(r.qty).toLocaleString('fr',{maximumFractionDigits:8})}</td>
+      <td class="mono" style="text-align:right;padding:6px 14px"${(row.qtyCur!=null && Math.abs(row.qtyCur-Number(r.qty))>1e-9)?` title="Qté achetée : ${Number(r.qty).toLocaleString('fr',{maximumFractionDigits:8})} (parts prélevées par commissions UC)"`:''}>${Number(row.qtyCur!=null?row.qtyCur:r.qty).toLocaleString('fr',{maximumFractionDigits:8})}</td>
       <td class="mono" style="text-align:right;padding:6px 14px">${fmtN(r.pxAchat)}</td>
       <td class="mono" style="text-align:right;padding:6px 14px">${Math.round(r.cost).toLocaleString('fr')} ${r.currency}</td>
       <td id="costeur-${i}" class="mono" style="text-align:right;padding:6px 14px;color:var(--text2)">${row.costEur ? Math.round(row.costEur).toLocaleString('fr') + ' €' : '—'}</td>
-      <td class="mono" style="text-align:right;padding:6px 14px;color:var(--text2)">${row.comm!=null?Math.round(row.comm).toLocaleString('fr')+' '+({EUR:'€',USD:'$',GBP:'£',CZK:'Kč'}[r.commCur||r.currency]||r.commCur||r.currency||'€'):'—'}</td>
+      <td class="mono" style="text-align:right;padding:6px 14px;color:var(--text2)"${row.commUcEur>0?` title="dont ${Math.round(row.commUcEur).toLocaleString('fr')} € de frais UC (parts prélevées)"`:''}>${row.commUcEur>0 ? (Math.round(((row.comm!=null?(mainToEur(row.comm, r.commCur||r.currency)||0):0)+row.commUcEur))).toLocaleString('fr')+' €' : (row.comm!=null?Math.round(row.comm).toLocaleString('fr')+' '+({EUR:'€',USD:'$',GBP:'£',CZK:'Kč'}[r.commCur||r.currency]||r.commCur||r.currency||'€'):'—')}</td>
       <td class="mono" style="text-align:right;padding:6px 14px;color:var(--text2)">${row.taxe!=null?Math.round(row.taxe).toLocaleString('fr')+' '+({EUR:'€',USD:'$',GBP:'£',CZK:'Kč'}[r.commCur||r.currency]||r.commCur||r.currency||'€'):'—'}</td>
       <td id="px-${i}"      class="mono" style="text-align:right;padding:6px 14px;color:var(--text2)">${row.pxActuel != null ? fmtN(row.pxActuel) : '—'}</td>
       <td id="val-${i}"     class="mono" style="text-align:right;padding:6px 14px;color:var(--text2)">${fmtE(row.valEur)}</td>
@@ -5011,7 +5142,7 @@ const GS_API_BASE  = 'https://sheets.googleapis.com/v4/spreadsheets';
 let _gsToken = null;
 
 const GS_KEYS = [
-  'book2_extra_rows','book2_all_rows','book2_overrides',
+  'book2_extra_rows','book2_all_rows','book2_overrides','book2_comm',
   'sold_rows','closed_positions',
   'portfolio_prices','portfolio_variations','portfolio_fx',
   'cash_data','oblig_data','dividend_data','conseq_data','conseq_detail_extra','conseq_detail_del',
@@ -5032,7 +5163,7 @@ const GS_KEYS = [
 // ==============================================================================
 const GS_AUTOSAVE_SET = new Set(GS_KEYS);
 const GS_USER_SET = new Set([
-  'book2_extra_rows','book2_all_rows','book2_overrides',
+  'book2_extra_rows','book2_all_rows','book2_overrides','book2_comm',
   'sold_rows','closed_positions','cash_data','oblig_data','dividend_data','conseq_data','conseq_detail_extra','conseq_detail_del',
   'direct_sector_overrides'
 ]);
@@ -5646,7 +5777,7 @@ function getTodayEvoRow() {
   BOOK2_ROWS.forEach(r => {
     const info    = CURRENT_PRICES[r.ticker];
     const costEur = r.costEur != null ? r.costEur : (toEur(r.cost, r.currency) || 0);
-    const val     = info?.price ? (toEur(r.qty * info.price, info.currency || r.currency) || costEur) : costEur;
+    const val     = info?.price ? (toEur(effCurQty(r) * info.price, info.currency || r.currency) || costEur) : costEur;
     const b = normBroker(r.broker || '—');
     pfByBroker[b] = (pfByBroker[b] || 0) + val;
   });
@@ -8231,7 +8362,7 @@ function renderPortfolio() {
     const t = r.ticker;
     if (!map[t]) map[t] = { name:r.name, isin:r.isin||'', ticker:t, qty:0, costEur:0, currency:r.currency, typeInv:r.typeInv||'', brokers:new Set() };
     const eur = r.costEur != null ? r.costEur : (toEur(r.cost, r.currency)||0);
-    map[t].qty     += r.qty;
+    map[t].qty     += effCurQty(r);
     map[t].costEur += Math.round(eur);
     if (r.isin && r.isin.length > 5) map[t].isin = r.isin;
     if (r.typeInv) map[t].typeInv = r.typeInv;
@@ -8355,7 +8486,7 @@ function renderRisques() {
     const t = r.ticker;
     if (!map[t]) map[t] = { name:r.name, ticker:t, qty:0, costEur:0, currency:r.currency };
     const eur = r.costEur != null ? r.costEur : (toEur(r.cost, r.currency)||0);
-    map[t].qty     += r.qty;
+    map[t].qty     += effCurQty(r);
     map[t].costEur += Math.round(eur);
   });
 
@@ -8673,7 +8804,7 @@ function _aeBuildRows() {
       };
     }
     const eur = r.costEur != null ? r.costEur : (toEur(r.cost, r.currency) || 0);
-    map[key].qty      += r.qty;
+    map[key].qty      += effCurQty(r);
     map[key].costEur  += eur;
     map[key].pxQtySum += (r.pxAchat || 0) * r.qty;
   });
@@ -9069,7 +9200,7 @@ function renderActions() {
     const t = r.ticker;
     if (!map[t]) map[t] = { name:r.name, ticker:t, qty:0, costEur:0, currency:r.currency, purchases:[] };
     const eur = r.costEur != null ? r.costEur : (toEur(r.cost, r.currency)||0);
-    map[t].qty     += r.qty;
+    map[t].qty     += effCurQty(r);
     map[t].costEur += Math.round(eur);
     map[t].purchases.push({ date:r.date, qty:r.qty, px:r.pxAchat });
   });
@@ -10066,7 +10197,7 @@ function renderETFValues() {
     if (r.typeInv && r.typeInv !== 'ETF') return;
     if (!map[r.ticker]) map[r.ticker] = { ticker:r.ticker, qty:0, costEur:0, currency:r.currency };
     const eur = r.costEur != null ? r.costEur : (toEur(r.cost, r.currency)||0);
-    map[r.ticker].qty     += r.qty;
+    map[r.ticker].qty     += effCurQty(r);
     map[r.ticker].costEur += Math.round(eur);
   });
 
@@ -10315,7 +10446,7 @@ function exportCSV() {
     let px = null, val = null, pnl = null, pct = null;
 
     if (info?.price) {
-      const v   = toEur(r.qty * info.price, info.currency || r.currency);
+      const v   = toEur(effCurQty(r) * info.price, info.currency || r.currency);
       const p   = v - (costEur || 0);
       px  = info.price;
       val = Math.round(v);
