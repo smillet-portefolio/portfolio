@@ -2000,10 +2000,28 @@ function renderDashboard() {
   // les placements KB (produits structurés/épargne saisis en OBLIG_DATA plateforme 'KB')
   // sont catégorisés via BROKER_TO_CAT[plateforme].
   window._dbHoldingsData = (function(){
+    // Catégorie d'un broker (pour le cash) : 'Actions & ETFs' affiné en Actions/ETFs.
     const _catOf = (rawBroker, r) => {
       const bc = BROKER_TO_CAT[rawBroker] || 'Actions & ETFs';
       if (bc === 'Actions & ETFs') return ((r && r.typeInv==='ETF') || (r && typeof ETF_TICKERS!=='undefined' && ETF_TICKERS.has(r.ticker))) ? 'ETFs' : 'Actions';
       return bc;
+    };
+    // Catégorie d'une LIGNE d'instrument par son TYPE (comme l'onglet Portefeuille) :
+    // crypto / produit structuré / épargne / obligation / ETF / action.
+    const _catOfRow = r => {
+      const ti = String(r.typeInv||'').toLowerCase();
+      if (ti.includes('crypto')) return 'Crypto';
+      if (ti.includes('structur') || ti.includes('pargne')) return 'Produits structurés & Épargne';
+      if (ti.includes('obligation')) return 'Obligations non cotées';
+      // Repli sur le BROKER (le donut « Par type d'actif » est basé broker) :
+      // ex. produits structurés/épargne saisis sous KB, crypto sous Ledger/Binance,
+      // même si le champ Type est vide.
+      const bc = BROKER_TO_CAT[normBroker(r.broker || '—')] || 'Actions & ETFs';
+      if (bc === 'Crypto') return 'Crypto';
+      if (bc === 'Produits structurés & Épargne') return 'Produits structurés & Épargne';
+      if (bc === 'Obligations non cotées') return 'Obligations non cotées';
+      if (ti === 'etf' || (typeof ETF_TICKERS!=='undefined' && ETF_TICKERS.has(r.ticker))) return 'ETFs';
+      return 'Actions';
     };
     const items = [], acc = {};
     BOOK2_ROWS.forEach(r => {
@@ -2014,7 +2032,7 @@ function renderDashboard() {
       if (!val || val <= 0) return;
       const bb = normBroker(r.broker || '—');
       const key = (r.ticker||r.name)+'|'+bb;
-      if (!acc[key]) acc[key] = { name:r.name||r.ticker, ticker:r.ticker||'', cat:_catOf(bb,r), broker:bb, valEur:0 };
+      if (!acc[key]) acc[key] = { name:r.name||r.ticker, ticker:r.ticker||'', cat:_catOfRow(r), broker:bb, valEur:0 };
       acc[key].valEur += val;
     });
     Object.values(acc).forEach(h => { h.valEur = Math.round(h.valEur); if (h.valEur>0) items.push(h); });
