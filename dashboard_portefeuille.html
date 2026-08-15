@@ -2677,7 +2677,14 @@ window._expoShow = function(kind, scope, label){
 // ── Détail des donuts du Dashboard (par type d'actif / par broker) ────────────
 function _dbHoldings(){
   const out = [], acc = {};
-  const _nb = b => (typeof normBroker==='function') ? normBroker(b||'—') : ((b==='KB obligations')?'KB':(b||'—'));
+  // Normalisation autonome (normBroker est local à renderDashboard, hors de portée ici) :
+  // KB* -> KB, BINANCE -> Binance, ledger -> Ledger, etc. pour matcher BROKER_TO_CAT.
+  const _nb = b => {
+    b = String(b==null ? '—' : b);
+    if (b.toUpperCase().startsWith('KB')) return 'KB';
+    const _m = { 'ledger':'Ledger', 'binance':'Binance', 'trading 212':'TRADING 212', 'trading 212 jito':'TRADING 212 JITO' };
+    return _m[b.toLowerCase()] || b;
+  };
   const _isEtf = r => (r && (r.typeInv==='ETF')) || (r && typeof ETF_TICKERS!=='undefined' && ETF_TICKERS.has(r.ticker));
   // Catégorie = celle du DONUT : par broker (BROKER_TO_CAT), et 'Actions & ETFs' est
   // affiné en 'Actions'/'ETFs' selon le type de l'instrument.
