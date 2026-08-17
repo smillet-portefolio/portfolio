@@ -3476,6 +3476,26 @@ const BOOK2_ROWS = [
     if (changed) localStorage.setItem('book2_extra_rows', JSON.stringify(extra));
   } catch(e) {}
 
+  // ── Corriger le ticker Invesco MSCI World : lettre O -> zéro (SC0J.DE) ───────
+  // Le symbole coté est SC0J.DE (chiffre 0). Une saisie « SCOJ.DE » (lettre O) casse
+  // le rattachement prix / composition / TER / indice. On canonicalise via l'ISIN.
+  (function(){
+    const fixTk = r => {
+      if (!r) return false;
+      if (r.ticker === 'SCOJ.DE' || (String(r.isin||'').toUpperCase() === 'IE00B60SX394' && r.ticker !== 'SC0J.DE')) { r.ticker = 'SC0J.DE'; return true; }
+      return false;
+    };
+    BOOK2_ROWS.forEach(fixTk);
+    try {
+      const saved = JSON.parse(localStorage.getItem('book2_all_rows') || '[]');
+      let ch = false; saved.forEach(r => { if (fixTk(r)) ch = true; });
+      if (ch) localStorage.setItem('book2_all_rows', JSON.stringify(saved));
+      const extra2 = JSON.parse(localStorage.getItem('book2_extra_rows') || '[]');
+      let ch2 = false; extra2.forEach(r => { if (fixTk(r)) ch2 = true; });
+      if (ch2) localStorage.setItem('book2_extra_rows', JSON.stringify(extra2));
+    } catch(e){}
+  })();
+
   // ── Restaurer les secteurs auto-détectés ──────────────────────────────────
   try {
     const saved = JSON.parse(localStorage.getItem('direct_sector_overrides') || '{}');
