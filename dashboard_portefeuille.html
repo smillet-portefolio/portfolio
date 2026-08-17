@@ -3897,6 +3897,8 @@ function restorePersistedPrices() {
     const savedDate = localStorage.getItem('portfolio_prices_date');
 
     Object.assign(CURRENT_PRICES, prices);
+    // Alias O/0 : cours publié sous 'SCOJ.DE' (lettre O) -> aussi 'SC0J.DE' (zéro).
+    if (CURRENT_PRICES['SCOJ.DE'] && !CURRENT_PRICES['SC0J.DE']) CURRENT_PRICES['SC0J.DE'] = { ...CURRENT_PRICES['SCOJ.DE'], source:'alias' };
     try {
       const sv = JSON.parse(localStorage.getItem('portfolio_variations') || '{}');
       if (sv && Object.keys(sv).length) Object.assign(CURRENT_VARIATIONS, sv);
@@ -5526,6 +5528,9 @@ async function gsLoadPrices() {
       CURRENT_PRICES[t] = { ...priceMap[t], source: 'gsheets' };
       if (varMap[t]) CURRENT_VARIATIONS[t] = varMap[t];
     });
+    // Alias O/0 : un cours publié sous 'SCOJ.DE' (lettre O) alimente aussi 'SC0J.DE' (zéro).
+    if (CURRENT_PRICES['SCOJ.DE'] && !CURRENT_PRICES['SC0J.DE']) CURRENT_PRICES['SC0J.DE'] = { ...CURRENT_PRICES['SCOJ.DE'], source:'alias' };
+    if (typeof CURRENT_VARIATIONS!=='undefined' && CURRENT_VARIATIONS['SCOJ.DE'] && !CURRENT_VARIATIONS['SC0J.DE']) CURRENT_VARIATIONS['SC0J.DE'] = CURRENT_VARIATIONS['SCOJ.DE'];
     if (typeof gsApplyConseqNav === 'function') gsApplyConseqNav();
 
     const portfolioTickers = [...new Set(BOOK2_ROWS.map(r => r.ticker))];
