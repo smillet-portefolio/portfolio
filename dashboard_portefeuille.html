@@ -712,7 +712,11 @@
 
     <!-- ── Composition complète ────────────────────────────────────────── -->
     <div id="etf_comp" class="sub-section">
-      <p class="section-desc" style="margin-bottom:14px">Données chargées depuis Google Sheets (onglets ETF_Country, ETF_Sector, ETF_Top10).</p>
+      <p class="section-desc" style="margin-bottom:8px">Données chargées depuis Google Sheets (onglets ETF_Country, ETF_Sector, ETF_Top10).</p>
+      <div style="margin-bottom:14px">
+        <button onclick="gsForceReloadETFComp()" title="Forcer un rechargement des compositions depuis Google Sheets (ignore le cache de session)"
+          style="padding:7px 14px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">🔄 Recharger depuis Google Sheets</button>
+      </div>
       <div class="sub-tabs" style="margin-bottom:14px">
         <button class="sub-tab active" onclick="swCompTab('comp_geo',this)" id="btn_comp_geo">Géographie</button>
         <button class="sub-tab" onclick="swCompTab('comp_sec',this)" id="btn_comp_sec">Secteurs</button>
@@ -5551,6 +5555,15 @@ async function gsLoadPrices() {
 // CHARGEMENT COMPOSITION ETF DEPUIS GOOGLE SHEETS
 // ══════════════════════════════════════════════════════════════════════════════
 
+// Force un rechargement FRAIS des compositions depuis Google Sheets (ignore le cache
+// de session _etfCompSessionLoaded), pour prendre en compte un ETF fraîchement uploadé.
+window.gsForceReloadETFComp = function(){
+  const status = document.getElementById('etfCompStatus');
+  if (!_gsToken){ if(status) status.innerHTML = '<span style="color:#f59e0b">⚠️ Connecte-toi à Google Sheets d\'abord</span>'; return; }
+  window._etfCompSessionLoaded = false;
+  if(status) status.innerHTML = '<span style="color:#60a5fa">⏳ Rechargement forcé…</span>';
+  gsLoadETFComp();
+};
 async function gsLoadETFComp() {
   _registerPortfolioETFs();
   const status = document.getElementById('etfCompStatus');
@@ -5599,7 +5612,8 @@ async function gsLoadETFComp() {
     const SEC_SKIP = new Set(['Nom','ISIN','ticker']);
 
     geoRows.forEach(row => {
-      const ticker = row['ticker'];
+      let ticker = row['ticker'];
+      { const _iso = row['ISIN'] || row['isin']; if (_iso && typeof ETF_ISIN_MAP!=='undefined' && ETF_ISIN_MAP[_iso]) ticker = ETF_ISIN_MAP[_iso]; }
       if (!ticker || !/^[A-Z0-9.]+$/.test(ticker)) return;
       const all = Object.entries(row)
         .filter(([k,v]) => !GEO_SKIP.has(k) && v != null && v !== '' && parseFloat(String(v).replace(",",".")) > 0)
@@ -5611,7 +5625,8 @@ async function gsLoadETFComp() {
     });
 
     secRows.forEach(row => {
-      const ticker = row['ticker'];
+      let ticker = row['ticker'];
+      { const _iso = row['ISIN'] || row['isin']; if (_iso && typeof ETF_ISIN_MAP!=='undefined' && ETF_ISIN_MAP[_iso]) ticker = ETF_ISIN_MAP[_iso]; }
       if (!ticker || !/^[A-Z0-9.]+$/.test(ticker)) return;
       const all = Object.entries(row)
         .filter(([k,v]) => !SEC_SKIP.has(k) && v != null && v !== '' && parseFloat(String(v).replace(",",".")) > 0)
@@ -9377,6 +9392,8 @@ const ETF_META = {
     geo:[['🇺🇸 États-Unis',67.3],['🇯🇵 Japon',5.8],['🇬🇧 Royaume-Uni',3.5]],
     sectors:[['Technologie',26.2],['Finance',14.6],['Industrie',11.0]],
     positions:[['NVIDIA Corp.',6.1],['Apple',5.0],['Microsoft',3.3]] },
+  'SC0J.DE': { name:'Invesco MSCI World',           short:'SC0J', ter:0.05, index:'MSCI World',                   type:'Cœur large',   badge:'badge-blue',
+    geo:[], sectors:[], positions:[] },
   'EMXC.DE': { name:'Amundi Emerging ex China',     short:'EMXC', ter:0.20, index:'MSCI EM ex Chine',             type:'Émergents',    badge:'badge-purple',
     geo:[['🇹🇼 Taïwan',29.7],['🇰🇷 Corée du Sud',20.6],['🇮🇳 Inde',14.8]],
     sectors:[['Technologie',39.7],['Finance',20.5],['Matériaux',6.8]],
@@ -9535,7 +9552,8 @@ function importETFComposition(file) {
 
       // Geo — store ALL values + top3 (others inclus pour que la somme = 100%)
       geoRows.forEach(row => {
-        const ticker = row['ticker'];
+        let ticker = row['ticker'];
+        { const _iso = row['ISIN'] || row['isin']; if (_iso && typeof ETF_ISIN_MAP!=='undefined' && ETF_ISIN_MAP[_iso]) ticker = ETF_ISIN_MAP[_iso]; }
         if (!ticker) return;
         const GEO_SKIP = new Set(['Nom','ISIN','ticker']);
         const all = Object.entries(row)
@@ -9552,7 +9570,8 @@ function importETFComposition(file) {
 
       // Sectors — store ALL values + top3 (Others inclus pour que la somme = 100%)
       secRows.forEach(row => {
-        const ticker = row['ticker'];
+        let ticker = row['ticker'];
+        { const _iso = row['ISIN'] || row['isin']; if (_iso && typeof ETF_ISIN_MAP!=='undefined' && ETF_ISIN_MAP[_iso]) ticker = ETF_ISIN_MAP[_iso]; }
         if (!ticker) return;
         const SEC_SKIP = new Set(['Nom','ISIN','ticker']);
         const all = Object.entries(row)
@@ -10322,6 +10341,9 @@ function renderETFValues() {
   const etfChartTot = etfChartData.reduce((s, e) => s + e.v, 0);
 
   if (window._etfWChart) { window._etfWChart.destroy(); window._etfWChart = null; }
+  // Hauteur dynamique : ~30px par ETF pour éviter que les barres/labels se superposent.
+  { const _etfCv = document.getElementById('etfW');
+    if (_etfCv && _etfCv.parentElement) _etfCv.parentElement.style.height = Math.max(300, etfChartData.length * 30 + 50) + 'px'; }
   window._etfWChart = makeBar('etfW', etfChartData, etfChartTot);
 
   // ── Rebuild etf_ter table with portfolio values + footer ────────────────────
