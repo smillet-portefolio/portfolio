@@ -943,11 +943,57 @@ function _reRentCost(id){ return _reRentList(id).reduce((s,x)=>s+(+x.elec||0)+(+
 function _reSaveList(k,id,arr){ const m=_reLoadJSON(k); m[id]=arr; try{ localStorage.setItem(k,JSON.stringify(m)); }catch(e){} if(typeof _gsToken!=='undefined'&&_gsToken&&typeof gsSaveAll==='function') gsSaveAll({silent:true}); }
 function _reNum(v){ return parseFloat(String(v).replace(/[^\d.,-]/g,'').replace(/\s/g,'').replace(',','.')); }
 function _reNextMonth(arr,fb){ if(!arr.length) return fb; const p=arr[arr.length-1].m.split('-').map(Number); const d=new Date(p[0],p[1],1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
-function reAddMort(id){ const a=REAL_ESTATE.find(x=>x.id===id); const pay=a&&a.mortPay?a.mortPay:54376; const arr=_reMortList(id); const nm=_reNextMonth(arr,'2026-06'); const dft=arr.length?arr[arr.length-1].principal:28000; const pi=prompt('Mensualite '+nm+' : '+pay+' Kc.\nPart capital rembourse (Kc) ? Le reste = interets.',dft); if(pi==null) return; const principal=_reNum(pi); if(!isFinite(principal)){ alert('Montant invalide'); return; } const iv=prompt('Assurance hypotheque '+nm+' (Kc) ?',arr.length?(arr[arr.length-1].insur||2718):2718); if(iv==null) return; arr.push({m:nm,principal:Math.round(principal),interest:Math.round(pay-principal),insur:Math.round(_reNum(iv))||0}); _reSaveList('re_mortgage',id,arr); renderImmo(); }
-function reEditMort(id,i){ const a=REAL_ESTATE.find(x=>x.id===id); const pay=a&&a.mortPay?a.mortPay:54376; const arr=_reMortList(id); if(!arr[i])return; const pi=prompt('Part capital '+arr[i].m+' (Kc) ? Mensualite '+pay,arr[i].principal); if(pi==null)return; const p=_reNum(pi); if(!isFinite(p))return; const iv=prompt('Assurance hypotheque '+arr[i].m+' (Kc) ?',arr[i].insur||0); if(iv==null)return; arr[i]={m:arr[i].m,principal:Math.round(p),interest:Math.round(pay-p),insur:Math.round(_reNum(iv))||0}; _reSaveList('re_mortgage',id,arr); renderImmo(); }
+function reFormModal(cfg){
+  let m=document.getElementById('reFormModal');
+  if(!m){ m=document.createElement('div'); m.id='reFormModal'; m.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10002;align-items:center;justify-content:center;padding:20px'; m.addEventListener('click',e=>{ if(e.target===m) m.style.display='none'; }); document.body.appendChild(m); }
+  const inS="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px;outline:none";
+  const lbS="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px";
+  const esc=s=>String(s==null?'':s).replace(/"/g,'&quot;');
+  const fh=fld=>`<div${fld.full?' style="grid-column:1/-1"':''}><label style="${lbS}">${fld.label}</label><input id="rf_${fld.key}" type="${fld.type||'number'}" ${fld.step?`step="${fld.step}"`:''} value="${esc(fld.value)}" placeholder="${esc(fld.placeholder||'')}" oninput="window._reFormRecalc&&window._reFormRecalc()" style="${inS}"></div>`;
+  m.innerHTML=`<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:26px 30px;width:520px;max-width:95vw;max-height:90vh;overflow:auto;box-shadow:0 24px 60px rgba(0,0,0,.5)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px"><h3 style="margin:0;font-size:16px;font-weight:700">${cfg.title}</h3><button onclick="document.getElementById('reFormModal').style.display='none'" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer">&times;</button></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">${cfg.fields.map(fh).join('')}</div>
+    <div id="rf_computed" style="margin-top:16px;font-size:13px;color:var(--text2)"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:22px">
+      <button onclick="document.getElementById('reFormModal').style.display='none'" style="padding:9px 20px;background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:6px;font-size:13px;cursor:pointer">Annuler</button>
+      <button id="rf_submit" style="padding:9px 20px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600">${cfg.submitLabel||'✓ Enregistrer'}</button>
+    </div>
+  </div>`;
+  const getVals=()=>{ const v={}; cfg.fields.forEach(fld=>{ const el=document.getElementById('rf_'+fld.key); let val=el?el.value:''; if((fld.type||'number')==='number'){ val=(val===''?null:parseFloat(String(val).replace(',','.'))); } v[fld.key]=val; }); return v; };
+  window._reFormRecalc=function(){ const box=document.getElementById('rf_computed'); if(box) box.innerHTML = cfg.compute ? (cfg.compute(getVals())||'') : ''; };
+  document.getElementById('rf_submit').onclick=function(){ const r=cfg.onSubmit(getVals()); if(r!==false) m.style.display='none'; };
+  m.style.display='flex';
+  window._reFormRecalc();
+}
+function reAddMort(id){ const a=REAL_ESTATE.find(x=>x.id===id); const pay=a&&a.mortPay?a.mortPay:54376; const arr=_reMortList(id); const nm=_reNextMonth(arr,'2026-06'); const last=arr.length?arr[arr.length-1]:{principal:28000,insur:2718};
+  reFormModal({ title:'Nouvelle mensualité — '+(a?a.name:id),
+    fields:[ {key:'m',label:'Mois',type:'month',value:nm}, {key:'pay',label:'Mensualité (Kč)',value:pay,step:'any'}, {key:'principal',label:'Part capital (Kč)',value:(last.principal||''),step:'any'}, {key:'insur',label:'Assurance (Kč)',value:(last.insur!=null?last.insur:2718),step:'any'} ],
+    compute:v=>(v.pay!=null&&v.principal!=null)?('Intérêts (mensualité − capital) : <strong style="color:#f0956e">'+_reCZK(Math.round(v.pay-v.principal))+'</strong>'):'',
+    submitLabel:'✓ Ajouter la mensualité',
+    onSubmit:v=>{ if(v.pay==null||v.principal==null){ alert('Renseigne la mensualité et la part capital.'); return false; } arr.push({m:v.m||nm,principal:Math.round(v.principal),interest:Math.round(v.pay-v.principal),insur:Math.round(v.insur||0)}); _reSaveList('re_mortgage',id,arr); renderImmo(); } });
+}
+function reEditMort(id,i){ const a=REAL_ESTATE.find(x=>x.id===id); const pay0=a&&a.mortPay?a.mortPay:54376; const arr=_reMortList(id); if(!arr[i])return; const cur=arr[i]; const curPay=((+cur.principal||0)+(+cur.interest||0))||pay0;
+  reFormModal({ title:'Modifier la mensualité — '+cur.m,
+    fields:[ {key:'m',label:'Mois',type:'month',value:cur.m}, {key:'pay',label:'Mensualité (Kč)',value:curPay,step:'any'}, {key:'principal',label:'Part capital (Kč)',value:cur.principal,step:'any'}, {key:'insur',label:'Assurance (Kč)',value:(cur.insur||0),step:'any'} ],
+    compute:v=>(v.pay!=null&&v.principal!=null)?('Intérêts (mensualité − capital) : <strong style="color:#f0956e">'+_reCZK(Math.round(v.pay-v.principal))+'</strong>'):'',
+    submitLabel:'✓ Enregistrer',
+    onSubmit:v=>{ if(v.pay==null||v.principal==null){ alert('Renseigne la mensualité et la part capital.'); return false; } arr[i]={m:v.m||cur.m,principal:Math.round(v.principal),interest:Math.round(v.pay-v.principal),insur:Math.round(v.insur||0)}; _reSaveList('re_mortgage',id,arr); renderImmo(); } });
+}
 function reDelMort(id,i){ const arr=_reMortList(id); if(!arr.length)return; const idx=(i==null)?arr.length-1:i; if(!arr[idx])return; if(!confirm('Supprimer la mensualite '+arr[idx].m+' ?'))return; arr.splice(idx,1); _reSaveList('re_mortgage',id,arr); renderImmo(); }
-function reAddRent(id){ const arr=_reRentList(id); const nm=_reNextMonth(arr,'2026-06'); const last=arr.length?arr[arr.length-1]:{rev:32800,elec:0,fees:3988,ins:0}; const rv=prompt('Revenus locatifs '+nm+' (Kc) ?',last.rev); if(rv==null)return; const el=prompt('Electricite '+nm+' (Kc) ?',last.elec||0); if(el==null)return; const fe=prompt('Charges mensuelles '+nm+' (Kc) ?',last.fees||0); if(fe==null)return; const ins=prompt('Assurance '+nm+' (Kc) ?',0); if(ins==null)return; arr.push({m:nm,rev:Math.round(_reNum(rv))||0,elec:Math.round(_reNum(el))||0,fees:Math.round(_reNum(fe))||0,ins:Math.round(_reNum(ins))||0}); _reSaveList('re_rental',id,arr); renderImmo(); }
-function reEditRent(id,i){ const arr=_reRentList(id); if(!arr[i])return; const rv=prompt('Revenus '+arr[i].m+' (Kc) ?',arr[i].rev); if(rv==null)return; const el=prompt('Electricite '+arr[i].m+' (Kc) ?',arr[i].elec||0); if(el==null)return; const fe=prompt('Charges '+arr[i].m+' (Kc) ?',arr[i].fees||0); if(fe==null)return; const ins=prompt('Assurance '+arr[i].m+' (Kc) ?',arr[i].ins||0); if(ins==null)return; arr[i]={m:arr[i].m,rev:Math.round(_reNum(rv))||0,elec:Math.round(_reNum(el))||0,fees:Math.round(_reNum(fe))||0,ins:Math.round(_reNum(ins))||0}; _reSaveList('re_rental',id,arr); renderImmo(); }
+function reAddRent(id){ const a=REAL_ESTATE.find(x=>x.id===id); const arr=_reRentList(id); const nm=_reNextMonth(arr,'2026-06'); const last=arr.length?arr[arr.length-1]:{rev:32800,elec:0,fees:3988,ins:0};
+  reFormModal({ title:'Nouveau mois locatif — '+(a?a.name:id),
+    fields:[ {key:'m',label:'Mois',type:'month',value:nm}, {key:'rev',label:'Revenus (Kč)',value:last.rev,step:'any'}, {key:'elec',label:'Électricité (Kč)',value:(last.elec||0),step:'any'}, {key:'fees',label:'Charges mensuelles (Kč)',value:(last.fees||0),step:'any'}, {key:'ins',label:'Assurance (Kč)',value:0,step:'any'} ],
+    compute:v=>{ const c=(v.elec||0)+(v.fees||0)+(v.ins||0); const n=(v.rev||0)-c; return 'Coûts : <strong style="color:#e06c6c">'+_reCZK(Math.round(c))+'</strong> · Net : <strong style="color:'+(n>=0?'#4caf82':'#e06c6c')+'">'+(n>=0?'+':'')+_reCZK(Math.round(n))+'</strong>'; },
+    submitLabel:'✓ Ajouter le mois',
+    onSubmit:v=>{ if(v.rev==null){ alert('Renseigne les revenus.'); return false; } arr.push({m:v.m||nm,rev:Math.round(v.rev)||0,elec:Math.round(v.elec||0)||0,fees:Math.round(v.fees||0)||0,ins:Math.round(v.ins||0)||0}); _reSaveList('re_rental',id,arr); renderImmo(); } });
+}
+function reEditRent(id,i){ const arr=_reRentList(id); if(!arr[i])return; const cur=arr[i];
+  reFormModal({ title:'Modifier le mois — '+cur.m,
+    fields:[ {key:'m',label:'Mois',type:'month',value:cur.m}, {key:'rev',label:'Revenus (Kč)',value:cur.rev,step:'any'}, {key:'elec',label:'Électricité (Kč)',value:(cur.elec||0),step:'any'}, {key:'fees',label:'Charges mensuelles (Kč)',value:(cur.fees||0),step:'any'}, {key:'ins',label:'Assurance (Kč)',value:(cur.ins||0),step:'any'} ],
+    compute:v=>{ const c=(v.elec||0)+(v.fees||0)+(v.ins||0); const n=(v.rev||0)-c; return 'Coûts : <strong style="color:#e06c6c">'+_reCZK(Math.round(c))+'</strong> · Net : <strong style="color:'+(n>=0?'#4caf82':'#e06c6c')+'">'+(n>=0?'+':'')+_reCZK(Math.round(n))+'</strong>'; },
+    submitLabel:'✓ Enregistrer',
+    onSubmit:v=>{ if(v.rev==null){ alert('Renseigne les revenus.'); return false; } arr[i]={m:v.m||cur.m,rev:Math.round(v.rev)||0,elec:Math.round(v.elec||0)||0,fees:Math.round(v.fees||0)||0,ins:Math.round(v.ins||0)||0}; _reSaveList('re_rental',id,arr); renderImmo(); } });
+}
 function reDelRent(id,i){ const arr=_reRentList(id); if(!arr.length)return; const idx=(i==null)?arr.length-1:i; if(!arr[idx])return; if(!confirm('Supprimer le mois '+arr[idx].m+' ?'))return; arr.splice(idx,1); _reSaveList('re_rental',id,arr); renderImmo(); }
 function _reFxNow(){ return (typeof FX_RATES!=='undefined' && FX_RATES.CZK) ? FX_RATES.CZK : (1/24.5); } // 1 CZK = X EUR (courant)
 const _reHistE = (czk,a) => czk / a.acq;        // EUR au taux d'acquisition
@@ -969,8 +1015,20 @@ const RE_RENT2_SEED = { pec: [{"m": "2019-02", "ins": 8915, "fees": 0, "rev": 0}
 function _reRent2List(id){ const m=_reLoadJSON('re_rental2'); return Array.isArray(m[id])? m[id] : ((RE_RENT2_SEED[id]||[]).map(x=>({...x}))); }
 function _reRent2Rev(id){ return _reRent2List(id).reduce((s,x)=>s+(+x.rev||0),0); }
 function _reRent2Net(id){ return _reRent2List(id).reduce((s,x)=>s+(+x.rev||0)-(+x.ins||0)-(+x.fees||0),0); }
-function reAddRent2(id){ const arr=_reRent2List(id); const nm=_reNextMonth(arr,'2026-06'); const last=arr.length?arr[arr.length-1]:{ins:0,fees:0,rev:0}; const iv=prompt('Assurance '+nm+' (Kc) ?',last.ins||0); if(iv==null)return; const fv=prompt('Charges mensuelles '+nm+' (Kc) ?',last.fees||0); if(fv==null)return; const rv=prompt('Revenus locatifs '+nm+' (Kc) ?',last.rev||0); if(rv==null)return; arr.push({m:nm,ins:Math.round(_reNum(iv))||0,fees:Math.round(_reNum(fv))||0,rev:Math.round(_reNum(rv))||0}); _reSaveList('re_rental2',id,arr); renderImmo(); }
-function reEditRent2(id,i){ const arr=_reRent2List(id); if(!arr[i])return; const iv=prompt('Assurance '+arr[i].m+' (Kc) ?',arr[i].ins); if(iv==null)return; const fv=prompt('Charges '+arr[i].m+' (Kc) ?',arr[i].fees); if(fv==null)return; const rv=prompt('Revenus '+arr[i].m+' (Kc) ?',arr[i].rev); if(rv==null)return; arr[i]={m:arr[i].m,ins:Math.round(_reNum(iv))||0,fees:Math.round(_reNum(fv))||0,rev:Math.round(_reNum(rv))||0}; _reSaveList('re_rental2',id,arr); renderImmo(); }
+function reAddRent2(id){ const a=REAL_ESTATE.find(x=>x.id===id); const arr=_reRent2List(id); const nm=_reNextMonth(arr,'2026-06'); const last=arr.length?arr[arr.length-1]:{ins:0,fees:0,rev:0};
+  reFormModal({ title:'Nouveau mois locatif — '+(a?a.name:id),
+    fields:[ {key:'m',label:'Mois',type:'month',value:nm}, {key:'rev',label:'Revenus (Kč)',value:(last.rev||0),step:'any'}, {key:'fees',label:'Charges mensuelles (Kč)',value:(last.fees||0),step:'any'}, {key:'ins',label:'Assurance (Kč)',value:(last.ins||0),step:'any'} ],
+    compute:v=>{ const c=(v.fees||0)+(v.ins||0); const n=(v.rev||0)-c; return 'Coûts : <strong style="color:#e06c6c">'+_reCZK(Math.round(c))+'</strong> · Net : <strong style="color:'+(n>=0?'#4caf82':'#e06c6c')+'">'+(n>=0?'+':'')+_reCZK(Math.round(n))+'</strong>'; },
+    submitLabel:'✓ Ajouter le mois',
+    onSubmit:v=>{ if(v.rev==null){ alert('Renseigne les revenus.'); return false; } arr.push({m:v.m||nm,ins:Math.round(v.ins||0)||0,fees:Math.round(v.fees||0)||0,rev:Math.round(v.rev)||0}); _reSaveList('re_rental2',id,arr); renderImmo(); } });
+}
+function reEditRent2(id,i){ const arr=_reRent2List(id); if(!arr[i])return; const cur=arr[i];
+  reFormModal({ title:'Modifier le mois — '+cur.m,
+    fields:[ {key:'m',label:'Mois',type:'month',value:cur.m}, {key:'rev',label:'Revenus (Kč)',value:(cur.rev||0),step:'any'}, {key:'fees',label:'Charges mensuelles (Kč)',value:(cur.fees||0),step:'any'}, {key:'ins',label:'Assurance (Kč)',value:(cur.ins||0),step:'any'} ],
+    compute:v=>{ const c=(v.fees||0)+(v.ins||0); const n=(v.rev||0)-c; return 'Coûts : <strong style="color:#e06c6c">'+_reCZK(Math.round(c))+'</strong> · Net : <strong style="color:'+(n>=0?'#4caf82':'#e06c6c')+'">'+(n>=0?'+':'')+_reCZK(Math.round(n))+'</strong>'; },
+    submitLabel:'✓ Enregistrer',
+    onSubmit:v=>{ if(v.rev==null){ alert('Renseigne les revenus.'); return false; } arr[i]={m:v.m||cur.m,ins:Math.round(v.ins||0)||0,fees:Math.round(v.fees||0)||0,rev:Math.round(v.rev)||0}; _reSaveList('re_rental2',id,arr); renderImmo(); } });
+}
 function reDelRent2(id,i){ const arr=_reRent2List(id); if(!arr.length)return; const idx=(i==null)?arr.length-1:i; if(!arr[idx])return; if(!confirm('Supprimer le mois '+arr[idx].m+' ?'))return; arr.splice(idx,1); _reSaveList('re_rental2',id,arr); renderImmo(); }
 function _reRent2Table(a){
   const arr=_reRent2List(a.id);
@@ -989,8 +1047,18 @@ function _reRent2Table(a){
 const RE_RENT3_SEED = { tisno:[{"d":"31/12/2024","rev":2267,"label":"Revenus locatif 2024"}] };
 function _reRent3List(id){ const m=_reLoadJSON('re_rental3'); return Array.isArray(m[id])? m[id] : ((RE_RENT3_SEED[id]||[]).map(x=>({...x}))); }
 function _reRent3Rev(id){ return _reRent3List(id).reduce((s,x)=>s+(+x.rev||0),0); }
-function reAddRent3(id){ const arr=_reRent3List(id); const d=prompt('Date (JJ/MM/AAAA) ?',''); if(d==null)return; const rv=prompt('Revenus locatif ?',0); if(rv==null)return; const lb=prompt('Description ?',''); if(lb==null)return; arr.push({d:d||'',rev:Math.round(_reNum(rv))||0,label:lb||''}); _reSaveList('re_rental3',id,arr); renderImmo(); }
-function reEditRent3(id,i){ const arr=_reRent3List(id); if(!arr[i])return; const d=prompt('Date ?',arr[i].d); if(d==null)return; const rv=prompt('Revenus ?',arr[i].rev); if(rv==null)return; const lb=prompt('Description ?',arr[i].label); if(lb==null)return; arr[i]={d:d||'',rev:Math.round(_reNum(rv))||0,label:lb||''}; _reSaveList('re_rental3',id,arr); renderImmo(); }
+function reAddRent3(id){ const a=REAL_ESTATE.find(x=>x.id===id); const arr=_reRent3List(id);
+  reFormModal({ title:'Nouvelle ligne locative — '+(a?a.name:id),
+    fields:[ {key:'d',label:'Date (JJ/MM/AAAA)',type:'text',value:'',placeholder:'ex: 31/12/2025'}, {key:'rev',label:'Revenus (EUR)',value:0,step:'any'}, {key:'label',label:'Description',type:'text',value:'',placeholder:'ex: Loyer été',full:true} ],
+    submitLabel:'✓ Ajouter la ligne',
+    onSubmit:v=>{ arr.push({d:(v.d||''),rev:Math.round(v.rev||0)||0,label:(v.label||'')}); _reSaveList('re_rental3',id,arr); renderImmo(); } });
+}
+function reEditRent3(id,i){ const arr=_reRent3List(id); if(!arr[i])return; const cur=arr[i];
+  reFormModal({ title:'Modifier la ligne',
+    fields:[ {key:'d',label:'Date (JJ/MM/AAAA)',type:'text',value:cur.d}, {key:'rev',label:'Revenus (EUR)',value:cur.rev,step:'any'}, {key:'label',label:'Description',type:'text',value:cur.label,full:true} ],
+    submitLabel:'✓ Enregistrer',
+    onSubmit:v=>{ arr[i]={d:(v.d||''),rev:Math.round(v.rev||0)||0,label:(v.label||'')}; _reSaveList('re_rental3',id,arr); renderImmo(); } });
+}
 function reDelRent3(id){ const arr=_reRent3List(id); if(!arr.length)return; if(!confirm('Retirer la derniere ligne ?'))return; arr.pop(); _reSaveList('re_rental3',id,arr); renderImmo(); }
 function _reRent3Table(a){
   const arr=_reRent3List(a.id); const tr=arr.reduce((s,x)=>s+(+x.rev||0),0);
