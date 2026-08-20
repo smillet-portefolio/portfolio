@@ -9077,8 +9077,17 @@ function _aeRenderRows() {
   const mono = "font-family:'DM Mono',monospace";
 
   // ── Corps ────────────────────────────────────────────────────────────────--
-  const body = rows.map(r => `<tr>
-      <td style="white-space:nowrap;padding:6px 8px"><strong>${r.name}</strong> ${typeBadge(r.typeInv)}</td>
+  // ── Groupes « Indices » (agrégats dépliables) ────────────────────────────────
+  const GRP_DEFS = [
+    { key:'msciw', label:'MSCI World',             members:['MWRE','XDWD','SC0J'], color:'#5a8dee' },
+    { key:'emexc', label:'MSCI Emerging ex China', members:['EMXC','MTPI'],        color:'#a78bfa' },
+    { key:'gce',   label:'Global Clean Energy',    members:['IQQH','Q8Y0'],        color:'#22c55e' },
+  ];
+  const _shortOf = t => (typeof ETF_META!=='undefined' && ETF_META[t] && ETF_META[t].short) ? ETF_META[t].short : String(t).split('.')[0];
+  const _grpKeyOf = r => { const s=_shortOf(r.ticker); for(const g of GRP_DEFS){ if(g.members.indexOf(s)>=0) return g.key; } return null; };
+  if(window._aeGrpOpen==null) window._aeGrpOpen=new Set();
+  const rowHTML = (r,ind) => `<tr>
+      <td style="white-space:nowrap;padding:6px 8px${ind?';padding-left:30px':''}">${ind?'<span style="color:var(--text3)">↳ </span>':''}<strong>${r.name}</strong> ${typeBadge(r.typeInv)}</td>
       <td class="mono" style="color:var(--text2);font-size:11px;padding:6px 8px">${r.isin || '—'}</td>
       <td style="text-align:right;padding:6px 8px;${mono}">${r.qty.toLocaleString('fr',{maximumFractionDigits:8})}</td>
       <td style="text-align:right;padding:6px 8px;${mono}">${pxTxt(r.pxAchat, r.currency)}</td>
@@ -9087,7 +9096,25 @@ function _aeRenderRows() {
       <td style="text-align:right;padding:6px 8px;${mono}">${pnlEurTxt(r.pnl)}</td>
       <td style="text-align:right;padding:6px 8px;${mono}">${pctTxt(r.pnlPct)}</td>
       ${AE_VARCOLS.map(k => varCell(r.vars[k])).join('')}
-    </tr>`).join('');
+    </tr>`;
+  let body = rows.filter(r=>!_grpKeyOf(r)).map(r=>rowHTML(r,false)).join('');
+  GRP_DEFS.forEach(g=>{
+    const mem = rows.filter(r=>_grpKeyOf(r)===g.key);
+    if(!mem.length) return;
+    const gVal = mem.reduce((s,r)=>s+(r.valEur!=null?r.valEur:(r.costEur||0)),0);
+    const gCost = mem.reduce((s,r)=>s+(r.costEur||0),0);
+    const gPnl = gVal-gCost, gPct = gCost ? gPnl/gCost*100 : null;
+    const open = window._aeGrpOpen.has(g.key);
+    body += `<tr onclick="aeGrpToggle('${g.key}')" style="cursor:pointer;background:var(--bg2);border-top:1px solid var(--border2)">
+        <td style="white-space:nowrap;padding:7px 8px;font-weight:700"><span style="display:inline-block;width:13px;color:${g.color}">${open?'▾':'▸'}</span><span style="width:9px;height:9px;border-radius:2px;background:${g.color};display:inline-block;margin-right:6px"></span>${g.label} <span style="color:var(--text2);font-weight:400;font-size:11px">(${mem.length} ETF)</span></td>
+        <td></td><td></td><td></td><td></td>
+        <td style="text-align:right;padding:7px 8px;${mono};font-weight:700">${eurTxt(gVal)}</td>
+        <td style="text-align:right;padding:7px 8px;${mono}">${pnlEurTxt(gPnl)}</td>
+        <td style="text-align:right;padding:7px 8px;${mono}">${pctTxt(gPct)}</td>
+        <td colspan="${AE_VARCOLS.length}"></td>
+      </tr>`;
+    if(open) body += mem.map(r=>rowHTML(r,true)).join('');
+  });
 
   // ── Totaux (sur lignes filtrées) ─────────────────────────────────────────--
   const hasPrices = rows.some(r => r.valEur != null);
@@ -9109,6 +9136,7 @@ function _aeRenderRows() {
   if (sumEl) sumEl.innerHTML = `Valeur ${eurTxt(totVal)} &nbsp;·&nbsp; P&L ${pnlEurTxt(totPnl)} (${pctTxt(totPnlPct)})`;
 }
 
+function aeGrpToggle(k){ if(window._aeGrpOpen==null) window._aeGrpOpen=new Set(); if(window._aeGrpOpen.has(k)) window._aeGrpOpen.delete(k); else window._aeGrpOpen.add(k); _aeRenderRows(); }
 function aeSort(col) {
   if (_aeSort.col === col) _aeSort.dir *= -1;
   else { _aeSort.col = col; _aeSort.dir = (AE_VARCOLS.includes(col) || ['qty','pxAchat','pxCurr','valEur','pnl','pnlPct'].includes(col)) ? -1 : 1; }
@@ -9124,6 +9152,7 @@ function aeFilter(col, val) {
 // ── Graphique évolution du P&L par titre (onglet Actions & ETFs) ────────────
 function aePnlSetMode(m){ window._aePnlMode = m; renderAePnlChart(); }
 function aePnlToggle(t){ if(window._aePnlSel == null) window._aePnlSel = new Set(window._aePnlTickers||[]); if(window._aePnlSel.has(t)) window._aePnlSel.delete(t); else window._aePnlSel.add(t); renderAePnlChart(); }
+function aePnlIdxToggle(k){ if(window._aePnlIdxSel == null) window._aePnlIdxSel = new Set(); if(window._aePnlIdxSel.has(k)) window._aePnlIdxSel.delete(k); else window._aePnlIdxSel.add(k); renderAePnlChart(); }
 function aePnlAll(){ window._aePnlTypeFilter='all'; window._aePnlStatusFilter='all'; window._aePnlSel = null; renderAePnlChart(); }
 function aePnlNone(){ window._aePnlSel = new Set(); renderAePnlChart(); }
 // Filtres combinables : type (all/action/etf) ET statut (all/gain/loss)
@@ -9157,6 +9186,13 @@ function renderAePnlChart(){
   const cv = document.getElementById('aePnlChart'); if(!cv) return;
   const note = document.getElementById('ae_pnl_note');
   const toolbar = document.getElementById('ae_pnl_toolbar');
+  // Indices agrégés (somme des positions/perf des ETF membres) — pastilles sous la ligne ETF.
+  const _shortOf = t => (typeof ETF_META!=='undefined' && ETF_META[t] && ETF_META[t].short) ? ETF_META[t].short : String(t).split('.')[0];
+  const AE_INDICES = [
+    { key:'@MSCIW', label:'MSCI World',              members:['MWRE','XDWD','SC0J'], color:'#5a8dee' },
+    { key:'@EMEXC', label:'MSCI Emerging ex China',  members:['EMXC','MTPI'],        color:'#a78bfa' },
+    { key:'@GCE',   label:'Global Clean Energy',     members:['IQQH','Q8Y0'],        color:'#22c55e' },
+  ];
   const lotsMap = {};
   BOOK2_ROWS.forEach(r=>{
     const ty=(r.typeInv||'').toLowerCase();
@@ -9186,6 +9222,7 @@ function renderAePnlChart(){
   });
   if(window._aePnlSel == null) window._aePnlSel = new Set(tickers);
   window._aePnlSel = new Set([...window._aePnlSel].filter(t=>tickers.indexOf(t)>=0));
+  if(window._aePnlIdxSel == null) window._aePnlIdxSel = new Set();   // indices agrégés sélectionnés
   const mode = window._aePnlMode || 'eur';
   const be=document.getElementById('ae_pnl_eur'), bp=document.getElementById('ae_pnl_pct');
   const setBtn=(el,on)=>{ if(!el) return; el.style.background=on?'var(--blue)':'var(--bg3)'; el.style.color=on?'#fff':'var(--text)'; el.style.borderColor=on?'var(--blue)':'var(--border2)'; };
@@ -9218,7 +9255,7 @@ function renderAePnlChart(){
   // Ligne 2 : pastilles par titre — 3 lignes distinctes (Actions / ETFs / Crypto) dans un ordre personnalisé
   if(toolbar){
     const ACT_ORDER = ['FGR','SPIE','SGO','VIE','VST','IBE','SU','VRT','ENR','C7A0','RACE','EL','RR','IDL','ABVX','VU','SAN','DTE'];
-    const ETF_ORDER = ['MWRE','XDWD','VGWE','I500','EMXC','MTPI','LEER','XMBR','GRE','IQQH','Q8Y0','NUKL','XDWH'];
+    const ETF_ORDER = ['MWRE','XDWD','SC0J','VGWE','I500','EMXC','MTPI','LEER','XMBR','GRE','IQQH','Q8Y0','NUKL','XDWH'];
     const _short = t => (typeof ETF_META!=='undefined' && ETF_META[t] && ETF_META[t].short) ? ETF_META[t].short : t;
     const _base  = t => String(t).split('.')[0];
     const _rank  = (arr, key) => { const i = arr.indexOf(key); return i<0 ? 999 : i; };
@@ -9235,10 +9272,18 @@ function renderAePnlChart(){
       return '<button onclick="'+oc+'" title="'+nm+'" style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:12px;font-size:11px;cursor:pointer;border:1px solid '+(on?c:'var(--border2)')+';background:'+(on?c:'var(--bg3)')+';color:'+(on?'#fff':'var(--text2)')+'"><span style="width:8px;height:8px;border-radius:50%;background:'+c+';display:inline-block"></span>'+short+'</button>';
     };
     const row = list => list.length ? '<div style="flex:0 0 100%;display:flex;flex-wrap:wrap;gap:6px">'+list.map(pill).join('')+'</div>' : '';
-    toolbar.innerHTML = row(acts) + row(etfs) + row(cryptos);
+    // Rangée « Indices » : pastilles agrégées (bordure pointillée) sous la ligne ETF.
+    const _ixPresent = ix => tickers.some(t => ix.members.indexOf(_short(t))>=0);
+    const ixPill = ix => { const on=window._aePnlIdxSel.has(ix.key); const c=ix.color; const mem=tickers.filter(t=>ix.members.indexOf(_short(t))>=0).map(_short).join(', ');
+      return '<button onclick="aePnlIdxToggle('+"'"+ix.key+"'"+')" title="Somme de : '+mem+'" style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:12px;font-size:11px;cursor:pointer;font-weight:600;border:1px dashed '+(on?c:'var(--border2)')+';background:'+(on?c:'var(--bg3)')+';color:'+(on?'#fff':'var(--text2)')+'"><span style="width:8px;height:8px;border-radius:2px;background:'+c+';display:inline-block"></span>'+ix.label+'</button>'; };
+    const _ixList = AE_INDICES.filter(_ixPresent);
+    const ixRow = _ixList.length ? '<div style="flex:0 0 100%;display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:2px"><span style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-right:2px">Indices</span>'+_ixList.map(ixPill).join('')+'</div>' : '';
+    toolbar.innerHTML = row(acts) + row(etfs) + row(cryptos) + ixRow;
   }
   // Axe temporel calé sur la plage de dates des titres SÉLECTIONNÉS (zoom auto).
-  const _selT = tickers.filter(t=>window._aePnlSel.has(t));
+  const _idxMembers = new Set();
+  AE_INDICES.forEach(ix=>{ if(window._aePnlIdxSel.has(ix.key)) tickers.forEach(t=>{ if(ix.members.indexOf(_shortOf(t))>=0) _idxMembers.add(t); }); });
+  const _selT = tickers.filter(t=>window._aePnlSel.has(t) || _idxMembers.has(t));
   const _axisT = _selT.length ? _selT : tickers;
   const dset = new Set();
   _axisT.forEach(t=>Object.keys(PRICE_HISTORY[t]).forEach(d=>dset.add(d)));
@@ -9267,7 +9312,20 @@ function renderAePnlChart(){
     const short = (typeof ETF_META!=='undefined' && ETF_META[t] && ETF_META[t].short) ? ETF_META[t].short : t;
     datasets.push({ label:(lotsMap[t].name||t)+' ('+short+')', data:data, borderColor:c, backgroundColor:'transparent', borderWidth:1.6, pointRadius:0, tension:0.25, spanGaps:true });
   });
-  if(note) note.textContent = window._aePnlSel.size+' / '+tickers.length+' titres affichés · '+(mode==='pct'?'P&L en %':'P&L en €')+' · cumul depuis le 1er achat';
+  // Séries agrégées « Indices » (somme des positions/perf des ETF membres) — ligne pointillée.
+  AE_INDICES.forEach(ix=>{
+    if(!window._aePnlIdxSel.has(ix.key)) return;
+    const mem = tickers.filter(t => ix.members.indexOf(_shortOf(t))>=0);
+    if(!mem.length) return;
+    const data = dates.map(d=>{
+      let val=0, cost=0, has=false;
+      mem.forEach(t=>{ const close=PRICE_HISTORY[t][d]; if(close==null) return; let cq=0,cc=0; lotsMap[t].lots.forEach(l=>{ if(l.date<=d){ cq+=l.qty; cc+=l.costEur; } }); if(cq>0){ val+=cq*close; cost+=cc; has=true; } });
+      if(!has) return null;
+      return mode==='pct' ? (cost>0 ? (val-cost)/cost*100 : null) : (val-cost);
+    });
+    datasets.push({ label:ix.label, data:data, borderColor:ix.color, backgroundColor:'transparent', borderWidth:2.6, borderDash:[6,3], pointRadius:0, tension:0.25, spanGaps:true });
+  });
+  if(note) note.textContent = window._aePnlSel.size+' / '+tickers.length+' titres affichés'+(window._aePnlIdxSel.size?(' · '+window._aePnlIdxSel.size+' indice(s)'):'')+' · '+(mode==='pct'?'P&L en %':'P&L en €')+' · cumul depuis le 1er achat';
   if(typeof Chart==='undefined') return;
   window._aePnlChartInst = new Chart(cv, { type:'line', data:{ labels:dates, datasets:datasets }, options:{
     responsive:true, maintainAspectRatio:false, interaction:{ mode:'nearest', intersect:false },
