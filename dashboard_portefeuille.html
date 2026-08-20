@@ -9097,15 +9097,8 @@ function _aeRenderRows() {
       <td style="text-align:right;padding:6px 8px;${mono}">${pctTxt(r.pnlPct)}</td>
       ${AE_VARCOLS.map(k => varCell(r.vars[k])).join('')}
     </tr>`;
-  let body = rows.filter(r=>!_grpKeyOf(r)).map(r=>rowHTML(r,false)).join('');
-  GRP_DEFS.forEach(g=>{
-    const mem = rows.filter(r=>_grpKeyOf(r)===g.key);
-    if(!mem.length) return;
-    const gVal = mem.reduce((s,r)=>s+(r.valEur!=null?r.valEur:(r.costEur||0)),0);
-    const gCost = mem.reduce((s,r)=>s+(r.costEur||0),0);
-    const gPnl = gVal-gCost, gPct = gCost ? gPnl/gCost*100 : null;
-    const open = window._aeGrpOpen.has(g.key);
-    body += `<tr onclick="aeGrpToggle('${g.key}')" style="cursor:pointer;background:var(--bg2);border-top:1px solid var(--border2)">
+  const grpRowHTML = (g,mem,gVal,gPnl,gPct) => { const open=window._aeGrpOpen.has(g.key);
+    let h = `<tr onclick="aeGrpToggle('${g.key}')" style="cursor:pointer;background:var(--bg2);border-top:1px solid var(--border2)">
         <td style="white-space:nowrap;padding:7px 8px;font-weight:700"><span style="display:inline-block;width:13px;color:${g.color}">${open?'▾':'▸'}</span><span style="width:9px;height:9px;border-radius:2px;background:${g.color};display:inline-block;margin-right:6px"></span>${g.label} <span style="color:var(--text2);font-weight:400;font-size:11px">(${mem.length} ETF)</span></td>
         <td></td><td></td><td></td><td></td>
         <td style="text-align:right;padding:7px 8px;${mono};font-weight:700">${eurTxt(gVal)}</td>
@@ -9113,8 +9106,25 @@ function _aeRenderRows() {
         <td style="text-align:right;padding:7px 8px;${mono}">${pctTxt(gPct)}</td>
         <td colspan="${AE_VARCOLS.length}"></td>
       </tr>`;
-    if(open) body += mem.map(r=>rowHTML(r,true)).join('');
-  });
+    if(open) h += mem.map(r=>rowHTML(r,true)).join('');
+    return h;
+  };
+  // Items de premier niveau : lignes non groupées + groupes agrégés (triés ENSEMBLE).
+  const _grpItems = GRP_DEFS.map(g=>{
+    const mem = rows.filter(r=>_grpKeyOf(r)===g.key);
+    if(!mem.length) return null;
+    const gVal = mem.reduce((s,r)=>s+(r.valEur!=null?r.valEur:(r.costEur||0)),0);
+    const gCost = mem.reduce((s,r)=>s+(r.costEur||0),0);
+    const gPnl = gVal-gCost, gPct = gCost ? gPnl/gCost*100 : null;
+    return { g, mem, gVal, gCost, gPnl, gPct, pseudo:{ name:g.label, isin:'', qty:null, pxAchat:null, pxCurr:null, valEur:gVal, costEur:gCost, pnl:gPnl, pnlPct:gPct, vars:{} } };
+  }).filter(Boolean);
+  let _topItems = rows.filter(r=>!_grpKeyOf(r)).map(r=>({ row:r })).concat(_grpItems.map(x=>({ grp:x })));
+  if(_aeSort.col){
+    const { col, dir } = _aeSort;
+    const sv = it => _aeVal(it.row ? it.row : it.grp.pseudo, col);
+    _topItems.sort((a,b)=>{ let va=sv(a), vb=sv(b); if(va==null) va=dir===1?Infinity:-Infinity; if(vb==null) vb=dir===1?Infinity:-Infinity; if(typeof va==='string') return String(va).localeCompare(String(vb))*dir; return (va-vb)*dir; });
+  }
+  let body = _topItems.map(it => it.row ? rowHTML(it.row,false) : grpRowHTML(it.grp.g,it.grp.mem,it.grp.gVal,it.grp.gPnl,it.grp.gPct)).join('');
 
   // ── Totaux (sur lignes filtrées) ─────────────────────────────────────────--
   const hasPrices = rows.some(r => r.valEur != null);
