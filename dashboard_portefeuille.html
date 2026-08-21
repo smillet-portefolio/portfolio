@@ -1257,6 +1257,10 @@ function sw(id, btn) {
   document.getElementById(id).classList.add('active');
   btn.classList.add('active');
   if (id === 'editeur') setTimeout(() => {
+    // Ouverture de l'onglet : repartir sans filtre (état + champs), pour éviter qu'un
+    // filtre resté en mémoire ne masque des lignes alors que les champs semblent vides.
+    _edFilter = {};
+    try { document.querySelectorAll('#posTable thead input').forEach(el => { el.value = ''; }); } catch(e){}
     buildPosTable();
     updateTableRows();            // toujours recalculer coût EUR au chargement
     setTimeout(restorePersistedPrices, 150);
@@ -12185,7 +12189,10 @@ window.addEventListener('load', () => {
     });
   }
   function kidEditer(b){
-    if(window._kidEdFilter==null) window._kidEdFilter={};
+    // Reconstruction complète de l'onglet -> les champs de filtre sont re-rendus VIDES,
+    // donc on réinitialise l'état des filtres pour qu'il corresponde (sinon un filtre
+    // resté en mémoire peut masquer toutes les lignes alors que les champs semblent vides).
+    window._kidEdFilter={};
     if(window._kidEdSort==null) window._kidEdSort={col:null,dir:1};
     const fxu=(typeof FX_RATES!=='undefined'&&FX_RATES&&FX_RATES.USD)?FX_RATES.USD:null;
     const fxg=(typeof FX_RATES!=='undefined'&&FX_RATES&&FX_RATES.GBP)?FX_RATES.GBP:null;
@@ -12358,7 +12365,7 @@ window.addEventListener('load', () => {
       + card('Performance', perf!=null?(perf>=0?'+':'')+perf.toFixed(1).replace('.',',')+'%':'—', (perf==null||perf>=0)?'#4caf82':'#e06c6c');
     const st=document.getElementById('kidEdStatus'); if(st) st.textContent=rows.length+' lignes affichées';
   }
-  window.kidEdFilter=function(col,val){ if(window._kidEdFilter==null)window._kidEdFilter={}; window._kidEdFilter[col]=val; kidEdBuild(); };
+  window.kidEdFilter=function(col,val){ if(window._kidEdFilter==null)window._kidEdFilter={}; if(val==null||String(val).trim()==='') delete window._kidEdFilter[col]; else window._kidEdFilter[col]=val; kidEdBuild(); };
   window.kidEdSort=function(col){ const s2=window._kidEdSort||{col:null,dir:1}; if(s2.col===col) s2.dir=-s2.dir; else { s2.col=col; s2.dir=1; } window._kidEdSort=s2; kidEdBuild(); };
 
   // ---- Modale ajout / édition ----
