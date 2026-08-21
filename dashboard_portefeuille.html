@@ -7157,7 +7157,15 @@ function renderCsqEvoTab(){
   var today=new Date().toISOString().slice(0,10);
   // séries NAV hebdo triées par fonds
   var navArr={};
-  funds.forEach(function(f){ var s=CSQ_NAV_W[f]||{}; navArr[f]=Object.keys(s).sort().map(function(d){return [d,s[d]];}); });
+  var _CODE2TICK={GLAK:'CONSEQ_GLAK',RAF:'CONSEQ_RAF',DL:'CONSEQ_DL',BOND35:'CONSEQ_BOND35'};
+  funds.forEach(function(f){
+    var m={}; var s=CSQ_NAV_W[f]||{}; Object.keys(s).forEach(function(d){ m[d]=s[d]; });
+    // Fusion des VL Conseq datées provenant de Google Sheets (onglet Historique_Prix),
+    // alimentées par la mise à jour QUOTIDIENNE des prix -> nouvelles semaines auto.
+    try{ var ph=(typeof PRICE_HISTORY!=='undefined'&&PRICE_HISTORY[_CODE2TICK[f]])?PRICE_HISTORY[_CODE2TICK[f]]:null;
+      if(ph){ Object.keys(ph).forEach(function(d){ var v=+ph[d]; if(v>0 && m[d]==null) m[d]=v; }); } }catch(e){}
+    navArr[f]=Object.keys(m).sort().map(function(d){return [d,m[d]];});
+  });
   // timeline hebdo = union des dates NAV dans [startDate, today]
   var dset={};
   funds.forEach(function(f){ navArr[f].forEach(function(p){ if(p[0]>=startDate&&p[0]<=today) dset[p[0]]=1; }); });
