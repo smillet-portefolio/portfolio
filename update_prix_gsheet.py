@@ -9,18 +9,28 @@ Prérequis : pip install yfinance pandas requests google-auth google-api-python-
 
 import datetime
 import os
+import sys
 import json
 import re
 import requests
 import pandas as pd
 import yfinance as yf
 
+# Windows : la console (cp1250) ne sait pas afficher « à », « → », « ✅ »… ce qui
+# faisait planter le script AU DÉMARRAGE (UnicodeEncodeError) avant toute mise à
+# jour des prix. On force la sortie en UTF-8 pour que les print ne plantent plus.
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 SERVICE_ACCOUNT_FILE = r"C:\Users\smill\OneDrive\Documents\banque\bourse\service_account.json"
 SHEET_ID  = os.environ.get("SHEET_ID", "15w4s6chCytFKmPSpGXeYQ9fiJEVD_T5U9671Q0chn_Q")
 SHEET_TAB = "Prices"
 HIST_TAB  = "Historique_Prix"        # onglet historique quotidien (Date|Ticker|Close_EUR)
 PORTFOLIO_EUR_CLOSES = {}            # {ticker: close_eur} rempli par collecter_prix()
-LINXEA_FILE = os.environ.get("LINXEA_FILE", r"C:\Users\smill\OneDrive\Documents\banque\bourse\linxea.xlsx")
+CONSEQ_HIST_OBS = {}                 # {tick: (date_publiee 'YYYY-MM-DD', nav CZK)} -> Historique_Prix
 
 try:
     from google.oauth2 import service_account
@@ -61,6 +71,12 @@ TICKERS = [
     ("XDWH.DE",  "Xtrackers MSCI World Health Care", "EUR", "XDWH.DE"),
     ("MTPI.PA",  "iShares MSCI ex China",         "EUR", "MTPI.PA"),
     ("VGWE.DE",  "Vanguard All-World High Div",   "EUR", "VGWE.DE"),
+    # Invesco MSCI World UCITS ETF (Acc) — coté Xetra sous SC0J.DE (zéro, pas la lettre O).
+    # L'entrée « SCOJ.DE » sert d'alias : si la ligne du portefeuille est saisie avec un O,
+    # YS_OVERRIDE la redirige vers la cotation Yahoo SC0J.DE.
+    ("SC0J.DE",  "Invesco MSCI World UCITS ETF",  "EUR", "SC0J.DE"),
+    ("SCOJ.DE",  "Invesco MSCI World UCITS ETF",  "EUR", "SC0J.DE"),
+    ("IWDA.AS",  "iShares Core MSCI World",       "EUR", "IWDA.AS"),   # détenu par Corentin
     ("Q8Y0",     "iShares Global Clean Energy Transition", "EUR", "Q8Y0.DE"),
     ("MWRE",     "Amundi Core MSCI World",        "EUR", "MWRE.DE"),
     ("C7A0.DE",  "CATL",                          "EUR", "C7A0.MU"),
@@ -200,6 +216,14 @@ def prix_conseq(slug):
     except Exception as e:
         print(f"  [Conseq {slug}] {e}")
         return None, None
+
+
+def _conseq_date_iso(s):
+    """Convertit une date Conseq « 18. 8. 2026 » en ISO « 2026-08-18 »."""
+    m = re.match(r"\s*(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})", str(s or ""))
+    if not m:
+        return None
+    return f"{int(m.group(3)):04d}-{int(m.group(2)):02d}-{int(m.group(1)):02d}"
 
 
 def fmt_prix(p):
@@ -372,6 +396,7 @@ def tickers_enfants():
 ENFANTS_ISIN_OVERRIDE = {
     "IE00BMG6Z448": "MTPI.PA",   # iShares MSCI EM ex-China -> cotation Euronext Paris (EUR)
     "DE000A0Q4R85": "4BRZ.MI",   # iShares MSCI Brazil -> Borsa Italiana (EUR)
+    "IE00B4L5Y983": "IWDA.AS",   # iShares Core MSCI World -> Euronext Amsterdam (EUR) — Corentin
 }
 
 
@@ -501,6 +526,13 @@ def collecter_prix():
     for tick, nom, slug in CONSEQ_FUNDS:
         nav, ddate = prix_conseq(slug)
         print(f"  {'OK' if nav else 'KO'} {nom:<40s} ({tick}) -> {nav}  ({ddate})")
+        # Historique DATÉ des VL Conseq (par date publiée) -> onglet Historique_Prix.
+        # Le dashboard fusionne ces points dans l'évolution Conseq : dès qu'une VL change,
+        # une nouvelle ligne d'évolution apparaît automatiquement (plus de script séparé).
+        if nav and nav > 0 and ddate:
+            _iso = _conseq_date_iso(ddate)   # « 18. 8. 2026 » -> « 2026-08-18 » (clé Historique_Prix)
+            if _iso:
+                CONSEQ_HIST_OBS[tick] = (_iso, round(float(nav), 4))
         rows.append(
             [tick, nom + (f" ({ddate})" if ddate else ""), fmt_prix(nav), "CZK",
              (maintenant if nav else "")]
@@ -552,154 +584,6 @@ def ecrire_google_sheets(rows):
         return False
 
 
-# ==============================================================================
-# MISE A JOUR DU FICHIER LOCAL linxea.xlsx (onglet "update python")
-# Etape optionnelle : ignoree si le fichier est absent ou si openpyxl manque
-# (donc sans effet en execution cloud / GitHub Actions).
-# ==============================================================================
-ISIN_VERS_TICKER = {
-    # Actions
-    "FR0012333284": "ABVX.PA",
-    "FR0000130452": "FGR.PA",
-    "FR0000124141": "VIE.PA",
-    "DE0005557508": "DTE.DE",
-    "FR0000121667": "EL.PA",
-    "NL0011585146": "RACE.MI",
-    "FR0010929125": "IDL.PA",
-    "DE0006231004": "IFX.DE",
-    "DE000ENER6Y0": "ENR.DE",
-    "FR0000125007": "SGO.PA",
-    "FR0000121972": "SU.PA",
-    "GB00B63H8491": "RR.L",
-    "US5949181045": "MSFT",
-    "US68389X1054": "ORCL",
-    "US92840M1027": "VST",
-    "FR0010282822": "VU.PA",
-    # ETFs
-    "LU2009202107": "EMXC.DE",
-    "LU1900066033": "LSMC.DE",
-    "IE00053WDH64": "HYDE.DE",
-    "IE00B1XNHC34": "IQQH.DE",
-    "IE00BMTX1Y45": "I500.DE",
-    "FR0012757854": "SPIE.PA",
-    "IE000JJPY166": "YCSH.DE",
-    "IE000YU9K6K2": "JEDI.DE",
-    "IE000M7V94E1": "NUKL.DE",
-    "LU0476289466": "D5BI.DE",
-    "IE00BJ0KDQ92": "XDWD.DE",
-    "IE00B6R52259": "IUSQ.DE",
-    "IE000BI8OT95": "MWRD.MI",
-    "LU1900066462": "LEER.DE",
-    "IE000U58J0M1": "INRE.PA",
-    "IE00BMG6Z448": "MTPI.PA",
-    "IE00BK5BR626": "VGWE.DE",
-}
-
-
-def mise_a_jour_linxea(fichier=None):
-    fichier = fichier or LINXEA_FILE
-    print("\n" + "-" * 55)
-    print(f"  LINXEA (fichier local) : {fichier}")
-    print("-" * 55)
-    if not fichier or not os.path.exists(fichier):
-        print("  -> Fichier linxea.xlsx absent : etape ignoree (normal en cloud).")
-        return
-    try:
-        from openpyxl import load_workbook
-    except ImportError:
-        print("  -> openpyxl non installe : etape ignoree (pip install openpyxl).")
-        return
-    try:
-        wb = load_workbook(fichier)
-    except Exception as e:
-        print(f"  ERREUR lecture : {e}")
-        return
-    if "update python" not in wb.sheetnames:
-        print(f"  ERREUR : onglet 'update python' introuvable. Onglets : {wb.sheetnames}")
-        return
-
-    ws = wb["update python"]
-    cnb = taux_cnb()
-    btc = prix_binance("BTCEUR")
-    eth = prix_binance("ETHEUR")
-
-    # Detection de la ligne d'en-tete
-    ligne_entete = 1
-    for r in range(1, 10):
-        if any(ws.cell(r, c).value for c in range(1, ws.max_column + 1)):
-            ligne_entete = r
-            break
-
-    entetes = {ws.cell(ligne_entete, c).value: c
-               for c in range(1, ws.max_column + 1)
-               if ws.cell(ligne_entete, c).value}
-
-    col_nom    = entetes.get("Nom")
-    col_isin   = entetes.get("ISIN")
-    col_source = entetes.get("information source")
-    col_prix   = entetes.get("price last closure")
-    col_date   = entetes.get("Last Update")
-    col_ticker = entetes.get("Ticker")
-
-    if not all([col_nom, col_isin, col_source, col_prix, col_date]):
-        print(f"  ERREUR : colonnes manquantes. Trouvees : {list(entetes.keys())}")
-        return
-
-    if col_ticker is None:
-        ws.insert_cols(col_isin + 1)
-        ws.cell(ligne_entete, col_isin + 1).value = "Ticker"
-        col_ticker = col_isin + 1
-        if col_source > col_isin: col_source += 1
-        if col_prix   > col_isin: col_prix   += 1
-        if col_date   > col_isin: col_date   += 1
-
-    maintenant = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    nb_ok = nb_ko = 0
-
-    for row_num in range(ligne_entete + 1, ws.max_row + 1):
-        nom    = ws.cell(row_num, col_nom).value
-        isin   = str(ws.cell(row_num, col_isin).value or "").strip()
-        source = str(ws.cell(row_num, col_source).value or "").strip().lower()
-        if not nom:
-            continue
-
-        prix = None
-        ticker_affiche = None
-        nom_l = nom.lower()
-
-        if source == "binance":
-            if "bitcoin" in nom_l:
-                prix, ticker_affiche = btc, "BTC/EUR"
-            elif "etherum" in nom_l or "ethereum" in nom_l:
-                prix, ticker_affiche = eth, "ETH/EUR"
-        elif source == "cnb.cz":
-            if "eur" in nom_l:
-                prix, ticker_affiche = cnb.get("EUR"), "EUR/CZK"
-            elif "usd" in nom_l:
-                prix, ticker_affiche = cnb.get("USD"), "USD/CZK"
-            elif "gbp" in nom_l:
-                prix, ticker_affiche = cnb.get("GBP"), "GBP/CZK"
-        elif source == "boursorama":
-            ticker_affiche = ISIN_VERS_TICKER.get(isin)
-            if ticker_affiche:
-                prix = prix_yahoo(ticker_affiche)
-                print(f"  {'OK' if prix else 'KO'} {nom} ({ticker_affiche}) -> {prix}")
-            else:
-                print(f"  ?? {nom} — ticker inconnu (ISIN: {isin})")
-
-        if ticker_affiche:
-            ws.cell(row_num, col_ticker).value = ticker_affiche
-        if prix is not None:
-            ws.cell(row_num, col_prix).value = prix
-            ws.cell(row_num, col_date).value = maintenant
-            nb_ok += 1
-        elif source in ("boursorama", "binance", "cnb.cz"):
-            nb_ko += 1
-
-    wb.save(fichier)
-    print(f"\n  OK : {nb_ok} mis a jour  |  KO : {nb_ko} non trouves  ->  linxea.xlsx sauvegarde.")
-
-
 def _native_to_eur(prix, cur, cnb):
     """Convertit un prix natif en EUR via les taux CNB (CZK par unite)."""
     try:
@@ -726,7 +610,7 @@ def append_price_history():
     """Enregistre le close EUR du jour de chaque titre du portefeuille dans
     l'onglet Historique_Prix (format long Date|Ticker|Close_EUR). Upsert : une
     seule valeur par (date, ticker) -> le dernier run du jour fait foi."""
-    if not PORTFOLIO_EUR_CLOSES:
+    if not PORTFOLIO_EUR_CLOSES and not CONSEQ_HIST_OBS:
         print("  [Historique] aucun close a stocker.")
         return
     if not GOOGLE_OK:
@@ -750,6 +634,11 @@ def append_price_history():
         today = datetime.date.today().isoformat()
         for tk, close in PORTFOLIO_EUR_CLOSES.items():
             data[(today, tk)] = str(close)
+        # VL Conseq datées (CZK) par date publiée -> upsert (idempotent)
+        for tk, obs in (CONSEQ_HIST_OBS or {}).items():
+            dd, nav = obs
+            if dd and nav:
+                data[(dd, tk)] = str(nav)
         out = [["Date", "Ticker", "Close_EUR"]]
         for key in sorted(data.keys()):
             out.append([key[0], key[1], data[key]])
@@ -757,7 +646,7 @@ def append_price_history():
         svc.values().update(spreadsheetId=SHEET_ID, range=f"{HIST_TAB}!A1",
                             valueInputOption="RAW", body={"values": out}).execute()
         print(f"  Historique_Prix : {len(PORTFOLIO_EUR_CLOSES)} close du {today} "
-              f"enregistres ({len(out)-1} lignes au total)")
+              f"+ {len(CONSEQ_HIST_OBS)} VL Conseq datees ({len(out)-1} lignes au total)")
     except Exception as e:
         print(f"  [Historique] erreur : {e}")
 
@@ -770,15 +659,10 @@ if __name__ == "__main__":
     ok   = ecrire_google_sheets(rows)
     if ok:
         print("\n✅ Prix et variations écrits")
+    else:
+        print("\n⚠️  Vérifier service_account.json")
     try:
         append_price_history()
     except Exception as e:
         print(f"  [Historique] {e}")
-    else:
-        print("\n⚠️  Vérifier service_account.json")
-    # Etape locale optionnelle : mise a jour du fichier linxea.xlsx
-    try:
-        mise_a_jour_linxea(LINXEA_FILE)
-    except Exception as e:
-        print(f"  [Linxea] {e}")
     print("=" * 55)
