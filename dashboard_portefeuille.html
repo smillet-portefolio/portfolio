@@ -334,6 +334,7 @@
     <button class="tab" onclick="sw('sect',this)">Secteurs</button>
     <button class="tab" onclick="sw('oblig',this)">📋 Obligations non cotées</button>
     <button class="tab" onclick="sw('conseq',this)">🏦 Conseq Retraite</button>
+    <button class="tab" onclick="sw('jito',this)">🏦 Retraite Jito</button>
     <button class="tab" onclick="sw('immo',this)">🏠 Immobilier</button>
     <button class="tab" onclick="sw('enfants',this)">👶 Investissements enfants</button>
   </div>
@@ -1273,6 +1274,7 @@ function sw(id, btn) {
   if (id === 'cash')         setTimeout(renderCashSection, 50);
   if (id === 'dividend')     setTimeout(renderDividendSection, 50);
   if (id === 'conseq')       setTimeout(renderConseqSection, 50);
+  if (id === 'jito')         setTimeout(renderJitoSection, 50);
   if (id === 'oblig') {
     setTimeout(function() {
       renderObligSection();
@@ -1876,7 +1878,12 @@ function renderPatrimoine(){
     penInv+=inv; penVal+=val; penPnl+=pv;
     penT+=rowT(f.name, czk(inv), czk(val), pv);
   });
-  const pensionCzk = (typeof CONSEQ_DATA!=='undefined' && CONSEQ_DATA && CONSEQ_DATA.valueNow) ? CONSEQ_DATA.valueNow : penVal;
+  let pensionCzk = (typeof CONSEQ_DATA!=='undefined' && CONSEQ_DATA && CONSEQ_DATA.valueNow) ? CONSEQ_DATA.valueNow : penVal;
+  // Retraite Jito (NN penzijní připojištění, CZK)
+  if (typeof jtValueNow==='function' && typeof JITO_STATE!=='undefined' && JITO_STATE) {
+    const jVal=jtValueNow(), jInv=jtInvestedNow();
+    if (jVal>0) { penInv+=jInv; penVal+=jVal; penPnl+=(jVal-jInv); pensionCzk+=jVal; penT+=rowT('NN Penzijní připojištění — Jito', czk(jInv), czk(jVal), jVal-jInv); }
+  }
 
   // Band
   const brutCzk = finVal + pensionCzk + immoEstCzk;
@@ -5243,7 +5250,7 @@ const GS_KEYS = [
   'book2_extra_rows','book2_all_rows','book2_overrides','book2_comm',
   'sold_rows','closed_positions',
   'portfolio_prices','portfolio_variations','portfolio_fx',
-  'cash_data','oblig_data','dividend_data','conseq_data','conseq_detail_extra','conseq_detail_del',
+  'cash_data','oblig_data','dividend_data','conseq_data','conseq_detail_extra','conseq_detail_del','jito_data',
   'etf_comp_override','etf_comp_date',
   'direct_sector_overrides',
   'evo_history',
@@ -5262,7 +5269,7 @@ const GS_KEYS = [
 const GS_AUTOSAVE_SET = new Set(GS_KEYS);
 const GS_USER_SET = new Set([
   'book2_extra_rows','book2_all_rows','book2_overrides','book2_comm',
-  'sold_rows','closed_positions','cash_data','oblig_data','dividend_data','conseq_data','conseq_detail_extra','conseq_detail_del',
+  'sold_rows','closed_positions','cash_data','oblig_data','dividend_data','conseq_data','conseq_detail_extra','conseq_detail_del','jito_data',
   'direct_sector_overrides'
 ]);
 let _gsReady     = false;
@@ -5618,6 +5625,9 @@ async function gsLoadPrices() {
     // Rafraîchir l'onglet Conseq (conversion EUR au dernier FX) si visible
     if (document.getElementById('conseq')?.classList.contains('active')) {
       setTimeout(() => { if (typeof renderConseqSection === 'function') renderConseqSection(); }, 150);
+    }
+    if (document.getElementById('jito')?.classList.contains('active')) {
+      setTimeout(() => { if (typeof renderJitoSection === 'function') renderJitoSection(); }, 150);
     }
     // Si l'onglet ETF composition est visible, re-render les tableaux avec les nouveaux prix
     if (document.getElementById('etf_comp')?.classList.contains('active')) {
@@ -7425,6 +7435,415 @@ function renderConseqSection(){
     if(tbl) tbl.querySelectorAll('th[data-csqcol]').forEach(function(th){var s=th.querySelector('.ov-arr');if(s){var on=th.dataset.csqcol===st.col;s.textContent=on?(st.dir<0?' ▼':' ▲'):' ⇅';s.style.opacity=on?'1':'0.35';}});
   }
 }
+
+// ==============================================================================
+// ONGLET RETRAITE JITO — NN Penzijní připojištění (fonds transformé, CZK)
+// Contrat 0053635715 (ING Penzijní fond → NN Penzijní společnost), effet 1.2.2004.
+// Modèle : compte en CZK, versements (participant PÚ / employeur PZ / autres PO /
+// État SP) + valorisation créditée chaque 1er janvier pour l'année précédente.
+// Données de base = relevés annuels 2004-2025 (JITO_DATA). Ajouts/modifs → localStorage 'jito_data'.
+// ==============================================================================
+const JITO_DATA={"years":{"2004":{"open":0.0,"close":1500.0,"rate":null,"ypu":13.4,"ysp":4.4,"contrib":100,"split":{"tot":{"pu":1100,"pz":0,"po":0,"zh":0,"sp":400,"zhsp":0,"tot":1500}},"rec":false},"2005":{"open":1500.0,"close":3317.8,"rate":4.16,"ypu":72.4,"ysp":32.0,"contrib":100,"split":{"tot":{"pu":2300,"pz":0,"po":0,"zh":13.4,"sp":1000,"zhsp":4.4,"tot":3317.8}},"rec":false},"2006":{"open":3317.8,"close":5222.2,"rate":3.6,"ypu":108.0,"ysp":50.2,"contrib":100,"split":{"tot":{"pu":3500,"pz":0,"po":0,"zh":85.8,"sp":1600,"zhsp":36.4,"tot":5222.2}},"rec":false},"2007":{"open":5222.2,"close":7180.4,"rate":2.5,"ypu":107.2,"ysp":50.8,"contrib":100,"split":{"tot":{"pu":4700,"pz":0,"po":0,"zh":193.8,"sp":2200,"zhsp":86.6,"tot":7180.4}},"rec":false},"2008":{"open":7180.4,"close":9138.4,"rate":0.04,"ypu":2.2,"ysp":1.0,"contrib":100,"split":{"tot":{"pu":5900,"pz":0,"po":0,"zh":301,"sp":2800,"zhsp":137.4,"tot":9138.4}},"rec":false},"2009":{"open":9138.4,"close":10941.6,"rate":null,"ypu":6.2,"ysp":3.0,"contrib":100,"split":{"tot":{"pu":7100,"pz":0,"po":0,"zh":303.2,"sp":3400,"zhsp":138.4,"tot":10941.6}},"rec":true},"2010":{"open":10941.6,"close":12750.8,"rate":2.14,"ypu":171.2,"ysp":83.2,"contrib":100,"split":{"tot":{"pu":8300,"pz":0,"po":0,"zh":309.4,"sp":4000,"zhsp":141.4,"tot":12750.8}},"rec":false},"2011":{"open":12750.8,"close":14805.2,"rate":2.14,"ypu":199.6,"ysp":97.4,"contrib":500,"split":{"tot":{"pu":9500,"pz":0,"po":0,"zh":480.6,"sp":4600,"zhsp":224.6,"tot":14805.2}},"rec":false},"2012":{"open":14805.2,"close":22102.2,"rate":1.75,"ypu":225.8,"ysp":98.2,"contrib":500,"split":{"tot":{"pu":15100,"pz":0,"po":0,"zh":680.2,"sp":6000,"zhsp":322,"tot":22102.2}},"rec":false},"2013":{"open":22102.2,"close":30046.2,"rate":1.41,"ypu":268.8,"ysp":104.0,"contrib":1500,"split":{"tot":{"pu":21100,"pz":0,"po":0,"zh":906,"sp":7620,"zhsp":420.2,"tot":30046.2}},"rec":false},"2014":{"open":30046.2,"close":49779.0,"rate":1.13,"ypu":349.2,"ysp":106.8,"contrib":1500,"split":{"star":{"pu":19050.0,"pz":0.0,"po":0.0,"zh":587.4,"sp":4990.0,"zhsp":262.1,"tot":24889.5},"vys":{"pu":19050.0,"pz":0.0,"po":0.0,"zh":587.4,"sp":4990.0,"zhsp":262.1,"tot":24889.5},"tot":{"pu":38100.0,"pz":0.0,"po":0.0,"zh":1174.8,"sp":9980.0,"zhsp":524.2,"tot":49779.0}},"rec":false},"2015":{"open":49779.0,"close":70995.0,"rate":0.88,"ypu":432.2,"ysp":107.8,"contrib":1500,"split":{"star":{"pu":28050.0,"pz":0.0,"po":0.0,"zh":762.0,"sp":6370.0,"zhsp":315.5,"tot":35497.5},"vys":{"pu":28050.0,"pz":0.0,"po":0.0,"zh":762.0,"sp":6370.0,"zhsp":315.5,"tot":35497.5},"tot":{"pu":56100.0,"pz":0.0,"po":0.0,"zh":1524.0,"sp":12740.0,"zhsp":631.0,"tot":70995.0}},"rec":false},"2016":{"open":70995.0,"close":92295.0,"rate":0.6,"ypu":403.6,"ysp":90.4,"contrib":1500,"split":{"star":{"pu":37050.0,"pz":0.0,"po":0.0,"zh":978.1,"sp":7750.0,"zhsp":369.4,"tot":46147.5},"vys":{"pu":37050.0,"pz":0.0,"po":0.0,"zh":978.1,"sp":7750.0,"zhsp":369.4,"tot":46147.5},"tot":{"pu":74100.0,"pz":0.0,"po":0.0,"zh":1956.2,"sp":15500.0,"zhsp":738.8,"tot":92295.0}},"rec":false},"2017":{"open":92295.0,"close":113549.0,"rate":0.69,"ypu":594.4,"ysp":124.4,"contrib":1500,"split":{"star":{"pu":46050.0,"pz":0.0,"po":0.0,"zh":1179.9,"sp":9130.0,"zhsp":414.6,"tot":56774.5},"vys":{"pu":46050.0,"pz":0.0,"po":0.0,"zh":1179.9,"sp":9130.0,"zhsp":414.6,"tot":56774.5},"tot":{"pu":92100.0,"pz":0.0,"po":0.0,"zh":2359.8,"sp":18260.0,"zhsp":829.2,"tot":113549.0}},"rec":false},"2018":{"open":113549.0,"close":135027.8,"rate":0.61,"ypu":633.8,"ysp":126.6,"contrib":1500,"split":{"star":{"pu":55050.0,"pz":0.0,"po":0.0,"zh":1477.1,"sp":10510.0,"zhsp":476.8,"tot":67513.9},"vys":{"pu":55050.0,"pz":0.0,"po":0.0,"zh":1477.1,"sp":10510.0,"zhsp":476.8,"tot":67513.9},"tot":{"pu":110100.0,"pz":0.0,"po":0.0,"zh":2954.2,"sp":21020.0,"zhsp":953.6,"tot":135027.8}},"rec":false},"2019":{"open":135027.8,"close":156548.2,"rate":0.95,"ypu":1173.4,"ysp":226.4,"contrib":1500,"split":{"star":{"pu":64050.0,"pz":0.0,"po":0.0,"zh":1794.0,"sp":11890.0,"zhsp":540.1,"tot":78274.1},"vys":{"pu":64050.0,"pz":0.0,"po":0.0,"zh":1794.0,"sp":11890.0,"zhsp":540.1,"tot":78274.1},"tot":{"pu":128100.0,"pz":0.0,"po":0.0,"zh":3588.0,"sp":23780.0,"zhsp":1080.2,"tot":156548.2}},"rec":false},"2020":{"open":156548.2,"close":178708.0,"rate":0.71,"ypu":1005.0,"ysp":188.8,"contrib":1500,"split":{"star":{"pu":73050.0,"pz":0.0,"po":0.0,"zh":2380.7,"sp":13270.0,"zhsp":653.3,"tot":89354.0},"vys":{"pu":73050.0,"pz":0.0,"po":0.0,"zh":2380.7,"sp":13270.0,"zhsp":653.3,"tot":89354.0},"tot":{"pu":146100.0,"pz":0.0,"po":0.0,"zh":4761.4,"sp":26540.0,"zhsp":1306.6,"tot":178708.0}},"rec":false},"2021":{"open":178708.0,"close":200661.8,"rate":0.33,"ypu":523.0,"ysp":96.2,"contrib":1500.0,"split":{"star":{"pu":82050.0,"pz":0.0,"po":0.0,"zh":3630.9,"sp":14650.0,"zhsp":0,"tot":100330.9},"vys":{"pu":82050.0,"pz":0.0,"po":0.0,"zh":3630.9,"sp":14650.0,"zhsp":0,"tot":100330.9},"tot":{"pu":164100.0,"pz":0.0,"po":0.0,"zh":7261.8,"sp":29300.0,"zhsp":0,"tot":200661.8}},"rec":false},"2022":{"open":200661.8,"close":226041.0,"rate":1.08,"ypu":1948.8,"ysp":349.8,"contrib":2000.0,"split":{"star":{"pu":93050.0,"pz":0.0,"po":0.0,"zh":3940.5,"sp":16030.0,"zhsp":0,"tot":113020.5},"vys":{"pu":93050.0,"pz":0.0,"po":0.0,"zh":3940.5,"sp":16030.0,"zhsp":0,"tot":113020.5},"tot":{"pu":186100.0,"pz":0.0,"po":0.0,"zh":7881.0,"sp":32060.0,"zhsp":0,"tot":226041.0}},"rec":false},"2023":{"open":226041.0,"close":255099.6,"rate":0.28,"ypu":576.0,"ysp":99.2,"contrib":3000.0,"split":{"star":{"pu":105050.0,"pz":0.0,"po":0.0,"zh":5089.8,"sp":17410.0,"zhsp":0,"tot":127549.8},"vys":{"pu":105050.0,"pz":0.0,"po":0.0,"zh":5089.8,"sp":17410.0,"zhsp":0,"tot":127549.8},"tot":{"pu":210100.0,"pz":0.0,"po":0.0,"zh":10179.6,"sp":34820.0,"zhsp":0,"tot":255099.6}},"rec":false},"2024":{"open":255099.6,"close":320184.8,"rate":0.83,"ypu":2051.8,"ysp":318.0,"contrib":3000.0,"split":{"star":{"pu":122550.0,"pz":13160.0,"po":0.0,"zh":5427.4,"sp":18955.0,"zhsp":0,"tot":160092.4},"vys":{"pu":122550.0,"pz":13160.0,"po":0.0,"zh":5427.4,"sp":18955.0,"zhsp":0,"tot":160092.4},"tot":{"pu":245100.0,"pz":26320.0,"po":0.0,"zh":10854.8,"sp":37910.0,"zhsp":0,"tot":320184.8}},"rec":false},"2025":{"open":320184.8,"close":394908.6,"rate":1.2,"ypu":4327.2,"ysp":null,"contrib":3000.0,"split":{"star":{"pu":140550.0,"pz":29302.0,"po":0.0,"zh":6612.3,"sp":20995.0,"zhsp":0,"tot":197459.3},"vys":{"pu":140550.0,"pz":29292.0,"po":0.0,"zh":6612.3,"sp":20995.0,"zhsp":0,"tot":197449.3},"tot":{"pu":281100.0,"pz":58594.0,"po":0.0,"zh":13224.6,"sp":41990.0,"zhsp":0,"tot":394908.6}},"rec":false}},"moves":[["2004-01-20","PU",100],["2004-03-17","PU",100],["2004-04-13","PU",100],["2004-05-25","PU",100],["2004-05-27","SP",100],["2004-06-14","PU",100],["2004-07-13","PU",100],["2004-08-12","PU",100],["2004-08-27","SP",150],["2004-09-14","PU",100],["2004-10-12","PU",100],["2004-11-12","PU",100],["2004-11-26","SP",150],["2004-12-14","PU",100],["2005-01-01","ZH",13.4],["2005-01-01","ZH_SP",4.4],["2005-01-12","PU",100],["2005-02-14","PU",100],["2005-02-23","SP",150],["2005-03-14","PU",100],["2005-04-12","PU",100],["2005-05-12","PU",100],["2005-05-27","SP",150],["2005-06-14","PU",100],["2005-07-12","PU",100],["2005-08-12","PU",100],["2005-08-29","SP",150],["2005-09-13","PU",100],["2005-10-12","PU",100],["2005-11-14","PU",100],["2005-11-28","SP",150],["2005-12-13","PU",100],["2006-01-01","ZH",72.4],["2006-01-01","ZH_SP",32.0],["2006-01-12","PU",100],["2006-02-14","PU",100],["2006-02-24","SP",150],["2006-03-14","PU",100],["2006-04-12","PU",100],["2006-05-12","PU",100],["2006-05-29","SP",150],["2006-06-13","PU",100],["2006-07-12","PU",100],["2006-08-14","PU",100],["2006-08-28","SP",150],["2006-09-12","PU",100],["2006-10-12","PU",100],["2006-11-14","PU",100],["2006-11-28","SP",150],["2006-12-12","PU",100],["2007-01-01","ZH",108.0],["2007-01-01","ZH_SP",50.2],["2007-01-12","PU",100],["2007-02-13","PU",100],["2007-02-26","SP",150],["2007-03-13","PU",100],["2007-04-12","PU",100],["2007-05-14","PU",100],["2007-05-29","SP",150],["2007-06-12","PU",100],["2007-07-12","PU",100],["2007-08-14","PU",100],["2007-08-29","SP",150],["2007-09-12","PU",100],["2007-10-12","PU",100],["2007-11-13","PU",100],["2007-11-28","SP",150],["2007-12-12","PU",100],["2008-01-01","ZH",107.2],["2008-01-01","ZH_SP",50.8],["2008-01-14","PU",100],["2008-02-12","PU",100],["2008-02-27","SP",150],["2008-03-12","PU",100],["2008-04-14","PU",100],["2008-05-13","PU",100],["2008-05-28","SP",150],["2008-06-12","PU",100],["2008-07-14","PU",100],["2008-08-12","PU",100],["2008-08-27","SP",150],["2008-09-12","PU",100],["2008-10-14","PU",100],["2008-11-12","PU",100],["2008-11-26","SP",150],["2008-12-12","PU",100],["2009-01-01","ZH",2.2],["2009-01-01","ZH_SP",1.0],["2009-01-12","PU",100],["2009-02-12","PU",100],["2009-02-26","SP",150],["2009-03-12","PU",100],["2009-04-14","PU",100],["2009-05-12","PU",100],["2009-05-27","SP",150],["2009-06-12","PU",100],["2009-07-13","PU",100],["2009-08-12","PU",100],["2009-08-27","SP",150],["2009-09-14","PU",100],["2009-10-12","PU",100],["2009-11-12","PU",100],["2009-11-26","SP",150],["2009-12-14","PU",100],["2010-01-01","ZH",6.2],["2010-01-01","ZH_SP",3.0],["2010-01-12","PU",100],["2010-02-12","PU",100],["2010-02-24","SP",150],["2010-03-12","PU",100],["2010-04-13","PU",100],["2010-05-12","PU",100],["2010-05-27","SP",150],["2010-06-14","PU",100],["2010-07-13","PU",100],["2010-08-12","PU",100],["2010-08-27","SP",150],["2010-09-14","PU",100],["2010-10-12","PU",100],["2010-11-12","PU",100],["2010-11-26","SP",150],["2010-12-14","PU",100],["2011-01-01","ZH",171.2],["2011-01-01","ZH_SP",83.2],["2011-01-12","PU",100],["2011-02-14","PU",100],["2011-02-24","SP",150],["2011-03-14","PU",100],["2011-04-12","PU",100],["2011-05-12","PU",100],["2011-05-27","SP",150],["2011-06-14","PU",100],["2011-07-12","PU",100],["2011-08-12","PU",100],["2011-08-29","SP",150],["2011-09-13","PU",100],["2011-10-12","PU",100],["2011-11-14","PU",100],["2011-11-28","SP",150],["2011-12-13","PU",100],["2012-01-01","ZH",199.6],["2012-01-01","ZH_SP",97.4],["2012-01-12","PU",100],["2012-02-14","PU",500],["2012-02-27","SP",150],["2012-03-13","PU",500],["2012-04-12","PU",500],["2012-05-14","PU",500],["2012-05-29","SP",350],["2012-06-12","PU",500],["2012-07-12","PU",500],["2012-08-14","PU",500],["2012-08-29","SP",450],["2012-09-12","PU",500],["2012-10-12","PU",500],["2012-11-13","PU",500],["2012-11-28","SP",450],["2012-12-18","PU",500],["2013-01-01","ZH",225.8],["2013-01-01","ZH_SP",98.2],["2013-01-18","PU",500],["2013-02-19","PU",500],["2013-02-26","SP",450],["2013-03-19","PU",500],["2013-04-29","PU",500],["2013-05-20","PU",500],["2013-05-29","SP",390],["2013-06-18","PU",500],["2013-07-18","PU",500],["2013-08-20","PU",500],["2013-08-28","SP",390],["2013-09-18","PU",500],["2013-10-18","PU",500],["2013-11-19","PU",500],["2013-11-27","SP",390],["2013-12-18","PU",500],["2014-01-01","ZH",268.8],["2014-01-01","ZH_SP",104.0],["2014-01-20","PU",500.0],["2014-02-18","PU",1500.0],["2014-02-26","SP",390.0],["2014-03-18","PU",1500.0],["2014-04-18","PU",1500.0],["2014-05-20","PU",1500.0],["2014-05-28","SP",590.0],["2014-06-18","PU",1500.0],["2014-07-18","PU",1500.0],["2014-08-19","PU",1500.0],["2014-08-27","SP",690.0],["2014-09-18","PU",1500.0],["2014-10-20","PU",1500.0],["2014-11-19","PU",1500.0],["2014-11-27","SP",690.0],["2014-12-18","PU",1500.0],["2015-01-01","ZH",349.2],["2015-01-01","ZH_SP",106.8],["2015-01-20","PU",1500.0],["2015-02-18","PU",1500.0],["2015-02-25","SP",690.0],["2015-03-18","PU",1500.0],["2015-04-20","PU",1500.0],["2015-05-19","PU",1500.0],["2015-05-27","SP",690.0],["2015-06-18","PU",1500.0],["2015-07-20","PU",1500.0],["2015-08-18","PU",1500.0],["2015-08-27","SP",690.0],["2015-09-18","PU",1500.0],["2015-10-20","PU",1500.0],["2015-11-19","PU",1500.0],["2015-11-27","SP",690.0],["2015-12-18","PU",1500.0],["2016-01-01","ZH",432.2],["2016-01-01","ZH_SP",107.8],["2016-01-19","PU",1500.0],["2016-02-18","PU",1500.0],["2016-02-26","SP",690.0],["2016-03-18","PU",1500.0],["2016-04-19","PU",1500.0],["2016-05-18","PU",1500.0],["2016-05-27","SP",690.0],["2016-06-20","PU",1500.0],["2016-07-19","PU",1500.0],["2016-08-18","PU",1500.0],["2016-08-29","SP",690.0],["2016-09-20","PU",1500.0],["2016-10-18","PU",1500.0],["2016-11-21","PU",1500.0],["2016-11-28","SP",690.0],["2016-12-20","PU",1500.0],["2017-01-01","ZH",403.6],["2017-01-01","ZH_SP",90.4],["2017-01-18","PU",1500.0],["2017-02-20","PU",1500.0],["2017-02-27","SP",690.0],["2017-03-20","PU",1500.0],["2017-04-19","PU",1500.0],["2017-05-17","PU",1500.0],["2017-05-29","SP",690.0],["2017-06-19","PU",1500.0],["2017-07-17","PU",1500.0],["2017-08-17","PU",1500.0],["2017-08-29","SP",690.0],["2017-09-18","PU",1500.0],["2017-10-17","PU",1500.0],["2017-11-20","PU",1500.0],["2017-11-28","SP",690.0],["2017-12-18","PU",1500.0],["2018-01-01","ZH",594.4],["2018-01-01","ZH_SP",124.4],["2018-01-17","PU",1500.0],["2018-02-19","PU",1500.0],["2018-02-27","SP",690.0],["2018-03-19","PU",1500.0],["2018-04-17","PU",1500.0],["2018-05-17","PU",1500.0],["2018-05-29","SP",690.0],["2018-06-18","PU",1500.0],["2018-07-17","PU",1500.0],["2018-08-17","PU",1500.0],["2018-08-30","SP",690.0],["2018-09-17","PU",1500.0],["2018-10-17","PU",1500.0],["2018-11-19","PU",1500.0],["2018-11-28","SP",690.0],["2018-12-17","PU",1500.0],["2019-01-01","ZH",633.8],["2019-01-01","ZH_SP",126.6],["2019-01-17","PU",1500.0],["2019-02-18","PU",1500.0],["2019-02-27","SP",690.0],["2019-03-18","PU",1500.0],["2019-04-17","PU",1500.0],["2019-05-17","PU",1500.0],["2019-05-29","SP",690.0],["2019-06-17","PU",1500.0],["2019-07-17","PU",1500.0],["2019-08-19","PU",1500.0],["2019-08-29","SP",690.0],["2019-09-17","PU",1500.0],["2019-10-17","PU",1500.0],["2019-11-18","PU",1500.0],["2019-11-29","SP",690.0],["2019-12-17","PU",1500.0],["2020-01-01","ZH",1173.4],["2020-01-01","ZH_SP",226.4],["2020-01-17","PU",1500.0],["2020-02-17","PU",1500.0],["2020-02-27","SP",690.0],["2020-03-17","PU",1500.0],["2020-04-17","PU",1500.0],["2020-05-18","PU",1500.0],["2020-05-28","SP",690.0],["2020-06-17","PU",1500.0],["2020-07-17","PU",1500.0],["2020-08-17","PU",1500.0],["2020-08-28","SP",690.0],["2020-09-17","PU",1500.0],["2020-10-19","PU",1500.0],["2020-11-18","PU",1500.0],["2020-11-27","SP",690.0],["2020-12-17","PU",1500.0],["2021-01-01","ZH",1005.0],["2021-01-01","ZH_SP",188.8],["2021-01-18","PU",1500.0],["2021-02-17","PU",1500.0],["2021-02-25","SP",690.0],["2021-03-17","PU",1500.0],["2021-04-19","PU",1500.0],["2021-05-17","PU",1500.0],["2021-05-28","SP",690.0],["2021-06-17","PU",1500.0],["2021-07-19","PU",1500.0],["2021-08-17","PU",1500.0],["2021-08-30","SP",690.0],["2021-09-17","PU",1500.0],["2021-10-18","PU",1500.0],["2021-11-18","PU",1500.0],["2021-11-29","SP",690.0],["2021-12-17","PU",1500.0],["2022-01-01","ZH",523.0],["2022-01-01","ZH_SP",96.2],["2022-01-17","PU",1500.0],["2022-02-17","PU",1500.0],["2022-02-25","SP",690.0],["2022-03-17","PU",1500.0],["2022-04-19","PU",1500.0],["2022-05-17","PU",2000.0],["2022-05-30","SP",690.0],["2022-06-17","PU",2000.0],["2022-07-18","PU",2000.0],["2022-08-17","PU",2000.0],["2022-08-29","SP",690.0],["2022-09-19","PU",2000.0],["2022-10-17","PU",2000.0],["2022-11-18","PU",2000.0],["2022-11-29","SP",690.0],["2022-12-19","PU",2000.0],["2023-01-01","ZH",1948.8],["2023-01-01","ZH_SP",349.8],["2023-01-17","PU",2000.0],["2023-02-17","PU",2000.0],["2023-02-27","SP",690.0],["2023-03-17","PU",2000.0],["2023-04-17","PU",2000.0],["2023-05-17","PU",2000.0],["2023-05-30","SP",690.0],["2023-06-19","PU",2000.0],["2023-07-17","PU",2000.0],["2023-08-17","PU",2000.0],["2023-08-30","SP",690.0],["2023-09-18","PU",2000.0],["2023-10-17","PU",2000.0],["2023-11-20","PU",2000.0],["2023-11-29","SP",690.0],["2023-12-18","PU",2000.0],["2024-01-01","ZH",576.0],["2024-01-01","ZH_SP",99.2],["2024-01-17","PU",2000.0],["2024-02-19","PU",3000.0],["2024-02-28","SP",690.0],["2024-03-06","PU",3000.0],["2024-03-06","PZ",2632.0],["2024-04-05","PU",3000.0],["2024-04-05","PZ",2632.0],["2024-05-07","PU",3000.0],["2024-05-07","PZ",2632.0],["2024-05-30","SP",690.0],["2024-06-06","PU",3000.0],["2024-06-06","PZ",2632.0],["2024-07-04","PU",3000.0],["2024-07-04","PZ",2632.0],["2024-08-06","PU",3000.0],["2024-08-06","PZ",2632.0],["2024-08-29","SP",690.0],["2024-09-05","PU",3000.0],["2024-09-05","PZ",2632.0],["2024-10-04","PU",3000.0],["2024-10-04","PZ",2632.0],["2024-11-05","PU",3000.0],["2024-11-05","PZ",2632.0],["2024-11-28","SP",1020.0],["2024-12-05","PU",3000.0],["2024-12-05","PZ",2632.0],["2025-01-01","ZH",2051.8],["2025-01-01","ZH_SP",318.0],["2025-01-07","PU",3000.0],["2025-01-07","PZ",2632.0],["2025-02-06","PU",3000.0],["2025-02-06","PZ",2632.0],["2025-02-27","SP",1020.0],["2025-03-05","PU",3000.0],["2025-03-05","PZ",2701.0],["2025-04-04","PU",3000.0],["2025-04-04","PZ",2701.0],["2025-05-07","PU",3000.0],["2025-05-07","PZ",2701.0],["2025-05-29","SP",1020.0],["2025-06-05","PU",3000.0],["2025-06-05","PZ",2701.0],["2025-07-04","PU",3000.0],["2025-07-04","PZ",2701.0],["2025-08-06","PU",3000.0],["2025-08-06","PZ",2701.0],["2025-08-28","SP",1020.0],["2025-09-04","PU",3000.0],["2025-09-04","PZ",2701.0],["2025-10-06","PU",3000.0],["2025-10-06","PZ",2701.0],["2025-11-04","PU",3000.0],["2025-11-04","PZ",2701.0],["2025-11-28","SP",1020.0],["2025-12-04","PU",3000.0],["2025-12-04","PZ",2701.0],["2026-01-01","ZH",4327.2]]};
+const JT_LABELS={PU:'Contribution participant',PZ:"Cotisation employeur",PO:'Contribution autres',SP:"Allocation de l'État",ZH:'Valorisation (PÚ/PZ/PO)',ZH_SP:"Valorisation (État)"};
+const JT_SHORT={PU:'Participant',PZ:'Employeur',PO:'Autres',SP:'État',ZH:'Valorisation',ZH_SP:'Valor. État'};
+const JT_COL={PU:'#4caf82',PZ:'#5a8dee',PO:'#9ca3af',SP:'#f0956e',ZH:'#9b87d4',ZH_SP:'#c4b5fd'};
+const JT_INVEST_TYPES=['PU','PZ','PO','SP'];
+var JITO_STATE=null;
+let _jtFilter='all';
+let _jtSort={col:'date',dir:-1};
+var _jtEvoRange='all';
+function jtSave(){ try{ localStorage.setItem('jito_data', JSON.stringify(JITO_STATE)); }catch(e){} }
+function jtFmt(n){ return Math.round(n).toLocaleString('fr'); }
+function jtFmt2(n){ return (Math.round(n*100)/100).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function jtEur(czk){ return (typeof csqEur==='function')?csqEur(czk):czk/24.3; }
+function jtPct(v,dec){ return v==null?'—':((v>=0?'+':'')+v.toFixed(dec==null?1:dec).replace('.',',')+'%'); }
+function jtColOf(n){ return n==null?'var(--text2)':(n>=0?'#4caf82':'#e06c6c'); }
+function _jtTh(col,label,align){ return '<th onclick="jtSort(\''+col+'\')" data-jtcol="'+col+'" style="cursor:pointer;user-select:none;text-align:'+(align||'left')+'">'+label+'<span class="ov-arr" style="font-size:9px;opacity:.35"> ⇅</span></th>'; }
+// Toutes les lignes (relevés + ajouts utilisateur, hors suppressions), triées par date.
+function jtAllMoves(){
+  var out=[]; var del=(JITO_STATE&&JITO_STATE.del)||[];
+  (JITO_DATA.moves||[]).forEach(function(m,i){ var id='s'+i; if(del.indexOf(id)>=0) return; out.push({id:id,date:m[0],type:m[1],amt:+m[2],src:'seed'}); });
+  ((JITO_STATE&&JITO_STATE.extra)||[]).forEach(function(m){ out.push({id:m.id,date:m.date,type:m.type,amt:+m.amt,src:m.src||'user'}); });
+  out.sort(function(a,b){ return a.date.localeCompare(b.date)||a.id.localeCompare(b.id); });
+  return out;
+}
+function jtIsInvest(t){ return JT_INVEST_TYPES.indexOf(t)>=0; }
+// Récapitulatif par année : versé, valorisation créditée, solde fin d'année (relevé ou reconstitué).
+function jtYears(){
+  var mv=jtAllMoves(); if(!mv.length) return [];
+  var y0=+mv[0].date.slice(0,4), y1=Math.max(new Date().getFullYear(), +mv[mv.length-1].date.slice(0,4));
+  var ys=[], bal=0, cumInv=0, sums={};
+  mv.forEach(function(m){ var y=m.date.slice(0,4); if(!sums[y]) sums[y]={PU:0,PZ:0,PO:0,SP:0,ZH:0,ZH_SP:0}; sums[y][m.type]=(sums[y][m.type]||0)+m.amt; });
+  var over=(JITO_STATE&&JITO_STATE.years)||{};
+  for(var y=y0;y<=y1;y++){
+    var s=sums[y]||{PU:0,PZ:0,PO:0,SP:0,ZH:0,ZH_SP:0};
+    var seed=JITO_DATA.years[String(y)]||null, ov=over[String(y)]||{};
+    var inv=s.PU+s.PZ+s.PO+s.SP, credited=s.ZH+s.ZH_SP;
+    var open=bal; bal=Math.round((bal+inv+credited)*100)/100; cumInv+=inv;
+    // valorisation AU TITRE de l'année y (créditée le 1.1 de y+1) : relevé sinon ligne 1.1.(y+1)
+    var nx=sums[y+1]; var yieldY=(ov.yieldY!=null)?ov.yieldY:(seed&&seed.ypu!=null?(seed.ypu+(seed.ysp||0)):(nx?(nx.ZH+nx.ZH_SP):null));
+    var rate=(ov.rate!=null)?ov.rate:(seed?seed.rate:null);
+    var closeRef=(ov.close!=null)?ov.close:(seed?seed.close:null);
+    ys.push({year:y,open:open,PU:s.PU,PZ:s.PZ,PO:s.PO,SP:s.SP,invested:inv,credited:credited,cumInv:cumInv,valueEnd:bal,closeRef:closeRef,delta:(closeRef!=null?Math.round((bal-closeRef)*100)/100:null),yieldY:yieldY,rate:rate,rec:!!(seed&&seed.rec),hasStmt:!!seed,cum:null});
+  }
+  var c={PU:0,PZ:0,PO:0,SP:0,ZH:0,ZH_SP:0};
+  ys.forEach(function(r){ var s=sums[r.year]||{}; Object.keys(c).forEach(function(k){ c[k]+=(s[k]||0); }); r.cum=Object.assign({},c); });
+  return ys;
+}
+function jtTotals(){
+  var t={PU:0,PZ:0,PO:0,SP:0,ZH:0,ZH_SP:0,bal:0,inv:0,first:null,last:null};
+  jtAllMoves().forEach(function(m){ t[m.type]=(t[m.type]||0)+m.amt; t.bal+=m.amt; if(jtIsInvest(m.type)) t.inv+=m.amt; if(!t.first) t.first=m.date; t.last=m.date; });
+  t.bal=Math.round(t.bal*100)/100; t.gain=Math.round((t.ZH+t.ZH_SP)*100)/100;
+  return t;
+}
+function jtValueNow(){ return JITO_STATE?jtTotals().bal:0; }
+function jtInvestedNow(){ return JITO_STATE?jtTotals().inv:0; }
+
+(function initJito(){
+  var raw=null; try{ raw=localStorage.getItem('jito_data'); }catch(e){}
+  if(raw){ try{ JITO_STATE=JSON.parse(raw); }catch(e){ JITO_STATE=null; } }
+  if(!JITO_STATE||typeof JITO_STATE!=='object') JITO_STATE={extra:[],del:[],years:{},params:{pu:3000,pz:2701,sp:1020,dayPu:5,dayPz:5}};
+  JITO_STATE.extra=JITO_STATE.extra||[]; JITO_STATE.del=JITO_STATE.del||[]; JITO_STATE.years=JITO_STATE.years||{};
+  JITO_STATE.params=Object.assign({pu:3000,pz:2701,sp:1020,dayPu:5,dayPz:5},JITO_STATE.params||{});
+  if(!raw) jtSave();
+
+  var wrapper=document.querySelector('.tabs').parentElement;
+  var sec=document.createElement('div'); sec.id='jito'; sec.className='section';
+  var TP='font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:12px';
+  var BTN='background:var(--blue);color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer';
+  var BTN2='background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:8px;padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer';
+  sec.innerHTML=
+    '<h2 style="font-size:18px;font-weight:700;margin:0 0 4px">🏦 Retraite Jito — NN Penzijní připojištění</h2>'+
+    '<p class="section-desc" style="margin-bottom:16px">Contrat 0053635715 (ING Penzijní fond → NN Penzijní společnost), effet 1.2.2004 — montants en CZK. Fonds transformé : compte en CZK sans parts, valorisation créditée chaque 1er janvier. Contributions participant, employeur et allocations de l\'État.</p>'+
+    '<div class="sub-tabs" style="margin-bottom:16px"><button class="sub-tab active" data-v="main" onclick="jtSwitchView(\'main\')">Vue d\'ensemble</button><button class="sub-tab" data-v="evo" onclick="jtSwitchView(\'evo\')">Évolution</button><button class="sub-tab" data-v="hist" onclick="jtSwitchView(\'hist\')">Historique des versements</button><button class="sub-tab" data-v="stmt" onclick="jtSwitchView(\'stmt\')">Relevés annuels</button></div>'+
+    '<div id="jt_view_main">'+
+    '<div id="jt_kpis" style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:18px"></div>'+
+    '<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:20px;margin-bottom:22px">'+
+      '<div class="card" style="padding:18px"><p style="'+TP+'">Évolution par année</p><div class="chart-wrap" style="height:300px"><canvas id="jt_evo"></canvas></div></div>'+
+      '<div class="card" style="padding:18px"><p style="'+TP+'">Répartition par source</p><div style="display:flex;flex-direction:column;align-items:center;gap:14px"><canvas id="jt_src" width="200" height="200"></canvas><div id="jt_src_leg" style="width:100%"></div></div></div>'+
+    '</div>'+
+    '<div class="card" style="padding:18px;margin-bottom:22px"><p style="'+TP+'">Détail par sous-compte (dernier relevé)</p>'+
+      '<div style="overflow-x:auto"><table id="jt_split_tbl"><thead><tr><th>Sous-compte</th><th style="text-align:right">Participant (PÚ)</th><th style="text-align:right">Employeur (PZ)</th><th style="text-align:right">Autres (PO)</th><th style="text-align:right">État (SP)</th><th style="text-align:right">Valorisation</th><th style="text-align:right">Total</th></tr></thead><tbody id="jt_split_body"></tbody></table></div>'+
+      '<p id="jt_split_note" style="font-size:11px;color:var(--text2);margin-top:8px"></p></div>'+
+    '<h3 style="font-size:14px;font-weight:700;margin:0 0 10px">Performance par année</h3>'+
+    '<div style="overflow-x:auto;margin-bottom:24px"><table id="jt_perf_tbl"><thead><tr>'+
+      '<th>Année</th><th style="text-align:right">Versé (année)</th><th style="text-align:right">dont État</th><th style="text-align:right">Versé cumulé</th><th style="text-align:right">Valeur fin d\'année</th><th style="text-align:right" title="Valorisation au titre de l\'année (créditée le 1er janvier suivant)">Valorisation (année)</th><th style="text-align:right" title="Taux de valorisation crédité (méthodologie APS/APF)">Taux crédité</th><th style="text-align:right">Plus-value cumulée</th><th style="text-align:right">Perf. cumulée</th><th style="text-align:right" title="Rendement annuel money-weighted (XIRR) de l\'année">XIRR annuel</th>'+
+    '</tr></thead><tbody id="jt_perf_body"></tbody></table></div>'+
+    '<p style="font-size:11px;color:var(--text2)">Versé = contributions participant + employeur + autres + allocation de l\'État. Plus-value = valorisation créditée par le fonds. La valeur de l\'année en cours est reconstituée = solde au 31/12 précédent + versements saisis + valorisation créditée au 1er janvier.</p>'+
+    '</div>'+
+    '<div id="jt_view_hist" style="display:none">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px">'+
+      '<h3 style="font-size:14px;font-weight:700;margin:0">Historique des versements</h3>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap"><button onclick="jtOpenGen()" style="'+BTN2+'">⚙️ Versements attendus</button><button onclick="jtOpenAdd()" style="'+BTN+'">+ Nouveau versement</button></div>'+
+    '</div>'+
+    '<div id="jt_filters" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap"></div>'+
+    '<div class="csq-scroll1"><table id="jt_tx_tbl"><thead><tr>'+
+      _jtTh('date','Date','left')+_jtTh('PU','Participant','right')+_jtTh('PZ','Employeur','right')+_jtTh('SP',"Allocation de l'État",'right')+_jtTh('ZH','Valorisation','right')+_jtTh('total','Total','right')+'<th style="text-align:center">Actions</th>'+
+    '</tr></thead><tbody id="jt_tx_body"></tbody></table></div>'+
+    '</div>'+
+    '<div id="jt_view_stmt" style="display:none">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px"><h3 style="font-size:14px;font-weight:700;margin:0">Relevés annuels (compte participant)</h3><button onclick="jtOpenYear()" style="'+BTN+'">✎ Solde / taux d\'un relevé</button></div>'+
+      '<div class="csq-scroll1"><table id="jt_stmt_tbl"><thead><tr><th>Année</th><th style="text-align:right">Solde 1/1</th><th style="text-align:right">Participant</th><th style="text-align:right">Employeur</th><th style="text-align:right">État</th><th style="text-align:right" title="Valorisation créditée le 1er janvier (au titre de l\'année précédente)">Valorisation créditée</th><th style="text-align:right">Solde 31/12</th><th style="text-align:right">Relevé 31/12</th><th style="text-align:right">Écart</th><th style="text-align:right">Taux (année)</th><th style="text-align:right">Cumul participant</th><th style="text-align:right">Cumul employeur</th><th style="text-align:right">Cumul État</th><th style="text-align:right">Cumul valorisation</th><th>Source</th></tr></thead><tbody id="jt_stmt_body"></tbody></table></div>'+
+      '<p style="font-size:11px;color:var(--text2);margin-top:8px">Solde 31/12 = solde 1/1 + mouvements de l\'année (reconstitué) ; Relevé = solde figurant sur le relevé annuel NN/ING. Un écart signale une ligne manquante ou en trop. 2009 : relevé absent, mouvements reconstitués (soldes 31/12/2008 et 1/1/2010 cohérents).</p>'+
+    '</div>'+
+    '<div id="jt_view_evo" style="display:none">'+
+    '<div id="jt_evo_kpis" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px"></div>'+
+    '<div id="jt_evo_filters" style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">'+
+      ['all|Tout','10a|10A','5a|5A','3a|3A','1a|1A','ytd|YTD'].map(function(s){var p=s.split('|');return '<button class="filter-btn jt-evo-btn'+(p[0]==='all'?' active':'')+'" data-r="'+p[0]+'" onclick="jtEvoSetRange(\''+p[0]+'\')">'+p[1]+'</button>';}).join('')+
+    '</div>'+
+    '<div class="card" style="padding:18px;margin-bottom:22px"><p id="jt_evo_title" style="'+TP+'">Évolution de la valeur — mensuelle (CZK)</p><div class="chart-wrap" style="height:340px"><canvas id="jt_evo_line"></canvas></div>'+
+      '<p style="font-size:11px;color:var(--text2);margin-top:8px">Solde reconstitué mois par mois à partir des mouvements du compte (relevés annuels 2004-2025 + saisies), comparé au montant cumulé versé (participant + employeur + État). La valorisation est créditée une fois par an, le 1er janvier.</p></div>'+
+    '<div class="card" style="padding:18px;margin-bottom:22px"><p style="'+TP+'">Valorisation créditée par année (CZK) et taux</p><div class="chart-wrap" style="height:220px"><canvas id="jt_evo_bar"></canvas></div></div>'+
+    '<div style="max-height:440px;overflow:auto"><table id="jt_evo_tbl"><thead><tr><th>Mois</th><th style="text-align:right">Versé cumulé</th><th style="text-align:right">Valeur</th><th style="text-align:right">Plus-value</th><th style="text-align:right">Perf.</th><th style="text-align:right">Mouvements du mois</th></tr></thead><tbody id="jt_evo_tbody"></tbody></table></div>'+
+    '</div>';
+  wrapper.appendChild(sec);
+
+  var inp=(typeof _csqInp!=='undefined')?_csqInp:'style="width:100%;padding:7px 9px;border:1px solid var(--border2);border-radius:7px;background:var(--bg2);color:var(--text);font-size:13px;box-sizing:border-box"';
+  var mk=function(id,w,html){ var m=document.createElement('div'); m.id=id; m.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center'; m.innerHTML='<div style="background:var(--bg);border-radius:12px;padding:22px;width:'+w+'px;max-width:92vw;border:1px solid var(--border2)">'+html+'</div>'; document.body.appendChild(m); };
+  var lab=function(t){ return '<label style="display:block;font-size:11px;color:var(--text2);margin-bottom:3px">'+t+'</label>'; };
+  var typeSel=function(id){ return '<select id="'+id+'" '+inp+'>'+['PU','PZ','SP','PO','ZH','ZH_SP'].map(function(k){return '<option value="'+k+'">'+JT_LABELS[k]+'</option>';}).join('')+'</select>'; };
+  var foot=function(cancel,ok,okLabel){ return '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button onclick="'+cancel+'" style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:8px 14px;cursor:pointer">Annuler</button><button onclick="'+ok+'" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-weight:600">'+(okLabel||'Enregistrer')+'</button></div>'; };
+  mk('jtModal',420,'<h3 id="jtf_title" style="margin:0 0 14px;font-size:16px">Nouveau versement</h3><input type="hidden" id="jtf_id">'+
+    '<div style="margin-bottom:10px">'+lab('Type')+typeSel('jtf_type')+'</div>'+
+    '<div style="margin-bottom:10px">'+lab('Date')+'<input id="jtf_date" type="date" '+inp+'></div>'+
+    '<div style="margin-bottom:4px">'+lab('Montant (CZK)')+'<input id="jtf_amount" type="number" step="0.01" oninput="jtPreview()" '+inp+'><div id="jtf_prev" style="font-size:11px;color:var(--text2);margin-top:5px"></div></div>'+
+    foot('jtCloseModal()','jtSubmit()'));
+  mk('jtGenModal',460,'<h3 style="margin:0 0 6px;font-size:16px">Versements attendus</h3><p style="font-size:12px;color:var(--text2);margin:0 0 12px">Génère les lignes mensuelles manquantes (participant + employeur) et l\'allocation trimestrielle de l\'État (fin février / mai / août / novembre) depuis le dernier versement saisi jusqu\'à aujourd\'hui. Les mois déjà présents ne sont pas dupliqués.</p>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+      '<div>'+lab('Participant / mois (CZK)')+'<input id="jtg_pu" type="number" step="1" '+inp+'></div><div>'+lab('Jour du mois')+'<input id="jtg_daypu" type="number" min="1" max="28" '+inp+'></div>'+
+      '<div>'+lab('Employeur / mois (CZK)')+'<input id="jtg_pz" type="number" step="1" '+inp+'></div><div>'+lab('Jour du mois')+'<input id="jtg_daypz" type="number" min="1" max="28" '+inp+'></div>'+
+      '<div>'+lab('État / trimestre (CZK)')+'<input id="jtg_sp" type="number" step="1" '+inp+'></div><div>'+lab('Jusqu\'au')+'<input id="jtg_until" type="date" '+inp+'></div>'+
+    '</div><div id="jtg_prev" style="font-size:12px;color:var(--text2);margin-top:10px"></div>'+
+    foot('jtCloseGen()','jtGenSubmit()','Générer'));
+  mk('jtYearModal',420,'<h3 style="margin:0 0 6px;font-size:16px">Solde / taux d\'un relevé annuel</h3><p style="font-size:12px;color:var(--text2);margin:0 0 12px">Saisir le solde au 31/12 figurant sur le relevé NN et le taux de valorisation crédité, pour contrôler la reconstitution.</p>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div>'+lab('Année')+'<input id="jty_year" type="number" min="2004" max="2100" '+inp+'></div><div>'+lab('Solde 31/12 (CZK)')+'<input id="jty_close" type="number" step="0.01" '+inp+'></div>'+
+    '<div>'+lab('Taux crédité (%)')+'<input id="jty_rate" type="number" step="0.01" '+inp+'></div><div>'+lab('Valorisation au titre de l\'année (CZK)')+'<input id="jty_yield" type="number" step="0.01" '+inp+'></div></div>'+
+    foot('jtCloseYear()','jtYearSubmit()'));
+})();
+
+function jtSwitchView(v){
+  ['main','hist','stmt','evo'].forEach(function(k){ var el=document.getElementById('jt_view_'+k); if(el) el.style.display=(k===v)?'':'none'; });
+  document.querySelectorAll('#jito .sub-tabs .sub-tab').forEach(function(b){ b.classList.toggle('active', b.dataset.v===v); });
+  if(v==='evo') renderJtEvoTab();
+  if(v==='stmt') renderJtStmt();
+  if(v==='main') renderJitoSection();
+}
+function jtSetFilter(f){ _jtFilter=f; renderJitoSection(); }
+function jtSort(col){ if(_jtSort.col===col)_jtSort.dir*=-1; else {_jtSort.col=col;_jtSort.dir=-1;} renderJitoSection(); }
+function jtNotify(){ jtSave(); renderJitoSection(); if(typeof renderPatrimoine==='function' && document.getElementById('patrimoine') && document.getElementById('patrimoine').classList.contains('active')) renderPatrimoine(); }
+// ---- Ajout / édition / suppression d'une ligne
+function jtOpenAdd(){ var m=document.getElementById('jtModal'); document.getElementById('jtf_title').textContent='Nouveau versement'; document.getElementById('jtf_id').value=''; document.getElementById('jtf_type').value='PU'; document.getElementById('jtf_date').value=new Date().toISOString().slice(0,10); document.getElementById('jtf_amount').value=JITO_STATE.params.pu||''; jtPreview(); m.style.display='flex'; }
+function jtEdit(id){ var r=jtAllMoves().filter(function(m){return m.id===id;})[0]; if(!r) return; var m=document.getElementById('jtModal'); document.getElementById('jtf_title').textContent='Modifier la ligne'; document.getElementById('jtf_id').value=id; document.getElementById('jtf_type').value=r.type; document.getElementById('jtf_date').value=r.date; document.getElementById('jtf_amount').value=r.amt; jtPreview(); m.style.display='flex'; }
+function jtCloseModal(){ document.getElementById('jtModal').style.display='none'; }
+function jtPreview(){ var a=parseFloat(document.getElementById('jtf_amount').value)||0; document.getElementById('jtf_prev').textContent=a?('≈ '+jtFmt(jtEur(a))+' €'):''; }
+function jtSubmit(){
+  var id=document.getElementById('jtf_id').value, type=document.getElementById('jtf_type').value, date=document.getElementById('jtf_date').value, amt=parseFloat(document.getElementById('jtf_amount').value);
+  if(!date||!amt||isNaN(amt)){ alert('Date et montant requis.'); return; }
+  if(id){ jtDel(id,true); }
+  JITO_STATE.extra.push({id:'x'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),date:date,type:type,amt:Math.round(amt*100)/100,src:'user'});
+  jtCloseModal(); jtNotify();
+}
+function jtDel(id,silent){
+  if(!silent && !confirm('Supprimer cette ligne ?')) return;
+  if(id.charAt(0)==='s'){ if(JITO_STATE.del.indexOf(id)<0) JITO_STATE.del.push(id); }
+  else JITO_STATE.extra=JITO_STATE.extra.filter(function(m){return m.id!==id;});
+  if(!silent) jtNotify();
+}
+// ---- Génération des versements attendus
+function jtOpenGen(){ var p=JITO_STATE.params; document.getElementById('jtg_pu').value=p.pu; document.getElementById('jtg_pz').value=p.pz; document.getElementById('jtg_sp').value=p.sp; document.getElementById('jtg_daypu').value=p.dayPu||5; document.getElementById('jtg_daypz').value=p.dayPz||5; document.getElementById('jtg_until').value=new Date().toISOString().slice(0,10); document.getElementById('jtg_prev').textContent=''; document.getElementById('jtGenModal').style.display='flex'; }
+function jtCloseGen(){ document.getElementById('jtGenModal').style.display='none'; }
+function jtGenSubmit(){
+  var p={pu:parseFloat(document.getElementById('jtg_pu').value)||0,pz:parseFloat(document.getElementById('jtg_pz').value)||0,sp:parseFloat(document.getElementById('jtg_sp').value)||0,dayPu:parseInt(document.getElementById('jtg_daypu').value)||5,dayPz:parseInt(document.getElementById('jtg_daypz').value)||5};
+  var until=document.getElementById('jtg_until').value||new Date().toISOString().slice(0,10);
+  JITO_STATE.params=p;
+  var mv=jtAllMoves(); var have={PU:{},PZ:{},SP:{}};
+  mv.forEach(function(m){ if(have[m.type]) have[m.type][m.date.slice(0,7)]=1; });
+  var lastPu=mv.filter(function(m){return m.type==='PU';}).pop(); var start=lastPu?lastPu.date.slice(0,7):until.slice(0,7);
+  var y=+start.slice(0,4), mo=+start.slice(5,7)+1; if(mo>12){mo=1;y++;}
+  var n=0; var pad=function(x){return (x<10?'0':'')+x;};
+  while(true){
+    var ym=y+'-'+pad(mo); if(ym>until.slice(0,7)) break;
+    var dPu=ym+'-'+pad(p.dayPu), dPz=ym+'-'+pad(p.dayPz);
+    if(p.pu&&!have.PU[ym]&&dPu<=until){ JITO_STATE.extra.push({id:'g'+ym+'pu',date:dPu,type:'PU',amt:p.pu,src:'gen'}); n++; }
+    if(p.pz&&!have.PZ[ym]&&dPz<=until){ JITO_STATE.extra.push({id:'g'+ym+'pz',date:dPz,type:'PZ',amt:p.pz,src:'gen'}); n++; }
+    if(p.sp&&[2,5,8,11].indexOf(mo)>=0&&!have.SP[ym]){ var dSp=ym+'-'+(mo===2?'27':'28'); if(dSp<=until){ JITO_STATE.extra.push({id:'g'+ym+'sp',date:dSp,type:'SP',amt:p.sp,src:'gen'}); n++; } }
+    mo++; if(mo>12){mo=1;y++;}
+  }
+  jtCloseGen(); jtNotify();
+  if(!n) alert('Aucune ligne à ajouter : les mois jusqu\'à cette date sont déjà présents.');
+}
+// ---- Solde / taux d'un relevé
+function jtOpenYear(){ var y=new Date().getFullYear()-1; var ov=JITO_STATE.years[String(y)]||{}; var sd=JITO_DATA.years[String(y)]||{}; document.getElementById('jty_year').value=y; document.getElementById('jty_close').value=(ov.close!=null?ov.close:(sd.close!=null?sd.close:'')); document.getElementById('jty_rate').value=(ov.rate!=null?ov.rate:(sd.rate!=null?sd.rate:'')); document.getElementById('jty_yield').value=(ov.yieldY!=null?ov.yieldY:''); document.getElementById('jtYearModal').style.display='flex'; }
+function jtCloseYear(){ document.getElementById('jtYearModal').style.display='none'; }
+function jtYearSubmit(){
+  var y=parseInt(document.getElementById('jty_year').value); if(!y){ alert('Année requise.'); return; }
+  var o={}; var c=parseFloat(document.getElementById('jty_close').value); if(!isNaN(c)) o.close=c;
+  var r=parseFloat(document.getElementById('jty_rate').value); if(!isNaN(r)) o.rate=r;
+  var yy=parseFloat(document.getElementById('jty_yield').value); if(!isNaN(yy)) o.yieldY=yy;
+  JITO_STATE.years[String(y)]=o; jtCloseYear(); jtSave(); renderJtStmt(); renderJitoSection();
+}
+
+// ---- Vue d'ensemble
+function renderJitoSection(){
+  if(!JITO_STATE||!document.getElementById('jito')) return;
+  var years=jtYears(), T=jtTotals(), fmt=jtFmt;
+  var totInv=T.inv, valNow=T.bal, gain=valNow-totInv, perf=totInv?gain/totInv*100:0;
+  var eurTxt=function(czk){return '≈ '+fmt(jtEur(czk))+' €';};
+  var cy=new Date().getFullYear();
+  var comp=years.filter(function(y){return y.year<cy;});
+  var lastComp=comp.length?comp[comp.length-1]:null;
+  var mv=jtAllMoves();
+  var avgAnn=null;
+  if(lastComp&&typeof _xirrAnnual==='function'){
+    var endISO=lastComp.year+'-12-31', bd={};
+    mv.forEach(function(m){ if(jtIsInvest(m.type)&&m.date<=endISO) bd[m.date]=(bd[m.date]||0)+m.amt; });
+    var cfs=Object.keys(bd).sort().map(function(d){return {t:new Date(d+'T00:00:00'),a:-bd[d]};});
+    if(cfs.length){ cfs.push({t:new Date(endISO+'T00:00:00'),a:lastComp.valueEnd}); var r=_xirrAnnual(cfs); if(r!=null) avgAnn=r*100; }
+  }
+  var ytd=null; var cur=years.filter(function(y){return y.year===cy;})[0];
+  if(cur&&cur.open){ var base=cur.open+cur.invested; ytd=base?(cur.credited/base*100):null; }
+  var lastRate=null,lastRateY=null; comp.slice().reverse().some(function(y){ if(y.rate!=null){lastRate=y.rate;lastRateY=y.year;return true;} return false; });
+  var kel=document.getElementById('jt_kpis');
+  if(kel){
+    var cards=[
+      {l:'Total versé',v:fmt(totInv)+' CZK',s:'participant '+fmt(T.PU)+' · employeur '+fmt(T.PZ)+' · État '+fmt(T.SP),c:'var(--text)'},
+      {l:'Valeur actuelle',v:fmt(valNow)+' CZK',s:eurTxt(valNow)+(T.last?' · dernier mouvement '+T.last.split('-').reverse().join('/'):''),c:'var(--text)'},
+      {l:'Plus-value (valorisation)',v:(gain>=0?'+':'')+fmt(gain)+' CZK',s:eurTxt(gain),c:jtColOf(gain)},
+      {l:'Performance totale',v:jtPct(perf),s:"depuis l'origine (2004)",c:jtColOf(perf)},
+      {l:'Performance annuelle moyenne',v:jtPct(avgAnn),s:'XIRR money-weighted · années complètes',c:jtColOf(avgAnn)},
+      {l:'Dernier taux crédité',v:(lastRate!=null?lastRate.toFixed(2).replace('.',',')+' %':'—'),s:(lastRateY?'au titre de '+lastRateY:'')+(ytd!=null?' · YTD '+jtPct(ytd,2):''),c:'var(--text)'}
+    ];
+    kel.innerHTML=cards.map(function(c){return '<div style="background:var(--bg2);border-radius:8px;padding:14px 16px;border:1px solid var(--border2)"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:6px">'+c.l+'</div><div style="font-size:19px;font-weight:700;color:'+c.c+'">'+c.v+'</div><div style="font-size:11px;color:var(--text2);margin-top:4px">'+c.s+'</div></div>';}).join('');
+  }
+  // Performance par année
+  var pb=document.getElementById('jt_perf_body');
+  if(pb){
+    var rows=[];
+    years.forEach(function(y,i){
+      var prev=i>0?years[i-1].valueEnd:0, v=y.valueEnd, gainC=v-y.cumInv, perfC=y.cumInv?gainC/y.cumInv*100:null;
+      var isCur=(y.year===cy);
+      var endISO=isCur?new Date().toISOString().slice(0,10):(y.year+'-12-31'), ys=y.year+'-01-01', xc=null;
+      if(typeof _xirrAnnual==='function'){
+        var cfs=[]; if(prev>0) cfs.push({t:new Date(ys+'T00:00:00'),a:-prev});
+        mv.forEach(function(m){ if(jtIsInvest(m.type)&&m.date>=ys&&m.date<=endISO) cfs.push({t:new Date(m.date+'T00:00:00'),a:-m.amt}); });
+        cfs.push({t:new Date(endISO+'T00:00:00'),a:v});
+        if(!isCur){ var r=_xirrAnnual(cfs); xc=(r!=null)?r*100:null; }
+      }
+      var lbl=isCur?(y.year+' (en cours)'):String(y.year);
+      rows.push('<tr><td><strong>'+lbl+'</strong>'+(y.rec?' <span title="Relevé absent — reconstitué" style="color:var(--text2);font-size:10px">≈</span>':'')+'</td>'+
+        '<td class="mono" style="text-align:right">'+fmt(y.invested)+'</td>'+
+        '<td class="mono" style="text-align:right;color:var(--text2)">'+fmt(y.SP)+'</td>'+
+        '<td class="mono" style="text-align:right">'+fmt(y.cumInv)+'</td>'+
+        '<td class="mono" style="text-align:right">'+fmt(v)+'</td>'+
+        '<td class="mono" style="text-align:right;color:'+jtColOf(y.yieldY)+'">'+(y.yieldY!=null?('+'+jtFmt2(y.yieldY)):'—')+'</td>'+
+        '<td class="mono" style="text-align:right">'+(y.rate!=null?y.rate.toFixed(2).replace('.',',')+' %':'—')+'</td>'+
+        '<td class="mono" style="text-align:right;color:'+jtColOf(gainC)+'">'+(gainC>=0?'+':'')+fmt(gainC)+'</td>'+
+        '<td class="mono" style="text-align:right;color:'+jtColOf(perfC)+'">'+jtPct(perfC)+'</td>'+
+        '<td class="mono" style="text-align:right;color:'+jtColOf(xc)+'">'+(xc!=null?jtPct(xc,2):'—')+'</td></tr>');
+    });
+    pb.innerHTML=rows.reverse().join('');
+  }
+  // Sous-comptes (dernier relevé)
+  var sb=document.getElementById('jt_split_body');
+  if(sb){
+    var ly=null; Object.keys(JITO_DATA.years).forEach(function(k){ var s=JITO_DATA.years[k]; if(s.split&&s.split.star&&(!ly||+k>ly.y)) ly={y:+k,s:s.split}; });
+    var html='';
+    if(ly){
+      [['star','Starobní penze (pension vieillesse)'],['vys','Výsluhová penze (pension de service)'],['tot','Total']].forEach(function(p){
+        var r=ly.s[p[0]]; if(!r) return; var zh=(r.zh||0)+(r.zhsp||0); var b=p[0]==='tot'?'font-weight:700;background:var(--bg3)':'';
+        html+='<tr style="'+b+'"><td>'+p[1]+'</td><td class="mono" style="text-align:right">'+jtFmt2(r.pu)+'</td><td class="mono" style="text-align:right">'+jtFmt2(r.pz)+'</td><td class="mono" style="text-align:right">'+jtFmt2(r.po||0)+'</td><td class="mono" style="text-align:right">'+jtFmt2(r.sp)+'</td><td class="mono" style="text-align:right;color:#9b87d4">'+jtFmt2(zh)+'</td><td class="mono" style="text-align:right">'+jtFmt2(r.tot)+'</td></tr>';
+      });
+    }
+    html+='<tr style="font-weight:700"><td>Situation actuelle (reconstituée)</td><td class="mono" style="text-align:right">'+jtFmt2(T.PU)+'</td><td class="mono" style="text-align:right">'+jtFmt2(T.PZ)+'</td><td class="mono" style="text-align:right">'+jtFmt2(T.PO)+'</td><td class="mono" style="text-align:right">'+jtFmt2(T.SP)+'</td><td class="mono" style="text-align:right;color:#9b87d4">'+jtFmt2(T.ZH+T.ZH_SP)+'</td><td class="mono" style="text-align:right">'+jtFmt2(T.bal)+'</td></tr>';
+    sb.innerHTML=html;
+    var nt=document.getElementById('jt_split_note'); if(nt) nt.textContent=(ly?'Répartition entre les deux sous-comptes (50/50 par construction du plan n°3) selon le relevé au 31/12/'+ly.y+'. ':'')+'La ligne « situation actuelle » cumule tous les mouvements saisis (relevés + ajouts).';
+  }
+  jtSrcChart(T); jtEvoChart(years);
+  var evv=document.getElementById('jt_view_evo'); if(evv&&evv.style.display!=='none') renderJtEvoTab();
+  var stv=document.getElementById('jt_view_stmt'); if(stv&&stv.style.display!=='none') renderJtStmt();
+  // Historique
+  var fel=document.getElementById('jt_filters');
+  if(fel){
+    var ys=['all'].concat(Object.keys(mv.reduce(function(o,m){o[m.date.slice(0,4)]=1;return o;},{})).sort().reverse());
+    fel.innerHTML=ys.map(function(y){var on=_jtFilter===y;var lab=y==='all'?'Toutes années':y;return '<button onclick="jtSetFilter(\''+y+'\')" style="border:1px solid '+(on?'var(--blue)':'var(--border2)')+';background:'+(on?'var(--blue)':'var(--bg2)')+';color:'+(on?'#fff':'var(--text)')+';border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer">'+lab+'</button>';}).join('');
+  }
+  var tb=document.getElementById('jt_tx_body');
+  if(tb){
+    var cols=['PU','PZ','SP','ZH'];
+    var byd={};
+    mv.forEach(function(m){
+      if(_jtFilter!=='all'&&m.date.slice(0,4)!==_jtFilter) return;
+      if(!byd[m.date]) byd[m.date]={PU:0,PZ:0,SP:0,ZH:0,items:[]};
+      var k=(m.type==='ZH_SP')?'ZH':(m.type==='PO'?'PU':m.type);
+      byd[m.date][k]+=m.amt; byd[m.date].items.push(m);
+    });
+    var dts=Object.keys(byd), st=_jtSort;
+    var tt=function(d){return byd[d].PU+byd[d].PZ+byd[d].SP+byd[d].ZH;};
+    dts.sort(function(a,b){ if(st.col==='date') return st.dir*a.localeCompare(b); if(st.col==='total') return st.dir*(tt(a)-tt(b)); return st.dir*((byd[a][st.col]||0)-(byd[b][st.col]||0)); });
+    var cT={PU:0,PZ:0,SP:0,ZH:0},grand=0; dts.forEach(function(d){cols.forEach(function(c){cT[c]+=byd[d][c];}); grand+=tt(d);});
+    var totalRow='<tr class="csq-tot"><td>Total ('+dts.length+')</td>'+cols.map(function(c){return '<td class="mono" style="text-align:right">'+fmt(cT[c])+' CZK</td>';}).join('')+'<td class="mono" style="text-align:right">'+fmt(grand)+' CZK</td><td></td></tr>';
+    var dataHtml=dts.map(function(d){
+      var b=byd[d];
+      var acts=b.items.map(function(m){ var tag=(m.src==='gen')?'<span title="Généré (versement attendu)" style="font-size:9px;color:#f0956e">⚙</span>':(m.src==='user'?'<span title="Saisie manuelle" style="font-size:9px;color:#5a8dee">✎</span>':''); return '<span style="white-space:nowrap;margin:0 3px" title="'+JT_LABELS[m.type]+' '+jtFmt2(m.amt)+'">'+tag+'<button onclick="jtEdit(\''+m.id+'\')" title="Modifier '+JT_SHORT[m.type]+'" style="background:none;border:none;cursor:pointer;font-size:12px">✏️</button><button onclick="jtDel(\''+m.id+'\')" title="Supprimer '+JT_SHORT[m.type]+'" style="background:none;border:none;cursor:pointer;font-size:12px">🗑️</button></span>'; }).join('');
+      return '<tr><td class="mono">'+d.split('-').reverse().join('/')+'</td>'+cols.map(function(c){var v=b[c];return '<td class="mono" style="text-align:right;color:'+(v?(c==='ZH'?'#9b87d4':'var(--text)'):'var(--text2)')+'">'+(v?fmt(v):'·')+'</td>';}).join('')+'<td class="mono" style="text-align:right;font-weight:600">'+fmt(tt(d))+'</td><td style="text-align:center">'+acts+'</td></tr>';
+    }).join('');
+    tb.innerHTML=totalRow+dataHtml;
+    var tbl=document.getElementById('jt_tx_tbl');
+    if(tbl) tbl.querySelectorAll('th[data-jtcol]').forEach(function(th){var s=th.querySelector('.ov-arr');if(s){var on=th.dataset.jtcol===st.col;s.textContent=on?(st.dir>0?' ▲':' ▼'):' ⇅';s.style.opacity=on?'1':'.35';}});
+  }
+}
+function jtSrcChart(T){
+  var cv=document.getElementById('jt_src'); if(!cv||typeof Chart==='undefined') return;
+  var parts=[['PU',T.PU],['PZ',T.PZ],['SP',T.SP],['ZH',T.ZH+T.ZH_SP],['PO',T.PO]].filter(function(p){return p[1]>0;});
+  var tot=parts.reduce(function(s,p){return s+p[1];},0);
+  if(window._jtSrcChart){try{window._jtSrcChart.destroy();}catch(e){}}
+  window._jtSrcChart=new Chart(cv.getContext('2d'),{type:'doughnut',data:{labels:parts.map(function(p){return JT_SHORT[p[0]];}),datasets:[{data:parts.map(function(p){return Math.round(p[1]);}),backgroundColor:parts.map(function(p){return JT_COL[p[0]];}),borderWidth:2,borderColor:'rgba(255,255,255,0.5)'}]},options:{responsive:false,cutout:'58%',plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return ' '+jtFmt(c.parsed)+' CZK ('+(tot?(c.parsed/tot*100).toFixed(1):0)+'%)';}}}}}});
+  var leg=document.getElementById('jt_src_leg');
+  if(leg) leg.innerHTML=parts.map(function(p){ var pct=tot?p[1]/tot*100:0; return '<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border2)"><span style="width:10px;height:10px;border-radius:2px;background:'+JT_COL[p[0]]+';flex-shrink:0"></span><span style="flex:1;font-size:12px">'+JT_LABELS[p[0]]+'</span><span class="mono" style="font-size:11px;color:var(--text2)">'+jtFmt(p[1])+' · '+pct.toFixed(1)+'%</span></div>'; }).join('');
+}
+function jtEvoChart(years){
+  var cv=document.getElementById('jt_evo'); if(!cv||typeof Chart==='undefined') return;
+  var labels=years.map(function(y){return String(y.year);});
+  var vals=years.map(function(y){return Math.round(y.valueEnd);});
+  var cum=years.map(function(y){return Math.round(y.cumInv);});
+  var cr=years.map(function(y){return y.yieldY!=null?Math.round(y.yieldY):null;});
+  if(window._jtEvoChart){try{window._jtEvoChart.destroy();}catch(e){}}
+  window._jtEvoChart=new Chart(cv.getContext('2d'),{type:'bar',data:{labels:labels,datasets:[
+    {type:'bar',label:'Valorisation (année)',data:cr,backgroundColor:'rgba(155,135,212,0.55)',yAxisID:'y1',borderRadius:4,order:3,categoryPercentage:0.55,barPercentage:0.8},
+    {type:'line',label:'Valeur',data:vals,borderColor:'#4caf82',backgroundColor:'rgba(76,175,130,0.12)',fill:true,tension:0.25,borderWidth:2,pointRadius:3,spanGaps:true,yAxisID:'y',order:1},
+    {type:'line',label:'Versé cumulé',data:cum,borderColor:'#5a8dee',backgroundColor:'transparent',borderDash:[5,4],fill:false,tension:0.25,borderWidth:2,pointRadius:3,yAxisID:'y',order:2}
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{color:'#8b95a8',font:{size:12},boxWidth:14,usePointStyle:true}},tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+jtFmt(c.parsed.y)+' CZK';}}}},scales:{y:{position:'left',ticks:{callback:function(v){return (v/1000).toFixed(0)+'k';},color:'#8b95a8'},grid:{color:'rgba(0,0,0,0.06)'}},y1:{position:'right',ticks:{callback:function(v){return (v/1000).toFixed(1)+'k';},color:'#9b87d4'},grid:{display:false}},x:{ticks:{color:'#8b95a8'},grid:{display:false}}}}});
+}
+// ---- Relevés annuels
+function renderJtStmt(){
+  var tb=document.getElementById('jt_stmt_body'); if(!tb) return;
+  var years=jtYears(), fmt=jtFmt2;
+  tb.innerHTML=years.slice().reverse().map(function(y){
+    var src=y.rec?'reconstitué':(y.hasStmt?'relevé NN/ING':'saisies');
+    var d=y.delta;
+    var dCol=(d==null)?'var(--text2)':(Math.abs(d)<0.01?'#4caf82':'#e06c6c');
+    return '<tr><td><strong>'+y.year+'</strong></td><td class="mono" style="text-align:right">'+fmt(y.open)+'</td><td class="mono" style="text-align:right">'+fmt(y.PU+y.PO)+'</td><td class="mono" style="text-align:right">'+fmt(y.PZ)+'</td><td class="mono" style="text-align:right">'+fmt(y.SP)+'</td><td class="mono" style="text-align:right;color:#9b87d4">'+fmt(y.credited)+'</td><td class="mono" style="text-align:right;font-weight:600">'+fmt(y.valueEnd)+'</td><td class="mono" style="text-align:right">'+(y.closeRef!=null?fmt(y.closeRef):'—')+'</td><td class="mono" style="text-align:right;color:'+dCol+'">'+(d==null?'—':(Math.abs(d)<0.01?'✓':((d>0?'+':'')+fmt(d))))+'</td><td class="mono" style="text-align:right">'+(y.rate!=null?y.rate.toFixed(2).replace('.',',')+' %':'—')+'</td><td class="mono" style="text-align:right">'+fmt(y.cum.PU+y.cum.PO)+'</td><td class="mono" style="text-align:right">'+fmt(y.cum.PZ)+'</td><td class="mono" style="text-align:right">'+fmt(y.cum.SP)+'</td><td class="mono" style="text-align:right;color:#9b87d4">'+fmt(y.cum.ZH+y.cum.ZH_SP)+'</td><td style="font-size:11px;color:var(--text2)">'+src+'</td></tr>';
+  }).join('');
+}
+// ---- Évolution mensuelle
+function jtEvoSetRange(r){ _jtEvoRange=r; renderJtEvoTab(); }
+function jtMonthly(){
+  var mv=jtAllMoves(); if(!mv.length) return [];
+  var out=[], bal=0, inv=0, i=0, now=new Date();
+  var y=+mv[0].date.slice(0,4), m=+mv[0].date.slice(5,7);
+  var endY=now.getFullYear(), endM=now.getMonth()+1;
+  var lastY=+mv[mv.length-1].date.slice(0,4), lastM=+mv[mv.length-1].date.slice(5,7);
+  if(lastY>endY||(lastY===endY&&lastM>endM)){ endY=lastY; endM=lastM; }
+  while(y<endY||(y===endY&&m<=endM)){
+    var key=y+'-'+(m<10?'0':'')+m, flow=0, dep=0;
+    while(i<mv.length&&mv[i].date.slice(0,7)<=key){ bal+=mv[i].amt; flow+=mv[i].amt; if(jtIsInvest(mv[i].type)){inv+=mv[i].amt;dep+=mv[i].amt;} i++; }
+    out.push({key:key,bal:Math.round(bal*100)/100,inv:Math.round(inv*100)/100,flow:Math.round(flow*100)/100,dep:dep});
+    m++; if(m>12){m=1;y++;}
+  }
+  return out;
+}
+function renderJtEvoTab(){
+  if(!document.getElementById('jt_evo_line')) return;
+  var all=jtMonthly(); if(!all.length) return;
+  var now=new Date(), r=_jtEvoRange, from=null;
+  var back=function(n){ var d=new Date(now.getFullYear()-n,now.getMonth(),1); return d.getFullYear()+'-'+((d.getMonth()+1)<10?'0':'')+(d.getMonth()+1); };
+  if(r==='10a') from=back(10); else if(r==='5a') from=back(5); else if(r==='3a') from=back(3); else if(r==='1a') from=back(1); else if(r==='ytd') from=now.getFullYear()+'-01';
+  var idx0=0; if(from){ for(var k=0;k<all.length;k++){ if(all[k].key>=from){ idx0=Math.max(0,k-1); break; } idx0=k; } }
+  var ser=all.slice(idx0); var base=ser[0], last=ser[ser.length-1];
+  document.querySelectorAll('#jt_evo_filters .jt-evo-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.r===r); });
+  var kel=document.getElementById('jt_evo_kpis');
+  if(kel){
+    var dv=last.bal-(from?base.bal:0), dd=last.inv-(from?base.inv:0), pv=dv-dd;
+    var pvPct=(from?(base.bal+dd):dd)?pv/(from?(base.bal+dd):dd)*100:null;
+    var cards=[
+      {l:'Valeur '+(from?'début période':'initiale'),v:jtFmt(from?base.bal:0)+' CZK',s:from?base.key:'—',c:'var(--text)'},
+      {l:'Valeur actuelle',v:jtFmt(last.bal)+' CZK',s:last.key,c:'var(--text)'},
+      {l:'Versé sur la période',v:jtFmt(dd)+' CZK',s:'participant + employeur + État',c:'var(--text)'},
+      {l:'Valorisation sur la période',v:(pv>=0?'+':'')+jtFmt(pv)+' CZK',s:jtPct(pvPct),c:jtColOf(pv)}
+    ];
+    kel.innerHTML=cards.map(function(c){return '<div style="background:var(--bg2);border-radius:8px;padding:14px 16px;border:1px solid var(--border2)"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:6px">'+c.l+'</div><div style="font-size:19px;font-weight:700;color:'+c.c+'">'+c.v+'</div><div style="font-size:11px;color:var(--text2);margin-top:4px">'+c.s+'</div></div>';}).join('');
+  }
+  if(typeof Chart!=='undefined'){
+    var cv=document.getElementById('jt_evo_line');
+    if(window._jtEvoLine){try{window._jtEvoLine.destroy();}catch(e){}}
+    window._jtEvoLine=new Chart(cv.getContext('2d'),{type:'line',data:{labels:ser.map(function(p){return p.key;}),datasets:[
+      {label:'Valeur',data:ser.map(function(p){return p.bal;}),borderColor:'#4caf82',backgroundColor:'rgba(76,175,130,0.12)',fill:true,tension:0.2,borderWidth:2,pointRadius:0},
+      {label:'Versé cumulé',data:ser.map(function(p){return p.inv;}),borderColor:'#5a8dee',borderDash:[5,4],fill:false,tension:0.2,borderWidth:2,pointRadius:0}
+    ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:true,position:'top',labels:{color:'#8b95a8',font:{size:12},boxWidth:14,usePointStyle:true}},tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+jtFmt(c.parsed.y)+' CZK';}}}},scales:{y:{ticks:{callback:function(v){return (v/1000).toFixed(0)+'k';},color:'#8b95a8'},grid:{color:'rgba(0,0,0,0.06)'}},x:{ticks:{color:'#8b95a8',maxTicksLimit:14},grid:{display:false}}}}});
+    var yrs=jtYears().filter(function(y){ return !from || (y.year+'-12')>=from; });
+    var cb=document.getElementById('jt_evo_bar');
+    if(cb){
+      if(window._jtEvoBar){try{window._jtEvoBar.destroy();}catch(e){}}
+      window._jtEvoBar=new Chart(cb.getContext('2d'),{type:'bar',data:{labels:yrs.map(function(y){return String(y.year);}),datasets:[
+        {type:'bar',label:'Valorisation (CZK)',data:yrs.map(function(y){return y.yieldY!=null?Math.round(y.yieldY):null;}),backgroundColor:'rgba(155,135,212,0.6)',borderRadius:4,yAxisID:'y'},
+        {type:'line',label:'Taux crédité (%)',data:yrs.map(function(y){return y.rate;}),borderColor:'#f0956e',backgroundColor:'transparent',borderWidth:2,pointRadius:3,spanGaps:true,yAxisID:'y1'}
+      ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{color:'#8b95a8',font:{size:12},boxWidth:14,usePointStyle:true}},tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+(c.dataset.yAxisID==='y1'?(c.parsed.y!=null?c.parsed.y.toFixed(2)+' %':'—'):jtFmt(c.parsed.y)+' CZK');}}}},scales:{y:{ticks:{color:'#8b95a8'},grid:{color:'rgba(0,0,0,0.06)'}},y1:{position:'right',ticks:{color:'#f0956e',callback:function(v){return v+' %';}},grid:{display:false}},x:{ticks:{color:'#8b95a8'},grid:{display:false}}}}});
+    }
+  }
+  var tb=document.getElementById('jt_evo_tbody');
+  if(tb) tb.innerHTML=ser.slice().reverse().map(function(p){ var g=p.bal-p.inv, pc=p.inv?g/p.inv*100:null; return '<tr><td class="mono">'+p.key+'</td><td class="mono" style="text-align:right">'+jtFmt(p.inv)+'</td><td class="mono" style="text-align:right">'+jtFmt(p.bal)+'</td><td class="mono" style="text-align:right;color:'+jtColOf(g)+'">'+(g>=0?'+':'')+jtFmt(g)+'</td><td class="mono" style="text-align:right;color:'+jtColOf(pc)+'">'+jtPct(pc)+'</td><td class="mono" style="text-align:right;color:var(--text2)">'+(p.flow?jtFmt(p.flow):'·')+'</td></tr>'; }).join('');
+}
+
 
 // ── Conversion EUR des échéances pour projets en devise étrangère ──────────────
 // Intérêts/capital FUTURS : réévalués au dernier FX (FX_RATES). Une fois l'échéance
