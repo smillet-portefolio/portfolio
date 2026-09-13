@@ -4829,7 +4829,7 @@ function submitSellLine() {
   }
   // Build closed position record (quantité vendue)
   const closed = {
-    name:r.name, ticker:r.ticker, broker:r.broker||'',
+    name:r.name, ticker:r.ticker, isin:r.isin||'', broker:r.broker||'',
     dateAchat:r.date, dateSell,
     qty:sellQ, pxAchat:r.pxAchat, currencyAchat:r.currency,
     pxVente:prix, currencyVente:dev, fxVente:fx,
@@ -4899,6 +4899,14 @@ function closedFilter(key, val) {
   window._closedFilter[key] = (val || '').trim().toLowerCase();
   renderClosedPositions();
 }
+// ISIN d'une clôture : champ stocké, sinon retrouvé via les lignes du portefeuille / la table ETF (par ticker).
+function _closedIsin(p){
+  if (p && p.isin) return p.isin;
+  const t = (p && p.ticker || '').toUpperCase(); if (!t) return '';
+  try { const r = (typeof BOOK2_ROWS!=='undefined' ? BOOK2_ROWS : []).find(x => x && (x.ticker||'').toUpperCase()===t && x.isin); if (r) return r.isin; } catch(e){}
+  try { if (typeof ETF_ISIN_MAP!=='undefined') { for (const k in ETF_ISIN_MAP) if (ETF_ISIN_MAP[k]===t) return k; } } catch(e){}
+  return '';
+}
 function renderClosedPositions() {
   const tbody = document.getElementById('closedBody'); if (!tbody) return;
   const _sym = c => ({EUR:'€', USD:'$', GBP:'£', CZK:'Kč', GBp:'p'}[c] || c || '€');
@@ -4919,6 +4927,7 @@ function renderClosedPositions() {
   let rows = all.filter(p =>
     (!cf.nom || (p.name||'').toLowerCase().includes(cf.nom)) &&
     (!cf.ticker || (p.ticker||'').toLowerCase().includes(cf.ticker)) &&
+    (!cf.isin || _closedIsin(p).toLowerCase().includes(cf.isin)) &&
     (!cf.broker || (p.broker||'').toLowerCase().includes(cf.broker)) &&
     (!cf.dateAchat || (p.dateAchat||'').toLowerCase().includes(cf.dateAchat)) &&
     (!cf.dateSell || (p.dateSell||'').toLowerCase().includes(cf.dateSell)) &&
@@ -4928,7 +4937,7 @@ function renderClosedPositions() {
     (!cf.pnl || (p.pnl != null && p.pnl >= _num(cf.pnl))));
   const cs = window._closedSort || { col:'dateSell', dir:-1 };
   rows = rows.slice().sort((a,b) => {
-    let x = a[cs.col], y = b[cs.col];
+    let x = (cs.col==='isin') ? _closedIsin(a) : a[cs.col], y = (cs.col==='isin') ? _closedIsin(b) : b[cs.col];
     if (typeof x === 'string' || typeof y === 'string')
       return cs.dir * String(x==null?'':x).localeCompare(String(y==null?'':y));
     if (x == null) x = -Infinity;
@@ -4949,6 +4958,7 @@ function renderClosedPositions() {
     tr.innerHTML = `
       <td style="padding:7px 12px"><strong>${p.name}</strong></td>
       <td style="padding:7px 12px;font-size:11px;font-family:'DM Mono',monospace">${p.ticker}</td>
+      <td style="padding:7px 12px;font-size:11px;font-family:'DM Mono',monospace;color:var(--text2)">${_closedIsin(p)||'—'}</td>
       <td style="padding:7px 12px;font-size:11px;color:var(--text2)">${p.broker||'—'}</td>
       <td style="padding:7px 12px;font-size:11px;color:var(--text2)">${p.dateAchat}</td>
       <td style="padding:7px 12px;font-size:11px;color:var(--text2)">${p.dateSell}</td>
@@ -5035,7 +5045,7 @@ function openEditClosed(id){
   const fxA=(p.qty&&p.pxAchat)? +(((p.costEur||0)/(p.qty*p.pxAchat))).toFixed(6) : 1;
   const fxV=(p.fxVente!=null)? p.fxVente : ((p.qty&&p.pxVente)? +(((p.saleEur||0)/(p.qty*p.pxVente))).toFixed(6):1);
   const set=(k,v)=>{ const e=document.getElementById(k); if(e) e.value=(v!=null?v:''); };
-  set('ce_nom',p.name); set('ce_ticker',p.ticker); set('ce_broker',p.broker);
+  set('ce_nom',p.name); set('ce_ticker',p.ticker); set('ce_isin',p.isin||_closedIsin(p)); set('ce_broker',p.broker);
   set('ce_dateAchat',p.dateAchat); set('ce_dateSell',p.dateSell); set('ce_qty',p.qty);
   set('ce_curAchat',p.currencyAchat||'EUR'); set('ce_pxAchat',p.pxAchat); set('ce_fxAchat',fxA);
   set('ce_curVente',p.currencyVente||'EUR'); set('ce_pxVente',p.pxVente); set('ce_fxVente',fxV);
@@ -5052,7 +5062,7 @@ function submitEditClosed(){
   const g=k=>{ const e=document.getElementById(k); return e?e.value:''; };
   const gn=k=>{ const v=parseFloat(String(g(k)).replace(',','.')); return isNaN(v)?null:v; };
   const p=all[i];
-  p.name=g('ce_nom')||p.name; p.ticker=(g('ce_ticker')||'').toUpperCase(); p.broker=g('ce_broker')||'';
+  p.name=g('ce_nom')||p.name; p.ticker=(g('ce_ticker')||'').toUpperCase(); p.isin=(g('ce_isin')||'').trim().toUpperCase(); p.broker=g('ce_broker')||'';
   p.dateAchat=g('ce_dateAchat')||p.dateAchat; p.dateSell=g('ce_dateSell')||p.dateSell;
   p.qty=(gn('ce_qty')!=null?gn('ce_qty'):p.qty);
   p.currencyAchat=g('ce_curAchat')||'EUR'; p.pxAchat=(gn('ce_pxAchat')!=null?gn('ce_pxAchat'):p.pxAchat);
@@ -8319,6 +8329,7 @@ function renderObligCharts(data) {
           <tr style="background:var(--bg2);text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2)">
             <th onclick="closedSort('name',this)" data-csort="name" style="padding:8px 12px;text-align:left;cursor:pointer;user-select:none">Nom<span class="cs-arr" style="font-size:9px"></span></th>
             <th onclick="closedSort('ticker',this)" data-csort="ticker" style="padding:8px 12px;text-align:left;cursor:pointer;user-select:none">Ticker<span class="cs-arr" style="font-size:9px"></span></th>
+            <th onclick="closedSort('isin',this)" data-csort="isin" style="padding:8px 12px;text-align:left;cursor:pointer;user-select:none">ISIN<span class="cs-arr" style="font-size:9px"></span></th>
             <th onclick="closedSort('broker',this)" data-csort="broker" style="padding:8px 12px;text-align:left;cursor:pointer;user-select:none">Broker<span class="cs-arr" style="font-size:9px"></span></th>
             <th onclick="closedSort('dateAchat',this)" data-csort="dateAchat" style="padding:8px 12px;text-align:left;cursor:pointer;user-select:none">Date achat<span class="cs-arr" style="font-size:9px"></span></th>
             <th onclick="closedSort('dateSell',this)" data-csort="dateSell" style="padding:8px 12px;text-align:left;cursor:pointer;user-select:none">Date vente<span class="cs-arr" style="font-size:9px"></span></th>
@@ -8336,6 +8347,7 @@ function renderObligCharts(data) {
           <tr style="background:var(--bg2)">
             <td style="padding:3px 8px"><input type="text" placeholder="Filtrer nom..." oninput="closedFilter('nom',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>
             <td style="padding:3px 8px"><input type="text" placeholder="Ticker..." oninput="closedFilter('ticker',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>
+            <td style="padding:3px 8px"><input type="text" placeholder="ISIN..." oninput="closedFilter('isin',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>
             <td style="padding:3px 8px"><input type="text" placeholder="Broker..." oninput="closedFilter('broker',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>
             <td style="padding:3px 8px"><input type="text" placeholder="AAAA-MM-JJ" oninput="closedFilter('dateAchat',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>
             <td style="padding:3px 8px"><input type="text" placeholder="AAAA-MM-JJ" oninput="closedFilter('dateSell',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>
@@ -8354,7 +8366,7 @@ function renderObligCharts(data) {
         <tbody id="closedBody"></tbody>
         <tfoot>
           <tr style="font-weight:700;background:var(--bg2)">
-            <td colspan="8" style="padding:8px 12px">Total réalisé</td>
+            <td colspan="9" style="padding:8px 12px">Total réalisé</td>
             <td id="closedCost" style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">—</td>
             <td id="closedVal"  style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">—</td>
             <td id="closedTotComm" style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">—</td>
@@ -13217,6 +13229,7 @@ window.addEventListener('load', () => {
       <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Nom</label><input id="ce_nom" type="text" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
       <div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Ticker</label><input id="ce_ticker" type="text" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
       <div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Broker</label><input id="ce_broker" type="text" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
+      <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">ISIN</label><input id="ce_isin" type="text" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
       <div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Date d'achat</label><input id="ce_dateAchat" type="date" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
       <div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Date de vente</label><input id="ce_dateSell" type="date" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
       <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Quantité</label><input id="ce_qty" type="number" step="any" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px"></div>
