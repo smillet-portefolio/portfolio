@@ -8279,14 +8279,32 @@ function renderObligCharts(data) {
   var intByYr={}, capByYr={};
   yrs.forEach(function(y){ intByYr[y]=0; capByYr[y]=0; });
   OBLIG_DATA.forEach(function(p){ (p.echeancier||[]).forEach(function(e){ var y=e.date.slice(0,4); intByYr[y]+=echIntEur(p,e); capByYr[y]+=echCapEur(p,e); }); });
+  // Performance annuelle = intérêts de l'année / capital investi « productif » cette année-là.
+  // Un projet n'entre au dénominateur que pour les années où il verse au moins un intérêt
+  // (un investissement de 2025 dont le 1er coupon tombe en 2026 est exclu de 2025). Le capital
+  // retenu est le capital restant dû au 1er janvier (montant initial − remboursements antérieurs).
+  var perfByYr = {};
+  yrs.forEach(function(y){
+    if (+y < 2023) { perfByYr[y] = null; return; }
+    var denom = 0;
+    OBLIG_DATA.forEach(function(p){
+      var ech = p.echeancier || [];
+      var paysInt = ech.some(function(e){ return e.date.slice(0,4) === y && (e.interet || 0) > 0; });
+      if (!paysInt) return;
+      var repaid = ech.filter(function(e){ return e.date < y + '-01-01'; }).reduce(function(s2, e){ return s2 + echCapEur(p, e); }, 0);
+      denom += Math.max(0, (p.montant || 0) - repaid);
+    });
+    perfByYr[y] = (denom > 0 && intByYr[y] > 0) ? Math.round(intByYr[y] / denom * 10000) / 100 : null;
+  });
   var c3 = document.getElementById('obligChartBar');
   if (c3) _obligCharts['obligChartBar'] = new Chart(c3, {
     type: 'bar',
     data: { labels: yrs, datasets: [
       { label: 'Int\u00e9r\u00eats', data: yrs.map(function(y){ return Math.round(intByYr[y]); }), backgroundColor: 'rgba(52,211,153,0.8)', stack: 's', borderRadius: 3 },
-      { label: 'Capital',   data: yrs.map(function(y){ return Math.round(capByYr[y]);  }), backgroundColor: 'rgba(6,95,70,0.9)',   stack: 's', borderRadius: 3 }
+      { label: 'Capital',   data: yrs.map(function(y){ return Math.round(capByYr[y]);  }), backgroundColor: 'rgba(6,95,70,0.9)',   stack: 's', borderRadius: 3 },
+      { type: 'line', label: 'Performance (%)', data: yrs.map(function(y){ return perfByYr[y]; }), yAxisID: 'y1', borderColor: '#f0956e', backgroundColor: '#f0956e', borderWidth: 2, pointRadius: 4, pointHoverRadius: 5, tension: 0.3, spanGaps: true, order: 0 }
     ]},
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'bottom', labels: { color: '#8b95a8', font: { size: 11 }, boxWidth: 12 } }, tooltip: { callbacks: { label: function(c){ return ' '+c.dataset.label+' : '+Math.round(c.parsed.y).toLocaleString('fr')+' \u20ac'; } } } }, scales: { x: { stacked: true, ticks: { color:'#8b95a8', font:{size:10} }, grid:{color:'rgba(255,255,255,0.04)'}, border:{display:false} }, y: { stacked: true, ticks: { color:'#8b95a8', font:{size:10}, callback: function(v){ return v.toLocaleString('fr'); } }, grid:{color:'rgba(255,255,255,0.04)'}, border:{display:false} } } }
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'bottom', labels: { color: '#8b95a8', font: { size: 11 }, boxWidth: 12 } }, tooltip: { callbacks: { label: function(c){ if (c.dataset.yAxisID === 'y1') { return c.parsed.y == null ? '' : ' Performance : ' + c.parsed.y.toFixed(2).replace('.', ',') + ' %'; } return ' '+c.dataset.label+' : '+Math.round(c.parsed.y).toLocaleString('fr')+' \u20ac'; } } } }, scales: { x: { stacked: true, ticks: { color:'#8b95a8', font:{size:10} }, grid:{color:'rgba(255,255,255,0.04)'}, border:{display:false} }, y: { stacked: true, ticks: { color:'#8b95a8', font:{size:10}, callback: function(v){ return v.toLocaleString('fr'); } }, grid:{color:'rgba(255,255,255,0.04)'}, border:{display:false} }, y1: { position: 'right', beginAtZero: true, ticks: { color:'#f0956e', font:{size:10}, callback: function(v){ return v + ' %'; } }, grid:{ display:false }, border:{display:false} } } }
   });
 }
 // ── Create and inject clotures section into the DOM ──────────────────────────
