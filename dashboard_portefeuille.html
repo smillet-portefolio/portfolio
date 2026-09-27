@@ -5264,7 +5264,7 @@ const GS_KEYS = [
   'etf_comp_override','etf_comp_date',
   'direct_sector_overrides',
   'evo_history',
-  'kids_hold','kids_closed','kids_deposits','kids_cash','kids_comm',
+  'kids_hold','kids_closed','kids_deposits','kids_cash','kids_comm','kids_div',
   're_estimates',
   're_mortgage',
   're_rental',
@@ -5279,7 +5279,7 @@ const GS_KEYS = [
 const GS_AUTOSAVE_SET = new Set(GS_KEYS);
 const GS_USER_SET = new Set([
   'book2_extra_rows','book2_all_rows','book2_overrides','book2_comm',
-  'sold_rows','closed_positions','cash_data','oblig_data','dividend_data','conseq_data','conseq_detail_extra','conseq_detail_del','jito_data',
+  'sold_rows','closed_positions','cash_data','oblig_data','dividend_data','conseq_data','conseq_detail_extra','conseq_detail_del','jito_data','kids_div',
   'direct_sector_overrides'
 ]);
 let _gsReady     = false;
@@ -11820,6 +11820,7 @@ window.addEventListener('load', () => {
          ${subBtn('📉 Actions ETFs +/−','ae')}
          ${subBtn('💰 Dépôts & Cash','cash')}
          ${subBtn('📤 Clôturées','clot')}
+         ${subBtn('💸 Dividendes','div')}
          ${subBtn('📈 Évolution','evo')}
          ${subBtn('✏️ Éditer','edit')}
        </div>
@@ -11838,10 +11839,196 @@ window.addEventListener('load', () => {
       case 'ae':    kidActEtf(b); break;
       case 'cash':  kidCash(b); break;
       case 'clot':  kidClotures(b); break;
+      case 'div':   kidDividendes(b); break;
       case 'evo':   kidEvolution(b); break;
       case 'edit':  kidEditer(b); break;
     }
   }
+
+  // ---- DIVIDENDES ENFANTS ---------------------------------------------------
+  // Même format / logique que l'onglet principal Dividendes (KPIs, graphique par année,
+  // tableau triable, modale ajout/édition, conversion € via FX). Spécifique enfants :
+  // chaque dividende est rattaché à un enfant (champ e) ; la sélection d'enfant (puces)
+  // filtre la page et la colonne « Enfant » est triable. Persistance : localStorage 'kids_div'
+  // (synchronisé GSheets via GS_KEYS).
+  let KIDS_DIV;
+  try { KIDS_DIV = JSON.parse(localStorage.getItem('kids_div')) || null; } catch(e){ KIDS_DIV=null; }
+  if(!Array.isArray(KIDS_DIV)) KIDS_DIV = [];
+  KIDS_DIV.forEach((d,i)=>{ if(d && !d.id) d.id='kd'+i+'_'+Math.random().toString(36).slice(2,6); });
+  window.KIDS_DIV = KIDS_DIV;
+  function kdivSave(){ try{ localStorage.setItem('kids_div', JSON.stringify(KIDS_DIV)); }catch(e){} }
+  let _kdivSort = { col:'date', dir:-1 };
+  const _kdivInp = (typeof _divInp!=='undefined') ? _divInp : 'style="width:100%;padding:7px 9px;border:1px solid var(--border2);border-radius:7px;background:var(--bg2);color:var(--text);font-size:13px;box-sizing:border-box"';
+  const _kdivField = (label, inner) => '<div style="margin-bottom:10px"><label style="display:block;font-size:11px;color:var(--text2);margin-bottom:3px">'+label+'</label>'+inner+'</div>';
+  const _kdivTh = (col,label) => '<th onclick="kdivSort(\''+col+'\')" data-kdivcol="'+col+'" style="cursor:pointer;user-select:none;white-space:nowrap">'+label+'<span class="ov-arr" style="font-size:9px;opacity:.35"> ⇅</span></th>';
+  const _kdivFx = cur => (typeof _divEurPerUnit==='function') ? _divEurPerUnit(cur) : 1;
+  function kdivEnsureModal(){
+    if(document.getElementById('kdivModal')) return;
+    const modal=document.createElement('div'); modal.id='kdivModal';
+    modal.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center';
+    modal.innerHTML='<div style="background:var(--bg);border-radius:12px;padding:22px;width:460px;max-width:92vw;max-height:90vh;overflow:auto;border:1px solid var(--border2)">'+
+      '<h3 id="kdivModalTitle" style="margin:0 0 14px;font-size:16px">Ajouter un dividende</h3>'+
+      _kdivField('Enfant','<select id="kdivf_e" '+_kdivInp+'>'+KIDS.map(k=>'<option value="'+k+'">'+k+'</option>').join('')+'</select>')+
+      _kdivField('Date','<input id="kdivf_date" type="date" '+_kdivInp+'>')+
+      _kdivField('Broker / compte','<input id="kdivf_broker" type="text" list="kdivf_brokers" placeholder="Linxea Corentin, SAXO Estelle..." '+_kdivInp+'>')+
+      _kdivField('Description','<input id="kdivf_name" type="text" list="kdivf_names" onchange="kdivNameSelected()" placeholder="Tapez ou choisissez..." '+_kdivInp+'>')+
+      _kdivField('Ticker','<input id="kdivf_ticker" type="text" list="kdivf_tickers" onchange="kdivTickerSelected()" '+_kdivInp+'>')+
+      _kdivField('ISIN','<input id="kdivf_isin" type="text" '+_kdivInp+'>')+
+      '<datalist id="kdivf_names"></datalist><datalist id="kdivf_brokers"></datalist><datalist id="kdivf_tickers"></datalist>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+        _kdivField('Devise','<select id="kdivf_cur" onchange="kdivFxPrefill()" '+_kdivInp+'><option>EUR</option><option>CZK</option><option>USD</option><option>GBP</option></select>')+
+        _kdivField('Taux FX (€ pour 1 unité)','<input id="kdivf_fx" type="number" step="0.0001" oninput="kdivPreview()" '+_kdivInp+'>')+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+        _kdivField('Dividende brut','<input id="kdivf_brut" type="number" step="0.01" oninput="kdivPreview()" '+_kdivInp+'>')+
+        _kdivField('Taxe','<input id="kdivf_taxe" type="number" step="0.01" oninput="kdivPreview()" '+_kdivInp+'>')+
+      '</div>'+
+      '<div id="kdivf_preview" style="font-size:12px;color:var(--text2);margin:4px 0 14px"></div>'+
+      '<div style="display:flex;gap:8px;justify-content:flex-end">'+
+        '<button onclick="kdivCloseModal()" style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:8px 14px;cursor:pointer">Annuler</button>'+
+        '<button onclick="kdivSubmit()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-weight:600">Enregistrer</button>'+
+      '</div></div>';
+    document.body.appendChild(modal);
+  }
+  function kidDividendes(b){
+    kdivEnsureModal();
+    b.innerHTML =
+      '<p class="section-desc" style="margin-bottom:16px">Dividendes encaissés sur les comptes des enfants — bruts, taxes et nets, convertis en euros.'+(sel()!=='Tous'?' Filtre : <strong>'+sel()+'</strong>.':'')+'</p>'+
+      '<div id="kdiv_kpis" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px"></div>'+
+      '<div style="margin-bottom:12px"><button onclick="kdivOpenAdd()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer">+ Ajouter un dividende</button></div>'+
+      '<h3 style="font-size:14px;font-weight:700;margin:4px 0 10px">Dividende net par année</h3>'+
+      '<div class="chart-wrap" style="height:300px;margin-bottom:24px"><canvas id="kdivYearChart"></canvas></div>'+
+      '<div style="max-height:70vh;overflow:auto"><table id="kdivTable"><thead><tr>'+
+        _kdivTh('date','Date')+_kdivTh('e','Enfant')+_kdivTh('broker','Broker')+_kdivTh('name','Description')+_kdivTh('ticker','Ticker')+_kdivTh('isin','ISIN')+_kdivTh('brutEur','Brut €')+_kdivTh('taxeEur','Taxe €')+_kdivTh('netEur','Net €')+'<th></th>'+
+      '</tr></thead><tbody id="kdivTableBody"></tbody></table></div>';
+    renderKidDividendes();
+  }
+  window.kdivSort=function(col){ if(_kdivSort.col===col)_kdivSort.dir*=-1; else{_kdivSort.col=col;_kdivSort.dir=['brutEur','taxeEur','netEur','date'].includes(col)?-1:1;} renderKidDividendes(); };
+  function kdivRows(){ const s=sel(); return KIDS_DIV.filter(d=>d && (s==='Tous' || d.e===s)); }
+  function renderKidDividendes(){
+    const tb=document.getElementById('kdivTableBody'); if(!tb) return;
+    KIDS_DIV.forEach(d=>{
+      const fx=(d.fx!=null?d.fx:_kdivFx(d.currency||'EUR'));
+      if(d.brutEur==null) d.brutEur=+(((d.brut||0)*fx)).toFixed(2);
+      if(d.taxeEur==null) d.taxeEur=+(((d.taxe||0)*fx)).toFixed(2);
+      if(d.netEur==null)  d.netEur =+((((d.net!=null?d.net:(d.brut||0)-(d.taxe||0)))*fx)).toFixed(2);
+    });
+    const data=kdivRows();
+    const fmt=n=>Math.round(n).toLocaleString('fr');
+    const fmt2=n=>(+n||0).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const totNet=data.reduce((s,d)=>s+(d.netEur||0),0), totBrut=data.reduce((s,d)=>s+(d.brutEur||0),0), totTax=data.reduce((s,d)=>s+(d.taxeEur||0),0);
+    const nSoc=new Set(data.map(d=>d.isin||d.ticker||d.name)).size;
+    const cards=[
+      {label:'Dividende net total',  val:fmt(totNet)+' €',  sub:data.length+' versements · '+nSoc+' sociétés', c:'#4caf82'},
+      {label:'Dividende brut total', val:fmt(totBrut)+' €', sub:'avant taxes', c:'var(--text)'},
+      {label:'Taxes totales',        val:fmt(totTax)+' €',  sub:totBrut?('soit '+(totTax/totBrut*100).toFixed(1).replace('.',',')+'% du brut'):'', c:'#e06c6c'},
+      {label:'Taux net moyen',       val:totBrut?((totNet/totBrut*100).toFixed(1).replace('.',',')+'%'):'—', sub:'net / brut', c:'var(--text)'},
+    ];
+    const kpiEl=document.getElementById('kdiv_kpis');
+    if(kpiEl) kpiEl.innerHTML=cards.map(c=>'<div style="background:var(--bg2);border-radius:8px;padding:14px 16px;border:1px solid var(--border2)"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:6px">'+c.label+'</div><div style="font-size:20px;font-weight:700;color:'+c.c+'">'+c.val+'</div><div style="font-size:11px;color:var(--text2);margin-top:3px">'+c.sub+'</div></div>').join('');
+    const st=_kdivSort;
+    const rows=data.slice().sort((a,b)=>{
+      const key=d=> ['brutEur','taxeEur','netEur'].includes(st.col)?(d[st.col]||0):(st.col==='date'?(d.date||''):String(d[st.col]||'').toLowerCase());
+      let x=key(a),y=key(b);
+      if(typeof x==='string'||typeof y==='string') return st.dir*String(x).localeCompare(String(y));
+      return st.dir*(x-y);
+    });
+    tb.innerHTML=rows.map(d=>{
+      const cur=(d.currency&&d.currency!=='EUR')?' <span style="font-size:9px;color:var(--text2)">('+d.currency+')</span>':'';
+      const col=COL[d.e]||'var(--text2)';
+      return '<tr>'+
+        '<td class="mono" style="white-space:nowrap">'+(d.date||'')+'</td>'+
+        '<td><span style="display:inline-block;padding:2px 9px;border-radius:12px;font-size:11px;font-weight:600;color:#fff;background:'+col+'">'+(d.e||'')+'</span></td>'+
+        '<td>'+(d.broker||'')+'</td>'+
+        '<td><strong>'+(d.name||'')+'</strong>'+cur+'</td>'+
+        '<td class="mono" style="color:var(--text2)">'+(d.ticker||'')+'</td>'+
+        '<td class="mono" style="font-size:11px;color:var(--text2)">'+(d.isin||'')+'</td>'+
+        '<td class="mono">'+fmt2(d.brutEur)+'</td>'+
+        '<td class="mono" style="color:#e06c6c">'+fmt2(d.taxeEur)+'</td>'+
+        '<td class="mono" style="color:#4caf82;font-weight:600">'+fmt2(d.netEur)+'</td>'+
+        '<td style="white-space:nowrap"><span onclick="kdivOpenEdit(\''+d.id+'\')" title="Modifier" style="cursor:pointer;font-size:13px;margin-right:12px">✏️</span><span onclick="kdivDelete(\''+d.id+'\')" title="Supprimer" style="cursor:pointer;color:var(--text2);font-size:13px">✕</span></td>'+
+      '</tr>';
+    }).join('')+
+    '<tr style="border-top:2px solid var(--border2);font-weight:700;background:var(--bg3)"><td colspan="6">Total ('+rows.length+')</td><td class="mono">'+fmt2(totBrut)+'</td><td class="mono" style="color:#e06c6c">'+fmt2(totTax)+'</td><td class="mono" style="color:#4caf82">'+fmt2(totNet)+'</td><td></td></tr>';
+    const tbl=document.getElementById('kdivTable');
+    if(tbl) tbl.querySelectorAll('th[data-kdivcol]').forEach(th=>{const s2=th.querySelector('.ov-arr');if(s2){const on=th.dataset.kdivcol===st.col;s2.textContent=on?(st.dir<0?' ▼':' ▲'):' ⇅';s2.style.opacity=on?'1':'0.35';}});
+    kdivRenderYearChart(data);
+  }
+  function kdivRenderYearChart(data){
+    const cv=document.getElementById('kdivYearChart'); if(!cv||typeof Chart==='undefined') return;
+    const byYear={};
+    data.forEach(d=>{ const y=(d.date||'').slice(0,4); if(!y) return; byYear[y]=byYear[y]||{}; byYear[y][d.e]=(byYear[y][d.e]||0)+(d.netEur||0); });
+    const years=Object.keys(byYear).sort();
+    const kids=(sel()==='Tous')?KIDS:[sel()];
+    const ds=kids.map(k=>({label:k,data:years.map(y=>Math.round(byYear[y][k]||0)),backgroundColor:COL[k],borderRadius:6,maxBarThickness:90,stack:'s'}));
+    if(window._kdivYearChart){ try{window._kdivYearChart.destroy();}catch(e){} window._kdivYearChart=null; }
+    window._kdivYearChart=new Chart(cv.getContext('2d'),{
+      type:'bar',
+      data:{labels:years,datasets:ds},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:kids.length>1,position:'top',labels:{color:'#8b95a8',font:{size:12},boxWidth:12}},tooltip:{callbacks:{label:c=>' '+c.dataset.label+' : '+Math.round(c.parsed.y).toLocaleString('fr')+' € net'}}},scales:{y:{stacked:true,ticks:{callback:v=>v.toLocaleString('fr')+' €',color:'#8b95a8'},grid:{color:'rgba(0,0,0,0.05)'}},x:{stacked:true,grid:{display:false},ticks:{color:'#8b95a8',font:{size:13}}}}}
+    });
+    _kidCharts.push(window._kdivYearChart);
+  }
+  window.kdivOpenAdd=function(){
+    kdivEnsureModal(); window._kdivEditId=null;
+    const t=document.getElementById('kdivModalTitle'); if(t)t.textContent='Ajouter un dividende';
+    document.getElementById('kdivf_date').value=new Date().toISOString().slice(0,10);
+    ['broker','name','ticker','isin','brut','taxe'].forEach(f=>{const e=document.getElementById('kdivf_'+f);if(e)e.value='';});
+    document.getElementById('kdivf_e').value=(sel()!=='Tous')?sel():KIDS[0];
+    document.getElementById('kdivf_cur').value='EUR';
+    kdivFxPrefill(); kdivBuildLists();
+    document.getElementById('kdivModal').style.display='flex';
+  };
+  window.kdivCloseModal=function(){ const m=document.getElementById('kdivModal'); if(m)m.style.display='none'; };
+  window.kdivFxPrefill=function(){ const cur=document.getElementById('kdivf_cur').value; const e=document.getElementById('kdivf_fx'); if(e)e.value=(cur==='EUR'?1:(+_kdivFx(cur)).toFixed(4)); kdivPreview(); };
+  window.kdivPreview=function(){
+    const cur=document.getElementById('kdivf_cur').value;
+    const fx=parseFloat(document.getElementById('kdivf_fx').value)||(cur==='EUR'?1:0);
+    const brut=parseFloat(document.getElementById('kdivf_brut').value)||0, taxe=parseFloat(document.getElementById('kdivf_taxe').value)||0, net=brut-taxe;
+    const el=document.getElementById('kdivf_preview');
+    if(el) el.innerHTML='Net : <strong>'+net.toLocaleString('fr',{maximumFractionDigits:2})+' '+cur+'</strong> → <strong style="color:#4caf82">'+(net*fx).toLocaleString('fr',{maximumFractionDigits:2})+' €</strong>';
+  };
+  window.kdivSubmit=function(){
+    const cur=document.getElementById('kdivf_cur').value;
+    const fx=cur==='EUR'?1:(parseFloat(document.getElementById('kdivf_fx').value)||_kdivFx(cur));
+    const brut=parseFloat(document.getElementById('kdivf_brut').value)||0, taxe=parseFloat(document.getElementById('kdivf_taxe').value)||0, net=+(brut-taxe).toFixed(4);
+    const date=document.getElementById('kdivf_date').value; if(!date){ alert('Date requise'); return; }
+    const rec={ e:document.getElementById('kdivf_e').value, broker:document.getElementById('kdivf_broker').value.trim(),
+      name:document.getElementById('kdivf_name').value.trim(), ticker:document.getElementById('kdivf_ticker').value.trim(),
+      isin:document.getElementById('kdivf_isin').value.trim(), date:date, currency:cur, fx:fx,
+      brut:+brut.toFixed(2), taxe:+taxe.toFixed(2), net:net, brutEur:+(brut*fx).toFixed(2), taxeEur:+(taxe*fx).toFixed(2), netEur:+(net*fx).toFixed(2) };
+    if(window._kdivEditId){
+      const idx=KIDS_DIV.findIndex(d=>d.id===window._kdivEditId);
+      if(idx>=0){ rec.id=window._kdivEditId; KIDS_DIV[idx]=rec; } else { rec.id='kd'+Date.now(); KIDS_DIV.push(rec); }
+      window._kdivEditId=null;
+    } else { rec.id='kd'+Date.now(); KIDS_DIV.push(rec); }
+    kdivSave(); renderKidDividendes(); kdivCloseModal();
+  };
+  window.kdivOpenEdit=function(id){
+    const d=KIDS_DIV.find(x=>x.id===id); if(!d) return;
+    kdivEnsureModal(); window._kdivEditId=id;
+    const t=document.getElementById('kdivModalTitle'); if(t)t.textContent='Modifier un dividende';
+    kdivBuildLists();
+    const set=(f,v)=>{ const e=document.getElementById('kdivf_'+f); if(e)e.value=(v!=null?v:''); };
+    set('e',d.e||KIDS[0]); set('date',d.date); set('broker',d.broker); set('name',d.name); set('ticker',d.ticker); set('isin',d.isin);
+    set('cur',d.currency||'EUR'); set('fx',(d.fx!=null?d.fx:_kdivFx(d.currency||'EUR'))); set('brut',d.brut); set('taxe',d.taxe);
+    kdivPreview(); document.getElementById('kdivModal').style.display='flex';
+  };
+  window.kdivDelete=function(id){ if(!confirm('Supprimer ce dividende ?')) return; const i=KIDS_DIV.findIndex(d=>d.id===id); if(i>=0) KIDS_DIV.splice(i,1); kdivSave(); renderKidDividendes(); };
+  function kdivBuildLists(){
+    const nameMap={}, brokers={};
+    (window.KIDS_HOLD||KIDS_HOLD||[]).forEach(r=>{ if(r&&r.nom&&!nameMap[r.nom]) nameMap[r.nom]={ticker:r.ticker||r.tk||'',isin:r.isin||''}; if(r&&r.c) brokers[r.c]=1; });
+    KIDS_DIV.forEach(d=>{ if(d.name&&!nameMap[d.name]) nameMap[d.name]={ticker:d.ticker||'',isin:d.isin||''}; if(d.broker) brokers[d.broker]=1; });
+    try{ kidComptes().forEach(c=>{ brokers[c]=1; }); }catch(e){}
+    window._kdivNameMap=nameMap; window._kdivTickerMap={};
+    Object.keys(nameMap).forEach(n=>{ const v=nameMap[n]; if(v.ticker&&!window._kdivTickerMap[v.ticker]) window._kdivTickerMap[v.ticker]={name:n,isin:v.isin}; });
+    const esc=x=>String(x).replace(/"/g,'&quot;');
+    const dlN=document.getElementById('kdivf_names'); if(dlN) dlN.innerHTML=Object.keys(nameMap).sort().map(n=>'<option value="'+esc(n)+'">').join('');
+    const dlB=document.getElementById('kdivf_brokers'); if(dlB) dlB.innerHTML=Object.keys(brokers).sort().map(b2=>'<option value="'+esc(b2)+'">').join('');
+    const dlT=document.getElementById('kdivf_tickers'); if(dlT) dlT.innerHTML=Object.keys(window._kdivTickerMap).sort().map(t=>'<option value="'+esc(t)+'">').join('');
+  }
+  window.kdivNameSelected=function(){ const n=document.getElementById('kdivf_name').value; const m=window._kdivNameMap&&window._kdivNameMap[n]; if(m){ const tk=document.getElementById('kdivf_ticker'), is=document.getElementById('kdivf_isin'); if(tk&&m.ticker) tk.value=m.ticker; if(is&&m.isin) is.value=m.isin; } };
+  window.kdivTickerSelected=function(){ const t=document.getElementById('kdivf_ticker').value; const m=window._kdivTickerMap&&window._kdivTickerMap[t]; if(m){ const nm=document.getElementById('kdivf_name'), is=document.getElementById('kdivf_isin'); if(nm&&!nm.value&&m.name) nm.value=m.name; if(is&&m.isin) is.value=m.isin; } };
 
   // ---- 1) SYNTHÈSE --------------------------------------------------------
   // ── Performance annuelle par enfant (source: fichier perfo annuelle) ─────────
