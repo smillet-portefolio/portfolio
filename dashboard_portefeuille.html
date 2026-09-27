@@ -3976,6 +3976,8 @@ function restorePersistedPrices() {
     const savedDate = localStorage.getItem('portfolio_prices_date');
 
     Object.assign(CURRENT_PRICES, prices);
+    // Correctif : un cours LSE (ticker .L) enregistré en 'GBP' alors qu'il est en pence -> 'GBp'.
+    Object.keys(CURRENT_PRICES).forEach(t => { const p = CURRENT_PRICES[t]; if (p && /\.L$/i.test(t) && p.currency === 'GBP' && +p.price > 100) p.currency = 'GBp'; });
     // Alias O/0 : cours publié sous 'SCOJ.DE' (lettre O) -> aussi 'SC0J.DE' (zéro).
     if (CURRENT_PRICES['SCOJ.DE'] && !CURRENT_PRICES['SC0J.DE']) CURRENT_PRICES['SC0J.DE'] = { ...CURRENT_PRICES['SCOJ.DE'], source:'alias' };
     try {
@@ -4677,8 +4679,14 @@ function submitEditLine() {
   // Prix actuel manuel -> CURRENT_PRICES + persistance (portfolio_prices -> Google Sheets)
   const pxAct = parseFloat(document.getElementById('el_pxActuel')?.value);
   if (!isNaN(pxAct) && pxAct > 0) {
-    if (typeof CURRENT_PRICES !== 'undefined') CURRENT_PRICES[ticker] = { price: pxAct, currency: devise, source: 'manuel' };
-    if (typeof saveToLocalStorage === 'function') saveToLocalStorage();
+    // Ne réécrire le cours que s'il a réellement été modifié ; conserver la devise de cotation
+    // existante (ex. RR.L coté en pence 'GBp' alors que la ligne est en 'GBP') pour ne pas
+    // fausser la valorisation d'un facteur 100.
+    const _prev = (typeof CURRENT_PRICES !== 'undefined') ? CURRENT_PRICES[ticker] : null;
+    if (typeof CURRENT_PRICES !== 'undefined' && !(_prev && Math.abs((+_prev.price||0) - pxAct) < 1e-9)) {
+      CURRENT_PRICES[ticker] = { price: pxAct, currency: (_prev && _prev.currency) ? _prev.currency : devise, source: 'manuel' };
+      if (typeof saveToLocalStorage === 'function') saveToLocalStorage();
+    }
   }
 
   // Persist extra rows
