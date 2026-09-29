@@ -54,6 +54,7 @@ TICKERS = [
     ("SGO.PA",   "Saint-Gobain",                  "EUR", "SGO.PA"),
     ("SU.PA",    "Schneider Electric",            "EUR", "SU.PA"),
     ("SAN.MC",   "Banco Santander",               "EUR", "SAN.MC"),
+    ("PUB.PA",   "Publicis Groupe",               "EUR", "PUB.PA"),
     ("RR.L",     "Rolls-Royce",                   "GBp", "RR.L"),
     ("MSFT",     "Microsoft",                     "USD", "MSFT"),
     ("ORCL",     "Oracle",                        "USD", "ORCL"),
