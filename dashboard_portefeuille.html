@@ -11974,12 +11974,12 @@ window.addEventListener('load', () => {
     data.forEach(d=>{ const y=(d.date||'').slice(0,4); if(!y) return; byYear[y]=byYear[y]||{}; byYear[y][d.e]=(byYear[y][d.e]||0)+(d.netEur||0); });
     const years=Object.keys(byYear).sort();
     const kids=(sel()==='Tous')?KIDS:[sel()];
-    const ds=kids.map(k=>({label:k,data:years.map(y=>Math.round(byYear[y][k]||0)),backgroundColor:COL[k],borderRadius:6,maxBarThickness:90,stack:'s'}));
+    const ds=kids.map(k=>({label:k,data:years.map(y=>Math.round(byYear[y][k]||0)),backgroundColor:COL[k],borderRadius:6,maxBarThickness:70}));
     if(window._kdivYearChart){ try{window._kdivYearChart.destroy();}catch(e){} window._kdivYearChart=null; }
     window._kdivYearChart=new Chart(cv.getContext('2d'),{
       type:'bar',
       data:{labels:years,datasets:ds},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:kids.length>1,position:'top',labels:{color:'#8b95a8',font:{size:12},boxWidth:12}},tooltip:{callbacks:{label:c=>' '+c.dataset.label+' : '+Math.round(c.parsed.y).toLocaleString('fr')+' € net'}}},scales:{y:{stacked:true,ticks:{callback:v=>v.toLocaleString('fr')+' €',color:'#8b95a8'},grid:{color:'rgba(0,0,0,0.05)'}},x:{stacked:true,grid:{display:false},ticks:{color:'#8b95a8',font:{size:13}}}}}
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:kids.length>1,position:'top',labels:{color:'#8b95a8',font:{size:12},boxWidth:12}},tooltip:{callbacks:{label:c=>' '+c.dataset.label+' : '+Math.round(c.parsed.y).toLocaleString('fr')+' € net'}}},scales:{y:{beginAtZero:true,ticks:{callback:v=>v.toLocaleString('fr')+' €',color:'#8b95a8'},grid:{color:'rgba(0,0,0,0.05)'}},x:{grid:{display:false},ticks:{color:'#8b95a8',font:{size:13}}}}}
     });
     _kidCharts.push(window._kdivYearChart);
   }
