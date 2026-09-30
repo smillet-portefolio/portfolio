@@ -11742,7 +11742,11 @@ window.addEventListener('load', () => {
   }
   function allDeps(){
     const base = KIDS_DEP_BASE.map(d=>({d:d.d,c:d.c,e:d.e,m:d.m,_i:null}));
-    const man  = KIDS_DEP.map((d,i)=>({d:d.d,c:d.c,e:d.e,m:d.m,_i:i}));
+    // Deux formats : {d,c,e,m} (onglet Enfants) et {date,broker,enfant,type,amountEur} (onglet Dépôts & Cash enfants)
+    const man  = KIDS_DEP.map((d,i)=> (d && d.m!==undefined)
+      ? {d:d.d,c:d.c,e:d.e,m:d.m,_i:i}
+      : {d:d.date,c:d.broker,e:d.enfant||compteEnfant(d.broker),
+         m:(d.type==='retrait'?-1:1)*Math.abs(+(d.amountEur!=null?d.amountEur:d.amount)||0),_i:i});
     return base.concat(man);
   }
   window.kidAddDep=function(){
