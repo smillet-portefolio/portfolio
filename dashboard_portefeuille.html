@@ -12201,7 +12201,7 @@ window.addEventListener('load', () => {
       }catch(_){}
       const byType={}; rows.forEach(r=>{ const t=r.t||'Autre'; if((+r.val||0)>0) byType[t]=(byType[t]||0)+(+r.val||0); });
       const byBk={}; rows.forEach(r=>{ const k=r.broker||'—'; if(!byBk[k])byBk[k]={inv:0,val:0}; byBk[k].inv+=(r.coutEur||0); byBk[k].val+=(+r.val||0); });
-      Object.keys(cashByCpt).forEach(cpt=>{ if(!byBk[cpt])byBk[cpt]={inv:0,val:0}; byBk[cpt].val+=cashByCpt[cpt]; });   // cash ajouté à la valeur du compte
+      // Tableau par broker = titres uniquement (coût d'achat vs valeur actuelle), sans le cash
       const bkKeys=Object.keys(byBk).sort((a,b2)=>byBk[b2].val-byBk[a].val);
       const donutId='kidSynDonut_'+c.replace(/[^a-zA-Z]/g,'');
       html+=`<div class="card" style="border-left:4px solid ${COL[c]};margin-bottom:22px;padding:22px 24px">
@@ -12210,7 +12210,7 @@ window.addEventListener('load', () => {
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px">
           ${kpi('Montant investi', fmt(invest), 'var(--text)')}
-          ${kpi('Valeur actuelle', fmt(valeur), 'var(--text)')}
+          ${kpiSub('Valeur actuelle', fmt(valeur), 'var(--text)', cash ? 'dont '+fmt(cash)+' de cash' : '')}
           ${kpiDual('Performance', pct(perf), fmts(gain), col(gain), 'Sur montant investi')}
           ${kpiDual('Performance YTD', _ytdHas?pct(ytdPct):'—', _ytdHas?fmts(_ytdG):'', _ytdHas?col(_ytdG):'var(--text2)', 'Depuis le 1er janvier')}
           ${kpiSub('Performance annuelle moyenne', xirrPct!=null?pct(xirrPct):'—', xirrPct!=null?col(xirrPct):'var(--text2)', 'XIRR money-weighted')}
@@ -12226,7 +12226,7 @@ window.addEventListener('load', () => {
               <thead><tr style="color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.4px;border-bottom:1px solid var(--border)"><th style="text-align:left;padding:6px 8px">Broker</th><th style="text-align:right;padding:6px 8px">Investi €</th><th style="text-align:right;padding:6px 8px">Valeur act. €</th><th style="text-align:right;padding:6px 8px">+/− €</th><th style="text-align:right;padding:6px 8px">Perf.</th></tr></thead>
               <tbody>
                 ${bkKeys.map(k=>{ const g=byBk[k].val-byBk[k].inv; const p=byBk[k].inv?g/byBk[k].inv*100:null; return `<tr style="border-bottom:1px solid var(--border)"><td style="padding:6px 8px;font-weight:600">${k}</td><td style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace">${fmt(byBk[k].inv)}</td><td style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace">${fmt(byBk[k].val)}</td><td style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;color:${col(g)}">${fmts(g)}</td><td style="text-align:right;padding:6px 8px;color:${col(g)}">${pct(p)}</td></tr>`; }).join('')}
-                <tr style="font-weight:700;border-top:2px solid var(--border2);background:var(--bg2)"><td style="padding:7px 8px">Total</td><td style="text-align:right;padding:7px 8px;font-family:'DM Mono',monospace">${fmt(investCost)}</td><td style="text-align:right;padding:7px 8px;font-family:'DM Mono',monospace">${fmt(valeur)}</td><td style="text-align:right;padding:7px 8px;font-family:'DM Mono',monospace;color:${col(gainCost)}">${fmts(gainCost)}</td><td style="text-align:right;padding:7px 8px;color:${col(gainCost)}">${pct(perfCost)}</td></tr>
+                <tr style="font-weight:700;border-top:2px solid var(--border2);background:var(--bg2)"><td style="padding:7px 8px">Total</td><td style="text-align:right;padding:7px 8px;font-family:'DM Mono',monospace">${fmt(investCost)}</td><td style="text-align:right;padding:7px 8px;font-family:'DM Mono',monospace">${fmt(holdVal)}</td><td style="text-align:right;padding:7px 8px;font-family:'DM Mono',monospace;color:${col(holdVal-investCost)}">${fmts(holdVal-investCost)}</td><td style="text-align:right;padding:7px 8px;color:${col(holdVal-investCost)}">${pct(investCost?(holdVal-investCost)/investCost*100:null)}</td></tr>
               </tbody>
             </table>
           </div>
