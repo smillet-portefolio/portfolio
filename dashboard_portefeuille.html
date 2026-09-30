@@ -9391,17 +9391,43 @@ function _aeBuildRows() {
     map[key].costEur  += eur;
     map[key].pxQtySum += (r.pxAchat || 0) * r.qty;
   });
+  // Dividendes nets encaissés (onglet Dividendes), rattachés par ISIN — sinon par ticker sans suffixe
+  const withDiv = !!window._aeWithDiv;
+  const divByKey = {};
+  if (withDiv && typeof DIVIDEND_DATA !== 'undefined') {
+    DIVIDEND_DATA.forEach(d => {
+      const k = d.isin ? 'I:' + d.isin : (d.ticker ? 'T:' + _aeTkBase(d.ticker) : null);
+      if (k) divByKey[k] = (divByKey[k] || 0) + (d.netEur || 0);
+    });
+  }
   return Object.values(map).map(row => {
     const info    = CURRENT_PRICES[row.ticker];
     const pxCurr  = info?.price ?? null;
     const pxCur   = info?.currency || row.currency;
     const pxAchat = row.qty > 0 ? row.pxQtySum / row.qty : 0;
     const valEur  = pxCurr != null ? toEur(row.qty * pxCurr, pxCur) : null;
-    const pnl     = valEur != null ? valEur - row.costEur : null;
+    let divEur = 0;
+    if (withDiv) {
+      for (const k of [row.isin ? 'I:' + row.isin : null, 'T:' + _aeTkBase(row.ticker)]) {
+        if (k && divByKey[k]) { divEur += divByKey[k]; delete divByKey[k]; }  // compté une seule fois
+      }
+    }
+    const pnl     = valEur != null ? valEur - row.costEur + divEur : null;
     const pnlPct  = valEur != null && row.costEur > 0 ? pnl / row.costEur * 100 : null;
     const vars    = CURRENT_VARIATIONS[row.ticker] || {};
-    return { ...row, pxCurr, pxCur, pxAchat, valEur, pnl, pnlPct, vars };
+    return { ...row, pxCurr, pxCur, pxAchat, valEur, divEur, pnl, pnlPct, vars };
   });
+}
+function _aeTkBase(t) { return String(t || '').toUpperCase().split('.')[0]; }
+function aeToggleDiv() {
+  window._aeWithDiv = !window._aeWithDiv;
+  const b = document.getElementById('ae_div_btn');
+  if (b) {
+    b.style.background  = window._aeWithDiv ? '#4caf82' : 'var(--bg3)';
+    b.style.color       = window._aeWithDiv ? '#fff' : 'var(--text)';
+    b.style.borderColor = window._aeWithDiv ? '#4caf82' : 'var(--border2)';
+  }
+  _aeRenderRows();
 }
 
 // Coquille de l'onglet (en-têtes + filtres) — construite une seule fois par affichage
@@ -9449,6 +9475,7 @@ function renderActEtf() {
         <h2 style="font-size:18px;font-weight:700;margin:0">📉 Actions &amp; ETFs — Performance &amp; variations</h2>
         <div style="display:flex;align-items:center;gap:12px">
           <div id="ae_summary" style="font-size:13px"></div>
+          <button id="ae_div_btn" onclick="aeToggleDiv()" title="Ajoute les dividendes nets encaissés au P&amp;L € et P&amp;L %" style="padding:4px 10px;border:1px solid ${window._aeWithDiv?'#4caf82':'var(--border2)'};background:${window._aeWithDiv?'#4caf82':'var(--bg3)'};color:${window._aeWithDiv?'#fff':'var(--text)'};border-radius:8px;font-size:11px;cursor:pointer;white-space:nowrap;font-weight:600">💸 Avec dividendes</button>
           <button onclick="exportAeXlsx()" title="Exporter en Excel" style="padding:4px 10px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);border-radius:8px;font-size:11px;cursor:pointer;white-space:nowrap;font-weight:600">⬇ Excel</button>
         </div>
       </div>
@@ -9568,7 +9595,7 @@ function _aeRenderRows() {
       <td style="text-align:right;padding:6px 8px;${mono}">${pxTxt(r.pxAchat, r.currency)}</td>
       <td style="text-align:right;padding:6px 8px;${mono}">${pxTxt(r.pxCurr, r.pxCur)}</td>
       <td style="text-align:right;padding:6px 8px;${mono}"><strong>${eurTxt(r.valEur)}</strong></td>
-      <td style="text-align:right;padding:6px 8px;${mono}">${pnlEurTxt(r.pnl)}</td>
+      <td style="text-align:right;padding:6px 8px;${mono}"${r.divEur ? ` title="dont ${fmtF(r.divEur)} € de dividendes nets"` : ''}>${pnlEurTxt(r.pnl)}${r.divEur ? ' <span style="font-size:9px">💸</span>' : ''}</td>
       <td style="text-align:right;padding:6px 8px;${mono}">${pctTxt(r.pnlPct)}</td>
       ${AE_VARCOLS.map(k => varCell(r.vars[k])).join('')}
     </tr>`;
@@ -9590,7 +9617,8 @@ function _aeRenderRows() {
     if(!mem.length) return null;
     const gVal = mem.reduce((s,r)=>s+(r.valEur!=null?r.valEur:(r.costEur||0)),0);
     const gCost = mem.reduce((s,r)=>s+(r.costEur||0),0);
-    const gPnl = gVal-gCost, gPct = gCost ? gPnl/gCost*100 : null;
+    const gDiv = mem.reduce((s,r)=>s+(r.divEur||0),0);
+    const gPnl = gVal-gCost+gDiv, gPct = gCost ? gPnl/gCost*100 : null;
     return { g, mem, gVal, gCost, gPnl, gPct, pseudo:{ name:g.label, isin:'', qty:null, pxAchat:null, pxCurr:null, valEur:gVal, costEur:gCost, pnl:gPnl, pnlPct:gPct, vars:{} } };
   }).filter(Boolean);
   let _topItems = rows.filter(r=>!_grpKeyOf(r)).map(r=>({ row:r })).concat(_grpItems.map(x=>({ grp:x })));
@@ -9605,7 +9633,8 @@ function _aeRenderRows() {
   const hasPrices = rows.some(r => r.valEur != null);
   const totCost = rows.reduce((s,r) => s + r.costEur, 0);
   const totVal  = hasPrices ? rows.reduce((s,r) => s + (r.valEur ?? r.costEur), 0) : totCost;
-  const totPnl  = totVal - totCost;
+  const totDiv  = rows.reduce((s,r) => s + (r.divEur || 0), 0);
+  const totPnl  = totVal - totCost + totDiv;
   const totPnlPct = totCost ? totPnl / totCost * 100 : 0;
   const totRow = `<tr style="border-top:2px solid var(--border);font-weight:700;background:var(--bg2)">
     <td colspan="5" style="text-align:right;padding:6px 8px">TOTAL (${rows.length} lignes)</td>
@@ -9618,7 +9647,8 @@ function _aeRenderRows() {
   tbody.innerHTML = body + totRow;
 
   const sumEl = document.getElementById('ae_summary');
-  if (sumEl) sumEl.innerHTML = `Valeur ${eurTxt(totVal)} &nbsp;·&nbsp; P&L ${pnlEurTxt(totPnl)} (${pctTxt(totPnlPct)})`;
+  if (sumEl) sumEl.innerHTML = `Valeur ${eurTxt(totVal)} &nbsp;·&nbsp; P&L ${pnlEurTxt(totPnl)} (${pctTxt(totPnlPct)})`
+    + (window._aeWithDiv ? ` <span style="color:var(--text2);font-size:11px">dont ${fmt(totDiv)} € de dividendes nets</span>` : '');
 }
 
 function aeGrpToggle(k){ if(window._aeGrpOpen==null) window._aeGrpOpen=new Set(); if(window._aeGrpOpen.has(k)) window._aeGrpOpen.delete(k); else window._aeGrpOpen.add(k); _aeRenderRows(); }
