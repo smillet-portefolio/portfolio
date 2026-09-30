@@ -1750,6 +1750,7 @@ const DIRECT_COUNTRY = {
   'IBE.MC':'Spain',          // Iberdrola
   'SAN.MC':'Spain',          // Banco Santander
   'PUB.PA':'France',         // Publicis Groupe
+  'STR.VI':'Austria',        // Strabag SE
   'VRT':'United States',     // Vertiv Holdings
   'C7A0.DE':'China',         // CATL (Contemporary Amperex)
   'C7A0.MU':'China',         // CATL (cotation Munich = ticker du portefeuille)
@@ -2718,6 +2719,7 @@ const DIRECT_SECTOR = {
   'IBE.MC':'Services publics', // Iberdrola (utility)
   'SAN.MC':'Finance',          // Banco Santander (banque)
   'PUB.PA':'Conso. disc.',     // Publicis Groupe (communication / publicité)
+  'STR.VI':'Industrie',        // Strabag SE (BTP / construction)
   'VRT':'Industrie',           // Vertiv Holdings
   'C7A0.DE':'Industrie',       // CATL (batteries)
   'C7A0.MU':'Industrie',       // CATL (cotation Munich = ticker du portefeuille)
@@ -9256,6 +9258,7 @@ const STOCK_SECTORS = {
   'IBE.MC':  'Services publics · Électricité renouvelable',
   'SAN.MC':  'Finance · Banque de détail',
   'PUB.PA':  'Communication · Publicité & marketing digital',
+  'STR.VI':  'Industrie · Construction & Infrastructures',
   'VRT':     'Industrie · Infrastructure data centers',
   'C7A0.MU': 'Industrie · Batteries / véhicules électriques',
   'C7A0.DE': 'Industrie · Batteries / véhicules électriques',
@@ -9284,6 +9287,7 @@ const STOCK_COUNTRY = {
   'IBE.MC':  '🇪🇸 Espagne',
   'SAN.MC':  '🇪🇸 Espagne',
   'PUB.PA':  '🇫🇷 France',
+  'STR.VI':  '🇦🇹 Autriche',
   'VRT':     '🇺🇸 États-Unis',
   'C7A0.MU': '🇨🇳 Chine',
   'C7A0.DE': '🇨🇳 Chine',
@@ -9310,6 +9314,7 @@ const STOCK_BADGE = {
   'FGR.PA':  'badge-green',
   'VIE.PA':  'badge-green',
   'PUB.PA':  'badge-blue',
+  'STR.VI':  'badge-green',
 };
 
 // Country flag by exchange suffix / known ticker
@@ -9320,6 +9325,7 @@ function stockFlag(ticker) {
   if (ticker.endsWith('.MI'))                        return '🇮🇹';
   if (ticker.endsWith('.MC'))                        return '🇪🇸';
   if (ticker.endsWith('.L'))                         return '🇬🇧';
+  if (ticker.endsWith('.VI'))                        return '🇦🇹';
   return '🏳️';
 }
 
@@ -9343,6 +9349,7 @@ const STOCK_COLORS = {
   'FGR.PA':  '#10b981',
   'VIE.PA':  '#10b981',
   'PUB.PA':  '#60a5fa',
+  'STR.VI':  '#f59e0b',
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
