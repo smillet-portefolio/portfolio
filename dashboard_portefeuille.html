@@ -6279,12 +6279,15 @@ function _renderEvoContent(rows, period) {
         labels: evoLabels,
         datasets: [
           { label: 'Valeur actuelle', data: points.map(r => r.act_total), borderColor: '#5a8dee', backgroundColor: 'rgba(90,141,238,0.1)', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.3 },
-          { label: 'Investi', data: points.map(r => r.inv_total), borderColor: '#f97316', backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 0, borderDash: [4,4], tension: 0.3 }
+          { label: 'Investi', data: points.map(r => r.inv_total), borderColor: '#f97316', backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 0, borderDash: [4,4], tension: 0.3 },
+          // Plus-value = valeur actuelle − investi, sur l'axe de droite (échelle propre)
+          { label: 'Plus-value', yAxisID: 'y1', data: points.map(r => (r.act_total != null && r.inv_total != null) ? r.act_total - r.inv_total : null), borderColor: '#4caf82', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: 0.3 }
         ]
       },
       options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
-        plugins: { legend: { labels: { color: 'var(--text)', font: { size: 11 } } }, tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + Math.round(ctx.raw).toLocaleString('fr') + ' €' } } },
-        scales: { x: { ticks: { color: 'var(--text2)', maxTicksLimit: 8 }, grid: { color: 'rgba(0,0,0,0.05)' } }, y: { ticks: { color: 'var(--text2)', callback: v => Math.round(v/1000) + 'k €' }, grid: { color: 'rgba(0,0,0,0.05)' } } }
+        plugins: { legend: { labels: { color: 'var(--text)', font: { size: 11 } } }, tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + (ctx.dataset.yAxisID === 'y1' && ctx.raw >= 0 ? '+' : '') + Math.round(ctx.raw).toLocaleString('fr') + ' €' } } },
+        scales: { x: { ticks: { color: 'var(--text2)', maxTicksLimit: 8 }, grid: { color: 'rgba(0,0,0,0.05)' } }, y: { ticks: { color: 'var(--text2)', callback: v => Math.round(v/1000) + 'k €' }, grid: { color: 'rgba(0,0,0,0.05)' } },
+          y1: { position: 'right', title: { display: true, text: 'Plus-value', color: '#4caf82', font: { size: 11 } }, ticks: { color: '#4caf82', callback: v => (v > 0 ? '+' : '') + Math.round(v/1000) + 'k €' }, grid: { drawOnChartArea: false } } }
       }
     });
   }
