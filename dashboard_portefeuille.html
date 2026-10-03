@@ -5281,7 +5281,8 @@ const GS_KEYS = [
   're_mortgage',
   're_rental',
   're_rental2',
-  're_rental3'
+  're_rental3',
+  'ae_pnl_order'
 ];
 
 // ==============================================================================
@@ -9711,6 +9712,32 @@ function aeSubTab(which){
   if(which==='chart'){ try{ renderAePnlChart(); }catch(e){ console.error('renderAePnlChart', e); } }
 }
 const _AE_PNL_PAL = ['#5a8dee','#4caf82','#f59e0b','#a78bfa','#e06c6c','#14b8a6','#f97316','#ec4899','#84cc16','#60a5fa','#34d399','#fb923c','#c084fc','#f43f5e','#22d3ee','#a3e635','#eab308','#fb7185','#2dd4bf','#818cf8'];
+// ── Ordre des pastilles par glisser-déposer (mémorisé, synchronisé GSheets via GS_KEYS) ──
+function _aePnlOrderGet(){ try{ const a=JSON.parse(localStorage.getItem('ae_pnl_order')||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+function aePnlDragStart(ev){ const b=ev.currentTarget; window._aeDragTk=b.dataset.aetk; try{ ev.dataTransfer.effectAllowed='move'; ev.dataTransfer.setData('text/plain', b.dataset.aetk); }catch(e){} b.style.opacity='0.4'; }
+function aePnlDragEnd(ev){ ev.currentTarget.style.opacity=''; window._aeDragTk=null; document.querySelectorAll('#ae_pnl_toolbar [data-aetk]').forEach(x=>{ x.style.boxShadow=''; }); }
+function _aeSameRow(a,b){ return a && b && a.parentElement===b.parentElement; }
+function aePnlDragOver(ev){
+  const tgt=ev.currentTarget, tk=window._aeDragTk; if(!tk || tgt.dataset.aetk===tk) return;
+  const src=document.querySelector('#ae_pnl_toolbar [data-aetk="'+tk+'"]'); if(!_aeSameRow(src,tgt)) return;   // déplacement dans la même rangée (Actions / ETFs / Crypto)
+  ev.preventDefault(); try{ ev.dataTransfer.dropEffect='move'; }catch(e){}
+  const r=tgt.getBoundingClientRect(), after=(ev.clientX-r.left)>r.width/2;
+  tgt.dataset.aeAfter = after ? '1' : '';
+  tgt.style.boxShadow = after ? '3px 0 0 0 var(--blue)' : '-3px 0 0 0 var(--blue)';
+}
+function aePnlDragLeave(ev){ ev.currentTarget.style.boxShadow=''; }
+function aePnlDrop(ev){
+  ev.preventDefault();
+  const tgt=ev.currentTarget, tk=window._aeDragTk; tgt.style.boxShadow='';
+  const src=document.querySelector('#ae_pnl_toolbar [data-aetk="'+tk+'"]');
+  if(!tk || !_aeSameRow(src,tgt) || tgt.dataset.aetk===tk) return;
+  tgt.parentElement.insertBefore(src, tgt.dataset.aeAfter ? tgt.nextSibling : tgt);
+  // Nouvel ordre = ordre affiché de toutes les pastilles (toutes rangées confondues)
+  const order=[...document.querySelectorAll('#ae_pnl_toolbar [data-aetk]')].map(x=>x.dataset.aetk);
+  const prev=_aePnlOrderGet().filter(t=>order.indexOf(t)<0);   // conserve les titres absents (ex. vendus)
+  try{ localStorage.setItem('ae_pnl_order', JSON.stringify(order.concat(prev))); }catch(e){}
+}
+
 function renderAePnlChart(){
   const cv = document.getElementById('aePnlChart'); if(!cv) return;
   const note = document.getElementById('ae_pnl_note');
@@ -9788,19 +9815,23 @@ function renderAePnlChart(){
     const _short = t => (typeof ETF_META!=='undefined' && ETF_META[t] && ETF_META[t].short) ? ETF_META[t].short : t;
     const _base  = t => String(t).split('.')[0];
     const _rank  = (arr, key) => { const i = arr.indexOf(key); return i<0 ? 999 : i; };
+    // Ordre personnalisé par glisser-déposer (prioritaire sur l'ordre par défaut)
+    const _uo = _aePnlOrderGet();
+    const _urank = t => { const i = _uo.indexOf(t); return i<0 ? 9999 : i; };
     const acts = tickers.filter(t => (window._aePnlTypes[t]||'Action')==='Action')
-                        .sort((a,b)=> _rank(ACT_ORDER,_base(a)) - _rank(ACT_ORDER,_base(b)) || String(a).localeCompare(b));
+                        .sort((a,b)=> _urank(a) - _urank(b) || _rank(ACT_ORDER,_base(a)) - _rank(ACT_ORDER,_base(b)) || String(a).localeCompare(b));
     const etfs = tickers.filter(t => window._aePnlTypes[t]==='ETF')
-                        .sort((a,b)=> _rank(ETF_ORDER,_short(a)) - _rank(ETF_ORDER,_short(b)) || String(a).localeCompare(b));
-    const cryptos = tickers.filter(t => window._aePnlTypes[t]==='Crypto');
+                        .sort((a,b)=> _urank(a) - _urank(b) || _rank(ETF_ORDER,_short(a)) - _rank(ETF_ORDER,_short(b)) || String(a).localeCompare(b));
+    const cryptos = tickers.filter(t => window._aePnlTypes[t]==='Crypto')
+                        .sort((a,b)=> _urank(a) - _urank(b));
     const pill = t => {
       const on = window._aePnlSel.has(t); const c=colorOf(t);
       const short = _short(t);
       const oc = 'aePnlToggle(' + "'" + t + "'" + ')';
       const nm = String(lotsMap[t].name||t).replace(/"/g,'&quot;');
-      return '<button onclick="'+oc+'" title="'+nm+'" style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:12px;font-size:11px;cursor:pointer;border:1px solid '+(on?c:'var(--border2)')+';background:'+(on?c:'var(--bg3)')+';color:'+(on?'#fff':'var(--text2)')+'"><span style="width:8px;height:8px;border-radius:50%;background:'+c+';display:inline-block"></span>'+short+'</button>';
+      return '<button draggable="true" data-aetk="'+t+'" ondragstart="aePnlDragStart(event)" ondragover="aePnlDragOver(event)" ondragleave="aePnlDragLeave(event)" ondrop="aePnlDrop(event)" ondragend="aePnlDragEnd(event)" onclick="'+oc+'" title="'+nm+' — glisser pour réordonner" style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:12px;font-size:11px;cursor:grab;border:1px solid '+(on?c:'var(--border2)')+';background:'+(on?c:'var(--bg3)')+';color:'+(on?'#fff':'var(--text2)')+'"><span style="width:8px;height:8px;border-radius:50%;background:'+c+';display:inline-block"></span>'+short+'</button>';
     };
-    const row = list => list.length ? '<div style="flex:0 0 100%;display:flex;flex-wrap:wrap;gap:6px">'+list.map(pill).join('')+'</div>' : '';
+    const row = list => list.length ? '<div data-aerow="1" style="flex:0 0 100%;display:flex;flex-wrap:wrap;gap:6px">'+list.map(pill).join('')+'</div>' : '';
     // Rangée « Indices » : pastilles agrégées (bordure pointillée) sous la ligne ETF.
     const _ixPresent = ix => tickers.some(t => ix.members.indexOf(_short(t))>=0);
     const ixPill = ix => { const on=window._aePnlIdxSel.has(ix.key); const c=ix.color; const mem=tickers.filter(t=>ix.members.indexOf(_short(t))>=0).map(_short).join(', ');
