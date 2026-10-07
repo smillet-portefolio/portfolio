@@ -56,6 +56,7 @@ TICKERS = [
     ("SAN.MC",   "Banco Santander",               "EUR", "SAN.MC"),
     ("PUB.PA",   "Publicis Groupe",               "EUR", "PUB.PA"),
     ("STR.VI",   "Strabag SE",                    "EUR", "STR.VI"),
+    ("SAF.PA",   "Safran",                        "EUR", "SAF.PA"),
     ("RR.L",     "Rolls-Royce",                   "GBp", "RR.L"),
     ("MSFT",     "Microsoft",                     "USD", "MSFT"),
     ("ORCL",     "Oracle",                        "USD", "ORCL"),
