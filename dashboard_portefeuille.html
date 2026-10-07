@@ -14,6 +14,71 @@
   console.log("Data injected v3 - " + Object.keys(localStorage).length + " keys");
 })();
 </script>
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// HARMONISATION Nom / ISIN / Ticker — corrections VALIDÉES par l'utilisateur (07/10/2026).
+// Appliquée à chaque chargement, AVANT la lecture des données (idempotente) : aucun
+// onglet ouvert avec d'anciennes données ne peut la défaire durablement. Les valeurs
+// corrigées partent dans Google Sheets à la sauvegarde automatique suivante.
+// Ne touche ni aux types, ni aux quantités/montants, ni aux tickers des positions
+// ACTIVES (book2_all_rows, kids_hold) -> mise à jour des prix inchangée.
+// ══════════════════════════════════════════════════════════════════════════════
+(function(){
+  var NAME_BY_ISIN = {
+    'FR0012757854':'Spie SA', 'FR0010208488':'Engie',
+    'LU2009202107':'Amundi MSCI Emerging ex China', 'LU1900066462':'Amundi MSCI Eastern Europe ex Russia',
+    'IE00BMG6Z448':'iShares MSCI Emerging ex China', 'IE00B4L5Y983':'iShares Core MSCI World',
+    'IE000M7V94E1':'VanEck Uranium Nuclear', 'IE00BMTX1Y45':'iShares S&P 500 Swap',
+    'IE000JJPY166':'iShares EUR Cash', 'LU1834987890':'Amundi STOXX Europe 600 Industrials',
+    'US0378331005':'Apple', 'US5949181045':'Microsoft'
+  };
+  var ISIN_FIX = { 'US7960502018':'US7960508882' };            // Samsung (SMSN)
+  var NAME_FIX = { 'Etherum':'Ethereum' };
+  // ISIN -> [ticker de référence, variantes à remplacer]
+  var TICKER_BY_ISIN = {
+    'DE0005557508':['DTE.DE',['DTE']], 'DE0007461006':['TPE.DE',['TPE']], 'DE000A1ML7J1':['VNA.DE',['VNA']],
+    'DE000ENER6Y0':['ENR.DE',['ENR']], 'FR0000121667':['EL.PA',['EL']], 'FR0000121972':['SU.PA',['SU.FR','SU']],
+    'FR0000125007':['SGO.PA',['SGO']], 'FR0010208488':['ENGI.PA',['ENGI.FR']], 'FR0010282822':['VU.PA',['VU.FR']],
+    'FR0012757854':['SPIE.PA',['SPIE.FR','SPIE']], 'IE000JJPY166':['YCSH.DE',['YCSH']], 'IE000M7V94E1':['NUKL.DE',['NUKL','NUCL']],
+    'IE00B1XNHC34':['IQQH.DE',['IQQH']], 'IE00B4L5Y983':['IWDA.AS',['EUNL']], 'IE00BHZRR147':['FLXC.DE',['FLXC']],
+    'IE00BMTX1Y45':['I500.DE',['I500']], 'LU0380865021':['XESC',['XXSC']], 'NL0011585146':['RACE.MI',['RACE']]
+  };
+  var KEYS = ['book2_all_rows','book2_extra_rows','book2_comm','book2_overrides','sold_rows','closed_positions',
+              'dividend_data','kids_hold','kids_closed','kids_comm','kids_div'];
+  var ACTIVE = { 'book2_all_rows':1, 'book2_extra_rows':1, 'kids_hold':1 };
+  var U = function(s){ return String(s == null ? '' : s).trim().toUpperCase(); };
+  var walk = function(o, fn){
+    if (Array.isArray(o)) { o.forEach(function(x){ walk(x, fn); }); return; }
+    if (o && typeof o === 'object') {
+      if (('isin' in o || 'ticker' in o) && ('name' in o || 'nom' in o)) fn(o);
+      Object.keys(o).forEach(function(k){ var v = o[k]; if (v && typeof v === 'object') walk(v, fn); });
+    }
+  };
+  try {
+    var data = {};
+    KEYS.forEach(function(k){ try { var s = localStorage.getItem(k); if (s && s.length > 2) data[k] = JSON.parse(s); } catch(e){} });
+    // Ticker -> ISIN (pour les lignes sans ISIN, ex. dividendes)
+    var isinOfTk = {};
+    Object.keys(data).forEach(function(k){ walk(data[k], function(o){ var i = U(o.isin), t = U(o.ticker); i = ISIN_FIX[i] || i; if (i && t && !isinOfTk[t]) isinOfTk[t] = i; }); });
+    var total = 0;
+    Object.keys(data).forEach(function(k){
+      var n = 0;
+      walk(data[k], function(o){
+        var nk = ('nom' in o && !('name' in o)) ? 'nom' : 'name';
+        var i0 = U(o.isin), t0 = U(o.ticker);
+        var i = ISIN_FIX[i0] || i0 || isinOfTk[t0] || '';
+        if (i0 && i !== i0) { o.isin = i; n++; }
+        var n0 = o[nk] || '', n1 = NAME_BY_ISIN[i] || NAME_FIX[String(n0).trim()] || n0;
+        if (n1 !== n0) { o[nk] = n1; n++; }
+        var tk = TICKER_BY_ISIN[i];
+        if (!ACTIVE[k] && tk && t0 && tk[1].indexOf(t0) >= 0) { o.ticker = tk[0]; n++; }
+      });
+      if (n) { localStorage.setItem(k, JSON.stringify(data[k])); total += n; }
+    });
+    if (total) console.log('Harmonisation Nom/ISIN/Ticker : ' + total + ' corrections appliquées');
+  } catch(e) { console.warn('Harmonisation Nom/ISIN/Ticker :', e); }
+})();
+</script>
 <script>/*!
  * Chart.js v4.5.1
  * https://www.chartjs.org
@@ -1751,6 +1816,7 @@ const DIRECT_COUNTRY = {
   'SAN.MC':'Spain',          // Banco Santander
   'PUB.PA':'France',         // Publicis Groupe
   'STR.VI':'Austria',        // Strabag SE
+  'SAF.PA':'France',         // Safran
   'VRT':'United States',     // Vertiv Holdings
   'C7A0.DE':'China',         // CATL (Contemporary Amperex)
   'C7A0.MU':'China',         // CATL (cotation Munich = ticker du portefeuille)
@@ -2001,7 +2067,7 @@ function renderDashboard() {
   const BROKER_TO_CAT = {
     'SAXO':'Actions & ETFs', 'IBKR':'Actions & ETFs', 'LINXEA':'Actions & ETFs',
     'XTB':'Actions & ETFs', 'TRADING 212':'Actions & ETFs', 'TRADING 212 JITO':'Actions & ETFs',
-    'Ledger':'Crypto', 'Binance':'Crypto',
+    'Ledger':'Crypto', 'Binance':'Crypto', 'Finst':'Crypto',
     'KB':'Produits structurés & Épargne',
     'LENDOSPHERE':'Obligations non cotées', 'ENERFIP':'Obligations non cotées', 'LUMO':'Obligations non cotées', 'KB obligations':'Obligations non cotées'
   };
@@ -2016,7 +2082,7 @@ function renderDashboard() {
   CATS.forEach(c => { investedByCat[c] = 0; });
 
   const normBroker = b => {
-    const map = { 'ledger':'Ledger', 'LEDGER':'Ledger', 'binance':'Binance', 'BINANCE':'Binance', 'trading 212':'TRADING 212' };
+    const map = { 'ledger':'Ledger', 'LEDGER':'Ledger', 'binance':'Binance', 'BINANCE':'Binance', 'finst':'Finst', 'FINST':'Finst', 'trading 212':'TRADING 212' };
     return map[b] || b;
   };
 
@@ -2261,11 +2327,11 @@ function renderDashboard() {
       setB('db_sharpe_bench', 'vs '+blab+' : <strong>'+(bsharpe!=null?((bsharpe>=0?'+':'')+bsharpe.toFixed(2).replace('.',',')):'—')+'</strong>');
     })();
 
-    // Variante HORS CRYPTO — même période, portefeuille privé de Ledger + Binance
+    // Variante HORS CRYPTO — même période, portefeuille privé de Ledger + Binance + Finst
     (function(){
       const setE=(id,v)=>{ const el=document.getElementById(id); if(el) el.innerHTML=v; };
-      const cryptoOf = r => (r.act_ledger||0) + (r.act_binance||0);
-      const invExOf  = r => (r.inv_total||0) - (r.inv_ledger||0) - (r.inv_binance||0);
+      const cryptoOf = r => (r.act_ledger||0) + (r.act_binance||0) + (r.act_finst||0);
+      const invExOf  = r => (r.inv_total||0) - (r.inv_ledger||0) - (r.inv_binance||0) - (r.inv_finst||0);
       const rx=[]; let xpeak=(rows[0].act_total-cryptoOf(rows[0])), xmdd=0;
       for(let i=1;i<rows.length;i++){
         const p=rows[i-1], c=rows[i];
@@ -2531,7 +2597,7 @@ function renderDashboard() {
                    .filter(r => r && r.date && r.date <= today && r.inv_total)
                    .slice().sort((a, b) => a.date.localeCompare(b.date));
   const BROKER_EVO = { 'KB':'kb','SAXO':'saxo','IBKR':'ibkr','TRADING 212':'t212','TRADING 212 JITO':'jito','XTB':'xtb',
-                       'Ledger':'ledger','Binance':'binance','ENERFIP':'enerfip','LENDOSPHERE':'lendo','LUMO':'lumo','LINXEA':'linxea' };
+                       'Ledger':'ledger','Binance':'binance','Finst':'finst','ENERFIP':'enerfip','LENDOSPHERE':'lendo','LUMO':'lumo','LINXEA':'linxea' };
   const YTD_CUT = today.slice(0,4) + '-01-01';
   const MTD_CUT = today.slice(0,7) + '-01';
   const evoBaseRow = (cut) => { let base = null; for (const r of EVO_SRC) { if (r.date < cut) base = r; else break; } return base || EVO_SRC[0] || null; };
@@ -2720,6 +2786,7 @@ const DIRECT_SECTOR = {
   'SAN.MC':'Finance',          // Banco Santander (banque)
   'PUB.PA':'Conso. disc.',     // Publicis Groupe (communication / publicité)
   'STR.VI':'Industrie',        // Strabag SE (BTP / construction)
+  'SAF.PA':'Industrie',        // Safran (aéronautique & défense)
   'VRT':'Industrie',           // Vertiv Holdings
   'C7A0.DE':'Industrie',       // CATL (batteries)
   'C7A0.MU':'Industrie',       // CATL (cotation Munich = ticker du portefeuille)
@@ -3170,9 +3237,9 @@ const ETF_HOLDINGS = [
   {id:'HYDE',isin:'IE00053WDH64',name:'Invesco Hydrogen Economy',val:4991,color:'#f97316',count:'~30',holdings:[{name:'Bloom Energy',ticker:'BE',pct:8.94,sec:'Énergie'},{name:'Plug Power',ticker:'PLUG',pct:7.87,sec:'Énergie'},{name:'Nel ASA',ticker:'NEL.OL',pct:7.42,sec:'Énergie'},{name:'Ballard Power',ticker:'BLDP',pct:6.93,sec:'Énergie'},{name:'ITM Power',ticker:'ITM.L',pct:6.54,sec:'Énergie'},{name:'Linde',ticker:'LIN',pct:6.18,sec:'Chimie'},{name:'Air Liquide',ticker:'AI.PA',pct:5.76,sec:'Chimie'},{name:'AFC Energy',ticker:'AFC.L',pct:5.41,sec:'Énergie'},{name:'Air Products',ticker:'APD',pct:4.87,sec:'Chimie'},{name:'McPhy Energy',ticker:'MCPHY',pct:4.32,sec:'Énergie'},{name:'Ceres Power',ticker:'CWR.L',pct:3.97,sec:'Énergie'},{name:'Hexagon Purus',ticker:'HPUR.OL',pct:3.54,sec:'Industrie'}]},
   {id:'VGWE',isin:'IE00BK5BR626',name:'Vanguard All-World High Dividend',val:6097,color:'#14b8a6',count:'~1800',holdings:[{name:'JPMorgan Chase',ticker:'JPM',pct:3.21,sec:'Finance'},{name:'Exxon Mobil',ticker:'XOM',pct:2.87,sec:'Énergie'},{name:'Johnson & Johnson',ticker:'JNJ',pct:2.54,sec:'Santé'},{name:'Procter & Gamble',ticker:'PG',pct:2.31,sec:'Conso'},{name:'Bank of America',ticker:'BAC',pct:2.18,sec:'Finance'},{name:'Chevron',ticker:'CVX',pct:1.97,sec:'Énergie'},{name:'AbbVie',ticker:'ABBV',pct:1.84,sec:'Santé'},{name:'Home Depot',ticker:'HD',pct:1.72,sec:'Conso'},{name:'Cisco Systems',ticker:'CSCO',pct:1.61,sec:'Tech'},{name:'Merck & Co',ticker:'MRK',pct:1.54,sec:'Santé'},{name:'Verizon',ticker:'VZ',pct:1.43,sec:'Telecoms'},{name:'Comcast',ticker:'CMCSA',pct:1.37,sec:'Telecoms'}]},
   {id:'D5BI',isin:'LU0476289466',name:'Xtrackers MSCI Mexico',val:5347,color:'#f59e0b',count:'~60',holdings:[{name:'América Móvil',ticker:'AMX',pct:16.42,sec:'Telecoms'},{name:'Walmart Mexico',ticker:'WALMEX',pct:12.87,sec:'Conso'},{name:'FEMSA',ticker:'FEMSAUBD',pct:9.54,sec:'Conso'},{name:'Grupo México',ticker:'GMEXICOB',pct:8.21,sec:'Matériaux'},{name:'Banorte',ticker:'GFNORTEO',pct:7.14,sec:'Finance'},{name:'Cemex',ticker:'CX',pct:5.87,sec:'Matériaux'},{name:'Grupo Bimbo',ticker:'BIMBOA',pct:4.63,sec:'Conso'},{name:'Arca Continental',ticker:'AC',pct:3.74,sec:'Conso'},{name:'Televisa',ticker:'TV',pct:4.12,sec:'Telecoms'},{name:'Kimberly-Clark Mx',ticker:'KIMBERA',pct:3.41,sec:'Conso'},{name:'Gruma',ticker:'GRUMAB',pct:2.98,sec:'Conso'},{name:'Megacable',ticker:'MEGACPO',pct:2.64,sec:'Telecoms'}]},
-  {id:'NUKL',isin:'IE000M7V94E1',name:'VanEck Uranium & Nuclear',val:3915,color:'#e06c6c',count:'~30',holdings:[{name:'Cameco Corp.',ticker:'CCJ',pct:7.6,sec:'Énergie'},{name:'Constellation En.',ticker:'CEG',pct:7.4,sec:'Énergie'},{name:'BWX Technologies',ticker:'BWXT',pct:6.0,sec:'Industrie'},{name:'Centrus Energy',ticker:'LEU',pct:5.7,sec:'Énergie'},{name:'NexGen Energy',ticker:'NXE',pct:4.5,sec:'Énergie'},{name:'Denison Mines',ticker:'DNN',pct:4.5,sec:'Énergie'},{name:'Kazatomprom',ticker:'KAP.LI',pct:4.4,sec:'Énergie'},{name:'CGN Power/Mining',ticker:'CGN',pct:6.6,sec:'Utilities'},{name:'Paladin Energy',ticker:'PDN.AX',pct:3.5,sec:'Énergie'},{name:'CEZ AS',ticker:'CEZ.PR',pct:3.5,sec:'Utilities'},{name:'Fortum Oyj',ticker:'FORTUM',pct:3.1,sec:'Utilities'},{name:'Yellow Cake',ticker:'YCA.L',pct:3.0,sec:'Énergie'}]},
+  {id:'NUKL',isin:'IE000M7V94E1',name:'VanEck Uranium Nuclear',val:3915,color:'#e06c6c',count:'~30',holdings:[{name:'Cameco Corp.',ticker:'CCJ',pct:7.6,sec:'Énergie'},{name:'Constellation En.',ticker:'CEG',pct:7.4,sec:'Énergie'},{name:'BWX Technologies',ticker:'BWXT',pct:6.0,sec:'Industrie'},{name:'Centrus Energy',ticker:'LEU',pct:5.7,sec:'Énergie'},{name:'NexGen Energy',ticker:'NXE',pct:4.5,sec:'Énergie'},{name:'Denison Mines',ticker:'DNN',pct:4.5,sec:'Énergie'},{name:'Kazatomprom',ticker:'KAP.LI',pct:4.4,sec:'Énergie'},{name:'CGN Power/Mining',ticker:'CGN',pct:6.6,sec:'Utilities'},{name:'Paladin Energy',ticker:'PDN.AX',pct:3.5,sec:'Énergie'},{name:'CEZ AS',ticker:'CEZ.PR',pct:3.5,sec:'Utilities'},{name:'Fortum Oyj',ticker:'FORTUM',pct:3.1,sec:'Utilities'},{name:'Yellow Cake',ticker:'YCA.L',pct:3.0,sec:'Énergie'}]},
   {id:'LSMC',isin:'LU1900066033',name:'Amundi MSCI Semiconductors',val:2478,color:'#8b5cf6',count:'~30',holdings:[{name:'NVIDIA',ticker:'NVDA',pct:18.74,sec:'Tech'},{name:'TSMC',ticker:'TSM',pct:14.32,sec:'Tech'},{name:'ASML Holding',ticker:'ASML',pct:10.87,sec:'Tech'},{name:'Broadcom',ticker:'AVGO',pct:8.94,sec:'Tech'},{name:'Samsung Elec.',ticker:'005930',pct:6.87,sec:'Tech'},{name:'Qualcomm',ticker:'QCOM',pct:5.64,sec:'Tech'},{name:'Texas Instruments',ticker:'TXN',pct:4.97,sec:'Tech'},{name:'SK Hynix',ticker:'000660',pct:4.34,sec:'Tech'},{name:'Micron Technology',ticker:'MU',pct:3.98,sec:'Tech'},{name:'Applied Materials',ticker:'AMAT',pct:3.74,sec:'Tech'},{name:'Lam Research',ticker:'LRCX',pct:3.21,sec:'Tech'},{name:'Infineon Tech.',ticker:'IFX.DE',pct:2.87,sec:'Tech'}]},
-  {id:'MTPI',isin:'IE00BMG6Z448',name:'iShares MSCI ex China',val:1826,color:'#84cc16',count:'~600',holdings:[{name:'Samsung Electronics',ticker:'005930.KS',pct:8.14,sec:'Tech'},{name:'Taiwan Semicon.',ticker:'TSM',pct:7.42,sec:'Tech'},{name:'SK Hynix',ticker:'000660.KS',pct:3.87,sec:'Tech'},{name:'Reliance Industries',ticker:'RELIANCE',pct:3.34,sec:'Énergie'},{name:'HDFC Bank',ticker:'HDB',pct:2.41,sec:'Finance'},{name:'Infosys',ticker:'INFY',pct:2.14,sec:'Tech'},{name:'ICICI Bank',ticker:'IBN',pct:1.87,sec:'Finance'},{name:'América Móvil',ticker:'AMX',pct:1.64,sec:'Telecoms'},{name:'LG Electronics',ticker:'066570.KS',pct:1.41,sec:'Tech'},{name:'Vale SA',ticker:'VALE',pct:1.24,sec:'Matériaux'},{name:'Petrobras',ticker:'PBR',pct:1.12,sec:'Énergie'},{name:'Tata Consultancy',ticker:'TCS.NS',pct:1.08,sec:'Tech'}]},
+  {id:'MTPI',isin:'IE00BMG6Z448',name:'iShares MSCI Emerging ex China',val:1826,color:'#84cc16',count:'~600',holdings:[{name:'Samsung Electronics',ticker:'005930.KS',pct:8.14,sec:'Tech'},{name:'Taiwan Semicon.',ticker:'TSM',pct:7.42,sec:'Tech'},{name:'SK Hynix',ticker:'000660.KS',pct:3.87,sec:'Tech'},{name:'Reliance Industries',ticker:'RELIANCE',pct:3.34,sec:'Énergie'},{name:'HDFC Bank',ticker:'HDB',pct:2.41,sec:'Finance'},{name:'Infosys',ticker:'INFY',pct:2.14,sec:'Tech'},{name:'ICICI Bank',ticker:'IBN',pct:1.87,sec:'Finance'},{name:'América Móvil',ticker:'AMX',pct:1.64,sec:'Telecoms'},{name:'LG Electronics',ticker:'066570.KS',pct:1.41,sec:'Tech'},{name:'Vale SA',ticker:'VALE',pct:1.24,sec:'Matériaux'},{name:'Petrobras',ticker:'PBR',pct:1.12,sec:'Énergie'},{name:'Tata Consultancy',ticker:'TCS.NS',pct:1.08,sec:'Tech'}]},
 ];
 
 // =============================================
@@ -3460,7 +3527,7 @@ const BOOK2_ROWS = [
   {isin:'LU2009202107',ticker:'EMXC.DE',name:'Amundi MSCI Emerging ex China',broker:'IBKR',date:'2025-11-05',currency:'EUR',qty:0.3646,pxAchat:29.24,cost:10.66},
   {isin:'DE0005557508',ticker:'DTE.DE',name:'Deutsche Telekom',broker:'IBKR',date:'2025-11-07',currency:'EUR',qty:100.0,pxAchat:26.45,cost:2645.0},
   {isin:'LU2009202107',ticker:'EMXC.DE',name:'Amundi MSCI Emerging ex China',broker:'IBKR',date:'2025-11-07',currency:'EUR',qty:54.0,pxAchat:29.0524,cost:1568.83},
-  {isin:'IE000M7V94E1',ticker:'NUKL.DE',name:'VanEck Uranium & Nuclear',broker:'IBKR',date:'2026-02-06',currency:'EUR',qty:74.0,pxAchat:52.9,cost:3914.6},
+  {isin:'IE000M7V94E1',ticker:'NUKL.DE',name:'VanEck Uranium Nuclear',broker:'IBKR',date:'2026-02-06',currency:'EUR',qty:74.0,pxAchat:52.9,cost:3914.6},
   {isin:'LU0476289466',ticker:'D5BI.DE',name:'Xtrackers MSCI Mexico',broker:'IBKR',date:'2026-02-16',currency:'EUR',qty:475.0,pxAchat:8.114,cost:3854.15},
   {isin:'NL0011585146',ticker:'RACE.MI',name:'Ferrari',broker:'IBKR',date:'2026-02-25',currency:'EUR',qty:3.0,pxAchat:321.2,cost:963.6},
   {isin:'NL0011585146',ticker:'RACE.MI',name:'Ferrari',broker:'IBKR',date:'2026-03-07',currency:'EUR',qty:5.0,pxAchat:291.75,cost:1458.75},
@@ -3491,7 +3558,7 @@ const BOOK2_ROWS = [
   {isin:'FR0010282822',ticker:'VU.PA',name:'Vusion Group',broker:'TRADING 212',date:'2026-04-09',currency:'EUR',qty:17.0,pxAchat:108.7,cost:1847.9},
   {isin:'IE00BK5BR626',ticker:'VGWE.DE',name:'Vanguard All-World High Dividend',broker:'TRADING 212',date:'2026-05-15',currency:'EUR',qty:34.0,pxAchat:87.1,cost:2961.4},
   {isin:'IE00BK5BR626',ticker:'VGWE.DE',name:'Vanguard All-World High Dividend',broker:'TRADING 212',date:'2026-05-15',currency:'EUR',qty:36.0,pxAchat:87.09,cost:3135.24},
-  {isin:'IE00BMG6Z448',ticker:'MTPI.PA',name:'iShares MSCI ex China',broker:'LINXEA',date:'2026-02-25',currency:'EUR',qty:257.1354,pxAchat:7.1,cost:1825.66}
+  {isin:'IE00BMG6Z448',ticker:'MTPI.PA',name:'iShares MSCI Emerging ex China',broker:'LINXEA',date:'2026-02-25',currency:'EUR',qty:257.1354,pxAchat:7.1,cost:1825.66}
 ];
 
 // ── Restore extra rows from localStorage immediately at page load ─────────────
@@ -4308,6 +4375,117 @@ function updateChartsFromCurrentPrices() {
 
 // ══ NOUVELLE LIGNE D'INVESTISSEMENT ══════════════════════════════════════════
 
+// ══════════════════════════════════════════════════════════════════════════════
+// RÉFÉRENTIEL UNIQUE Nom ↔ ISIN ↔ Ticker (formulaires « Nouvelle ligne » Éditer + Enfants)
+//   Une seule liste construite depuis toutes les données existantes. Un ISIN ou un
+//   ticker ne peut correspondre qu'à UN nom. Priorité du nom/ticker de référence :
+//   Portefeuille > Enfants > fiches ETF > Clôturées > Enfants clôturées > Dividendes.
+// ══════════════════════════════════════════════════════════════════════════════
+const REF_EXTRA = [
+  { name:'Safran', isin:'FR0000073272', ticker:'SAF.PA', type:'Action', devise:'EUR' },
+];
+function _refCollect(){
+  const out = [], J = k => { try { const v = JSON.parse(localStorage.getItem(k) || '[]'); return Array.isArray(v) ? v : Object.values(v || {}); } catch(e){ return []; } };
+  const add = (prio, name, isin, ticker, type, devise) => {
+    name = String(name || '').trim(); if (!name) return;
+    out.push({ prio, name, isin: String(isin || '').trim().toUpperCase(), ticker: String(ticker || '').trim().toUpperCase(), type: type || '', devise: devise || '' });
+  };
+  (typeof BOOK2_ROWS !== 'undefined' ? BOOK2_ROWS : []).forEach(r => add(0, r.name, r.isin, r.ticker, r.typeInv, r.currency));
+  (window.KIDS_HOLD || []).forEach(r => add(1, r.nom, r.isin, r.ticker, r.t, r.devise));
+  if (typeof ETF_META !== 'undefined') Object.keys(ETF_META).forEach(tk => { const m = ETF_META[tk]; if (m) add(2, m.name, m.isin, tk, 'ETF', 'EUR'); });
+  J('closed_positions').concat(J('sold_rows')).forEach(r => r && add(3, r.name, r.isin, r.ticker, r.typeInv, r.currency || r.currencyAchat));
+  (window.KIDS_CLOSED || []).forEach(r => r && add(4, r.nom || r.name, r.isin, r.ticker, r.t, r.devise));
+  (typeof DIVIDEND_DATA !== 'undefined' ? DIVIDEND_DATA : []).forEach(r => add(5, r.name, r.isin, r.ticker, '', ''));
+  // Valeurs ajoutées au référentiel avant tout achat (proposées dans les menus déroulants)
+  REF_EXTRA.forEach(r => add(2, r.name, r.isin, r.ticker, r.type, r.devise));
+  return out;
+}
+function refBuild(){
+  const recs = _refCollect().sort((a, b) => a.prio - b.prio);
+  const groups = [], byIsin = {}, byTk = {}, byName = {};
+  // 1) groupes par ISIN ; 2) lignes sans ISIN rattachées par ticker, sinon groupe par ticker
+  recs.filter(r => r.isin).forEach(r => {
+    let g = byIsin[r.isin];
+    if (!g) { g = byIsin[r.isin] = { isin: r.isin, recs: [] }; groups.push(g); }
+    g.recs.push(r);
+  });
+  groups.forEach(g => g.recs.forEach(r => { if (r.ticker && !byTk[r.ticker]) byTk[r.ticker] = g; }));
+  recs.filter(r => !r.isin).forEach(r => {
+    let g = r.ticker ? byTk[r.ticker] : null;
+    if (!g) { const k = r.ticker || ('N:' + r.name.toLowerCase()); g = byTk[k]; if (!g) { g = byTk[k] = { isin: '', recs: [] }; groups.push(g); } }
+    g.recs.push(r);
+  });
+  // Valeurs de référence : 1ère occurrence de plus haute priorité (recs triés par prio)
+  groups.forEach(g => {
+    const first = f => { const r = g.recs.find(x => x[f]); return r ? r[f] : ''; };
+    g.name = g.recs[0].name; g.ticker = first('ticker'); g.type = first('type'); g.devise = first('devise');
+    g.names = [...new Set(g.recs.map(r => r.name))];
+    g.tickers = [...new Set(g.recs.map(r => r.ticker).filter(Boolean))];
+    // Type manquant (anciennes lignes, dividendes…) : déduit -> ETF / Crypto / Action
+    if (!g.type) {
+      const _etf = g.recs.some(r => (typeof ETF_TICKERS !== 'undefined' && ETF_TICKERS.has(r.ticker)) || (typeof ETF_META !== 'undefined' && ETF_META[r.ticker]))
+                || g.names.some(n => /\b(ETF|UCITS|iShares|Amundi|Xtrackers|Vanguard|SPDR|VanEck|Invesco|Lyxor|WisdomTree|HANetf)\b/i.test(n));
+      const _cry = g.tickers.some(t => /^(BTC|ETH|SOL|XRP|ADA|DOT|BNB|USDC|USDT)\b|\/EUR$/.test(t)) || g.names.some(n => /bitcoin|ether|solana/i.test(n));
+      g.type = _etf ? 'ETF' : (_cry ? 'Crypto' : 'Action');
+    }
+    g.tickers.forEach(t => { byTk[t] = g; });
+    g.names.forEach(n => { const k = n.toLowerCase(); if (!byName[k]) byName[k] = g; });
+  });
+  return { groups, byIsin, byTk, byName };
+}
+const _refEsc = s => String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+// Branche le référentiel sur un formulaire : ids = { nom, isin, ticker, type, devise, nomList, isinList, tkList }
+function refAttach(ids){
+  const R = refBuild(); window._refLast = R;
+  const $ = id => document.getElementById(id);
+  const all = R.groups.slice().sort((a, b) => a.name.localeCompare(b.name));
+  // Listes déroulantes filtrées par le Type choisi (ETF -> ETF seulement, Action -> actions seulement…)
+  const renderLists = () => {
+    const t = (($(ids.type) || {}).value || '').toLowerCase();
+    const gs = t ? all.filter(g => (g.type || '').toLowerCase() === t) : all;
+    if ($(ids.nomList)) $(ids.nomList).innerHTML = [...new Set(gs.map(g => g.name))].map(n => `<option value="${_refEsc(n)}">`).join('');
+    if ($(ids.isinList)) $(ids.isinList).innerHTML = gs.filter(g => g.isin).map(g => `<option value="${_refEsc(g.isin)}" label="${_refEsc(g.name)}">${_refEsc(g.name)}</option>`).join('');
+    if ($(ids.tkList)) $(ids.tkList).innerHTML = gs.filter(g => g.ticker).map(g => `<option value="${_refEsc(g.ticker)}" label="${_refEsc(g.name)}">${_refEsc(g.name)}</option>`).join('');
+  };
+  renderLists();
+  if ($(ids.type)) $(ids.type).onchange = renderLists;
+  const fill = g => {
+    if ($(ids.nom)) $(ids.nom).value = g.name;
+    if ($(ids.isin)) $(ids.isin).value = g.isin;
+    if ($(ids.ticker)) $(ids.ticker).value = g.ticker;
+    // Type rempli automatiquement s'il n'a pas été choisi
+    const ty = $(ids.type); if (ty && !ty.value && g.type && [...ty.options].some(o => o.value === g.type)) { ty.value = g.type; renderLists(); }
+    const dv = $(ids.devise); if (dv && g.devise && [...dv.options].some(o => o.value === g.devise) && dv.value !== g.devise) { dv.value = g.devise; if (dv.onchange) dv.onchange(); }
+  };
+  const on = (id, find) => { const el = $(id); if (!el) return; el.oninput = el.onchange = () => { const g = find(el.value.trim()); if (g) fill(g); }; };
+  on(ids.nom,    v => R.byName[v.toLowerCase()]);
+  if ($(ids.isin)) $(ids.isin).style.textTransform = 'uppercase';
+  on(ids.isin,   v => R.byIsin[v.toUpperCase()]);
+  on(ids.ticker, v => R.byTk[v.toUpperCase()]);
+}
+// Contrôle de cohérence avant enregistrement -> null si OK, sinon message HTML
+function refCheck(nom, isin, ticker, applyFn){
+  const R = window._refLast || refBuild();
+  isin = String(isin || '').toUpperCase(); ticker = String(ticker || '').toUpperCase();
+  const gI = isin ? R.byIsin[isin] : null, gT = ticker ? R.byTk[ticker] : null, gN = R.byName[String(nom || '').toLowerCase()];
+  const fix = g => applyFn ? ` <a href="#" onclick="${applyFn}('${_refEsc(g.isin || g.ticker)}');return false" style="color:#60a5fa;font-weight:600">→ utiliser « ${_refEsc(g.name)} »</a>` : '';
+  if (gI && gI.name !== nom) return `L'ISIN ${isin} est déjà enregistré sous le nom « ${_refEsc(gI.name)} ».` + fix(gI);
+  if (gT && gT.name !== nom) return `Le ticker ${ticker} est déjà enregistré sous le nom « ${_refEsc(gT.name)} ».` + fix(gT);
+  if (gI && gT && gI !== gT) return `Le ticker ${ticker} correspond à un autre ISIN (${gT.isin || '—'}).`;
+  if (gN && isin && gN.isin && gN.isin !== isin) return `« ${_refEsc(nom)} » est déjà enregistré avec l'ISIN ${gN.isin}.` + fix(gN);
+  if (gN && ticker && gN.tickers.length && gN.tickers.indexOf(ticker) < 0) return `« ${_refEsc(nom)} » est déjà enregistré avec le ticker ${gN.ticker}.` + fix(gN);
+  return null;
+}
+function _refApplyTo(ids, key){
+  const R = window._refLast || refBuild(); const g = R.byIsin[key] || R.byTk[key]; if (!g) return;
+  const $ = id => document.getElementById(id);
+  if ($(ids.nom)) $(ids.nom).value = g.name; if ($(ids.isin)) $(ids.isin).value = g.isin; if ($(ids.ticker)) $(ids.ticker).value = g.ticker;
+}
+const _REF_IDS_NL  = { nom:'nl_nom',  isin:'nl_isin',  ticker:'nl_ticker',  type:'nl_type',  devise:'nl_devise',  nomList:'nl_nom_list',  isinList:'nl_isin_list',  tkList:'nl_ticker_list' };
+const _REF_IDS_KNL = { nom:'knl_nom', isin:'knl_isin', ticker:'knl_ticker', type:'knl_type', devise:'knl_devise', nomList:'knl_nom_list', isinList:'knl_isin_list', tkList:'knl_ticker_list' };
+function refApplyNl(key){ _refApplyTo(_REF_IDS_NL, key); const e = document.getElementById('nl_error'); if (e) e.style.display = 'none'; }
+function refApplyKnl(key){ _refApplyTo(_REF_IDS_KNL, key); const e = document.getElementById('knl_error'); if (e) e.style.display = 'none'; }
+
 function openNewLineModal() {
   // Reset form
   ['nl_isin','nl_nom','nl_ticker','nl_broker','nl_qte','nl_prix','nl_fx','nl_comm','nl_taxe'].forEach(id => {
@@ -4316,13 +4494,8 @@ function openNewLineModal() {
   const nlType = document.getElementById('nl_type');
   if (nlType) nlType.value = '';
 
-  // Alimenter la liste d'autocomplétion avec les noms existants
-  const datalist = document.getElementById('nl_nom_list');
-  if (datalist) {
-    const namesSet = new Set(BOOK2_ROWS.map(r => r.name).filter(Boolean));
-    if (typeof ETF_META !== 'undefined') Object.values(ETF_META).forEach(m => { if (m && m.name) namesSet.add(m.name); });
-    datalist.innerHTML = [...namesSet].sort().map(n => `<option value="${n.replace(/"/g,'&quot;')}">`).join('');
-  }
+  // Menus déroulants Nom / ISIN / Ticker : référentiel unique (filtré par Type, auto-remplissage croisé)
+  refAttach(_REF_IDS_NL);
 
   // Alimenter la liste brokers
   const datalistBroker = document.getElementById('nl_broker_list');
@@ -4362,33 +4535,6 @@ function openNewLineModal() {
     }
     nlPreview();
   };
-  // Auto-remplir ticker et type quand on sélectionne un nom existant
-  const nlNom = document.getElementById('nl_nom');
-  if (nlNom) {
-    nlNom.oninput = () => {
-      const val = nlNom.value.trim();
-      const match = BOOK2_ROWS.find(r => r.name === val);
-      if (match) {
-        const ticker = document.getElementById('nl_ticker');
-        const type   = document.getElementById('nl_type');
-        const isin   = document.getElementById('nl_isin');
-        if (ticker && !ticker.value) ticker.value = match.ticker || '';
-        if (type   && !type.value)   type.value   = match.typeInv || '';
-        if (isin   && !isin.value)   isin.value   = (match.isin || '').toUpperCase();
-      } else if (typeof ETF_META !== 'undefined') {
-        const tk = Object.keys(ETF_META).find(k => ETF_META[k] && ETF_META[k].name === val);
-        if (tk) {
-          const ticker = document.getElementById('nl_ticker');
-          const type   = document.getElementById('nl_type');
-          const isin   = document.getElementById('nl_isin');
-          if (ticker && !ticker.value) ticker.value = tk;
-          if (type   && !type.value)   type.value   = 'ETF';
-          if (isin   && !isin.value && ETF_META[tk].isin) isin.value = (ETF_META[tk].isin || '').toUpperCase();
-        }
-      }
-    };
-  }
-
   setTimeout(() => document.getElementById('nl_nom').focus(), 50);
 }
 
@@ -4460,6 +4606,8 @@ function submitNewLine() {
   if (isNaN(qte) || qte <= 0)  errors.push('Quantité invalide (doit être > 0)');
   if (isNaN(prix) || prix < 0) errors.push("Prix d'achat invalide (doit être ≥ 0)");   // 0 autorisé (actions gratuites)
   if (devise !== 'EUR' && (isNaN(fx) || fx <= 0)) errors.push('Taux de change requis (doit être > 0)');
+  // Référentiel : un ISIN / ticker = un seul nom
+  if (nom) { const _rc = refCheck(nom, isin, ticker, 'refApplyNl'); if (_rc) errors.push(_rc); }
 
   if (errors.length) {
     errEl.innerHTML = '⚠️ ' + errors.join(' &nbsp;·&nbsp; ');
@@ -5867,7 +6015,7 @@ function getEvoRows() {
   // valeur actuelle = cours de clôture quotidiens (EMXC.DE / Q8Y0.DE / MWRE.DE, EUR).
   const JITO_INV = 8198.4;
   const JITO_ACT = {'2026-05-04':8109.88,'2026-05-05':8258.08,'2026-05-06':8354.94,'2026-05-07':8334.28,'2026-05-08':8337.79,'2026-05-11':8443.41,'2026-05-12':8262.17,'2026-05-13':8454.28,'2026-05-14':8544.49,'2026-05-15':8433.28,'2026-05-18':8352.03,'2026-05-19':8270.55,'2026-05-20':8415.53,'2026-05-21':8490.89,'2026-05-22':8623.03,'2026-05-25':8742.33,'2026-05-26':8743.32,'2026-05-27':8765.86,'2026-05-28':8808.45,'2026-05-29':8831.89,'2026-06-01':8868.57,'2026-06-02':8942.67,'2026-06-03':8889.57,'2026-06-04':8795.9,'2026-06-05':8598.99,'2026-06-08':8521.8,'2026-06-09':8376.92,'2026-06-10':8295.21,'2026-06-11':8366.42,'2026-06-12':8581.14,'2026-06-15':8698.27,'2026-06-16':8688.03,'2026-06-17':8710.22,'2026-06-18':8810.61,'2026-06-19':8828.17};
-  const _JBRK = ['kb','lumo','lendo','enerfip','linxea','saxo','ibkr','t212','jito','xtb','ledger','binance'];
+  const _JBRK = ['kb','lumo','lendo','enerfip','linxea','saxo','ibkr','t212','jito','xtb','ledger','binance','finst'];
   rows.forEach(r => {
     if (!r || JITO_ACT[r.date] == null) return;
     r.act_jito = JITO_ACT[r.date];
@@ -5880,7 +6028,7 @@ function getEvoRows() {
     r.perf_total = r.inv_total > 0 ? (r.act_total - r.inv_total) / r.inv_total : 0;
   });
   // Reconcilier les lignes GELEES : total = somme exacte des 11 colonnes par broker
-  const _BRK = ['kb','lumo','lendo','enerfip','linxea','saxo','ibkr','t212','jito','xtb','ledger','binance'];
+  const _BRK = ['kb','lumo','lendo','enerfip','linxea','saxo','ibkr','t212','jito','xtb','ledger','binance','finst'];
   rows.forEach(r => {
     if (!r || !r.frozen) return;
     const _at = _BRK.reduce((s,k) => s + (r['act_'+k] || 0), 0);
@@ -5902,7 +6050,7 @@ function getTodayEvoRow() {
 
   const normBroker = b => {
     if (b && String(b).toUpperCase().startsWith('KB')) return 'KB';  // KB + "KB obligations" -> KB (meme logique que le tableau par broker)
-    const map = { 'ledger':'Ledger','LEDGER':'Ledger','binance':'Binance','BINANCE':'Binance','trading 212':'TRADING 212','TRADING 212 JITO':'TRADING 212 JITO' };
+    const map = { 'ledger':'Ledger','LEDGER':'Ledger','binance':'Binance','BINANCE':'Binance','finst':'Finst','FINST':'Finst','trading 212':'TRADING 212','TRADING 212 JITO':'TRADING 212 JITO' };
     return map[b] || b;
   };
 
@@ -5942,21 +6090,21 @@ function getTodayEvoRow() {
 
   const act_kb=A('KB'), act_lumo=A('LUMO'), act_lendo=A('LENDOSPHERE'), act_enerfip=A('ENERFIP'),
         act_linxea=A('LINXEA'), act_saxo=A('SAXO'), act_ibkr=A('IBKR'), act_t212=A('TRADING 212'), act_jito=A('TRADING 212 JITO'),
-        act_xtb=A('XTB'), act_ledger=A('Ledger'), act_binance=A('Binance');
+        act_xtb=A('XTB'), act_ledger=A('Ledger'), act_binance=A('Binance'), act_finst=A('Finst');
   const act_bonds = act_lumo + act_lendo + act_enerfip;
   const act_total = Object.values(pfByBroker).reduce((s,v) => s + v, 0);
 
   const inv_kb=I('KB'), inv_lumo=I('LUMO'), inv_lendo=I('LENDOSPHERE'), inv_enerfip=I('ENERFIP'),
         inv_linxea=I('LINXEA'), inv_saxo=I('SAXO'), inv_ibkr=I('IBKR'), inv_t212=I('TRADING 212'), inv_jito=I('TRADING 212 JITO'),
-        inv_xtb=I('XTB'), inv_ledger=I('Ledger'), inv_binance=I('Binance');
+        inv_xtb=I('XTB'), inv_ledger=I('Ledger'), inv_binance=I('Binance'), inv_finst=I('Finst');
   const inv_bonds = inv_lumo + inv_lendo + inv_enerfip;
   const inv_total = Object.values(investedByBroker).reduce((s,v) => s + v, 0);
 
   return {
     date: today,
-    act_kb, act_lumo, act_lendo, act_enerfip, act_bonds, act_linxea, act_saxo, act_ibkr, act_t212, act_jito, act_xtb, act_ledger, act_binance, act_total,
+    act_kb, act_lumo, act_lendo, act_enerfip, act_bonds, act_linxea, act_saxo, act_ibkr, act_t212, act_jito, act_xtb, act_ledger, act_binance, act_finst, act_total,
     act_delta: null,  // calculé après
-    inv_kb, inv_lumo, inv_lendo, inv_enerfip, inv_bonds, inv_linxea, inv_saxo, inv_ibkr, inv_t212, inv_jito, inv_xtb, inv_ledger, inv_binance, inv_total,
+    inv_kb, inv_lumo, inv_lendo, inv_enerfip, inv_bonds, inv_linxea, inv_saxo, inv_ibkr, inv_t212, inv_jito, inv_xtb, inv_ledger, inv_binance, inv_finst, inv_total,
     perf_total: inv_total > 0 ? (act_total - inv_total) / inv_total : 0,
     frozen: false,
     live: true
@@ -6147,7 +6295,7 @@ function renderEvolution() {
             <button onclick="exportEvoXlsx()" title="Exporter en Excel" style="padding:4px 10px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);border-radius:8px;font-size:11px;cursor:pointer;white-space:nowrap;font-weight:600">⬇ Excel</button>
           </div>
         </div>
-        <div style="max-height:70vh;overflow:auto"><table id="evoTable" style="border-collapse:collapse;font-size:11px;width:100%;min-width:1746px">
+        <div style="max-height:70vh;overflow:auto"><table id="evoTable" style="border-collapse:collapse;font-size:11px;width:100%;min-width:1842px">
           <thead>
             <tr style="background:var(--bg3)">
               <th style="padding:7px 10px;text-align:left;border-bottom:2px solid var(--border2);min-width:90px">Date</th>
@@ -6168,6 +6316,7 @@ function renderEvolution() {
               <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">XTB<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
               <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">LEDGER<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
               <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">BINANCE<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
+              <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">FINST<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
               <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2)">Statut</th>
             </tr>
           </thead>
@@ -6343,6 +6492,7 @@ function _renderEvoContent(rows, period) {
         <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_xtb, r.act_xtb)}</td>
         <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_ledger, r.act_ledger)}</td>
         <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_binance, r.act_binance)}</td>
+        <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_finst, r.act_finst)}</td>
         <td style="padding:6px 8px;white-space:nowrap">${statusBadge}<button onclick="evoEditRow('${r.date}')" title="Modifier" style="margin-left:6px;padding:2px 7px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);border-radius:8px;font-size:10px;cursor:pointer">✏️</button></td>
       </tr>`;
     }).join('');
@@ -6372,7 +6522,7 @@ function evoEditRow(date) {
   const rows = getEvoRows();
   const r = rows.find(x => x.date === date);
   if (!r) return;
-  const BRK = [['KB','kb'],['LUMO','lumo'],['LENDO.','lendo'],['ENERFIP','enerfip'],['LINXEA','linxea'],['SAXO','saxo'],['IBKR','ibkr'],['T212','t212'],['JITO','jito'],['XTB','xtb'],['LEDGER','ledger'],['BINANCE','binance']];
+  const BRK = [['KB','kb'],['LUMO','lumo'],['LENDO.','lendo'],['ENERFIP','enerfip'],['LINXEA','linxea'],['SAXO','saxo'],['IBKR','ibkr'],['T212','t212'],['JITO','jito'],['XTB','xtb'],['LEDGER','ledger'],['BINANCE','binance'],['FINST','finst']];
   let m = document.getElementById('evoEditModal');
   if (!m) { m = document.createElement('div'); m.id = 'evoEditModal'; m.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center'; document.body.appendChild(m); }
   const inp = 'width:100%;box-sizing:border-box;padding:5px 7px;border:1px solid var(--border2);border-radius:5px;background:var(--bg2);color:var(--text);font-size:12px;text-align:right';
@@ -6401,7 +6551,7 @@ function evoEditSave(date) {
   const i = rows.findIndex(x => x.date === date);
   if (i < 0) return;
   const r = rows[i];
-  const BRK = ['kb','lumo','lendo','enerfip','linxea','saxo','ibkr','t212','jito','xtb','ledger','binance'];
+  const BRK = ['kb','lumo','lendo','enerfip','linxea','saxo','ibkr','t212','jito','xtb','ledger','binance','finst'];
   BRK.forEach(function(k) {
     const iv = document.getElementById('evoed_inv_' + k);
     const av = document.getElementById('evoed_act_' + k);
@@ -8525,7 +8675,7 @@ function renderObligCharts(data) {
 // DÉPÔTS & CASH
 // ══════════════════════════════════════════════════════════════════════════════
 
-const CASH_BROKERS = ['SAXO','IBKR','XTB','TRADING 212','TRADING 212 JITO','LINXEA','KB','KB obligations','Ledger','Binance','LENDOSPHERE','LUMO','ENERFIP'];
+const CASH_BROKERS = ['SAXO','IBKR','XTB','TRADING 212','TRADING 212 JITO','LINXEA','KB','KB obligations','Ledger','Binance','Finst','LENDOSPHERE','LUMO','ENERFIP'];
 // Données historiques de base (non effaçables via reset broker)
 var CASH_BASE_DEPOSITS = [{"date": "2025-05-30", "broker": "TRADING 212", "amount": 2406.74, "currency": "EUR", "type": "dépôt"}, {"date": "2026-05-12", "broker": "SAXO", "amount": 15000.0, "currency": "EUR", "type": "dépôt"}, {"date": "2026-05-08", "broker": "IBKR", "amount": 15000.0, "currency": "EUR", "type": "retrait"}, {"date": "2026-05-07", "broker": "KB", "amount": 7419.79, "currency": "EUR", "type": "dépôt"}, {"date": "2025-05-30", "broker": "TRADING 212", "amount": 601.68, "currency": "EUR", "type": "dépôt"}, {"date": "2026-05-06", "broker": "KB", "amount": 35304.07, "currency": "EUR", "type": "retrait"}, {"date": "2026-05-06", "broker": "IBKR", "amount": 35274.82, "currency": "EUR", "type": "dépôt"}, {"date": "2025-05-30", "broker": "TRADING 212", "amount": 561.57, "currency": "EUR", "type": "retrait"}, {"date": "2025-06-02", "broker": "TRADING 212", "amount": 2997.59, "currency": "EUR", "type": "dépôt"}, {"date": "2026-04-13", "broker": "XTB", "amount": 2000.0, "currency": "EUR", "type": "dépôt"}, {"date": "2026-04-10", "broker": "KB", "amount": 24628.28, "currency": "EUR", "type": "dépôt"}, {"date": "2026-04-10", "broker": "IBKR", "amount": 15100.0, "currency": "EUR", "type": "retrait"}, {"date": "2026-04-09", "broker": "IBKR", "amount": 17829.0, "currency": "EUR", "type": "dépôt"}, {"date": "2026-04-09", "broker": "SAXO", "amount": 19015.42, "currency": "EUR", "type": "dépôt"}, {"date": "2025-06-06", "broker": "TRADING 212", "amount": 20202.02, "currency": "EUR", "type": "dépôt"}, {"date": "2025-06-06", "broker": "TRADING 212", "amount": 2626.26, "currency": "EUR", "type": "dépôt"}, {"date": "2026-03-07", "broker": "IBKR", "amount": 7564.0, "currency": "EUR", "type": "retrait"}, {"date": "2026-03-06", "broker": "IBKR", "amount": 7565.0, "currency": "EUR", "type": "dépôt"}, {"date": "2026-02-10", "broker": "SAXO", "amount": 2267.0, "currency": "EUR", "type": "dépôt"}, {"date": "2026-02-06", "broker": "IBKR", "amount": 4492.0, "currency": "EUR", "type": "dépôt"}, {"date": "2026-02-06", "broker": "IBKR", "amount": 500.0, "currency": "EUR", "type": "retrait"}, {"date": "2026-01-19", "broker": "IBKR", "amount": 1500.0, "currency": "EUR", "type": "dépôt"}, {"date": "2026-01-16", "broker": "SAXO", "amount": 3000.0, "currency": "EUR", "type": "dépôt"}, {"date": "2026-01-12", "broker": "SAXO", "amount": 2650.0, "currency": "EUR", "type": "dépôt"}, {"date": "2025-06-06", "broker": "TRADING 212", "amount": 2626.57, "currency": "EUR", "type": "retrait"}, {"date": "2026-01-06", "broker": "IBKR", "amount": 6181.48, "currency": "EUR", "type": "retrait"}, {"date": "2026-01-03", "broker": "IBKR", "amount": 6199.63, "currency": "EUR", "type": "dépôt"}, {"date": "2025-06-09", "broker": "TRADING 212", "amount": 4033.07, "currency": "EUR", "type": "dépôt"}, {"date": "2025-12-13", "broker": "IBKR", "amount": 2348.0, "currency": "EUR", "type": "dépôt"}, {"date": "2025-12-05", "broker": "IBKR", "amount": 1448.0, "currency": "EUR", "type": "dépôt"}, {"date": "2025-12-05", "broker": "IBKR", "amount": 1445.0, "currency": "EUR", "type": "retrait"}, {"date": "2025-12-02", "broker": "SAXO", "amount": 4550.0, "currency": "EUR", "type": "dépôt"}, {"date": "2025-12-01", "broker": "XTB", "amount": 4550.0, "currency": "EUR", "type": "retrait"}, {"date": "2025-06-09", "broker": "TRADING 212", "amount": 4033.07, "currency": "EUR", "type": "retrait"}, {"date": "2025-11-07", "broker": "IBKR", "amount": 2460.0, "currency": "EUR", "type": "retrait"}, {"date": "2025-11-06", "broker": "IBKR", "amount": 2463.0, "currency": "EUR", "type": "dépôt"}, {"date": "2025-06-14", "broker": "TRADING 212", "amount": 9863.12, "currency": "EUR", "type": "dépôt"}, {"date": "2025-06-14", "broker": "TRADING 212", "amount": 9543.89, "currency": "EUR", "type": "retrait"}, {"date": "2025-10-15", "broker": "SAXO", "amount": 9400.0, "currency": "EUR", "type": "dépôt"}, {"date": "2025-10-07", "broker": "KB", "amount": 13709.77, "currency": "EUR", "type": "retrait"}, {"date": "2025-10-07", "broker": "IBKR", "amount": 4319.0, "currency": "EUR", "type": "dépôt"}, {"date": "2025-06-14", "broker": "TRADING 212", "amount": 603.86, "currency": "EUR", "type": "dépôt"}, {"date": "2025-06-16", "broker": "TRADING 212", "amount": 685.9, "currency": "EUR", "type": "retrait"}, {"date": "2025-09-09", "broker": "XTB", "amount": 1000.0, "currency": "EUR", "type": "dépôt"}, {"date": "2025-09-04", "broker": "IBKR", "amount": 10070.0, "currency": "EUR", "type": "dépôt"}, {"date": "2025-09-04", "broker": "IBKR", "amount": 10000.0, "currency": "EUR", "type": "retrait"}, {"date": "2025-06-16", "broker": "TRADING 212", "amount": 645.51, "currency": "EUR", "type": "retrait"}, {"date": "2025-08-07", "broker": "IBKR", "amount": 4500.0, "currency": "EUR", "type": "retrait"}, {"date": "2025-08-06", "broker": "IBKR", "amount": 8140.8, "currency": "EUR", "type": "dépôt"}, {"date": "2025-06-16", "broker": "TRADING 212", "amount": 403.47, "currency": "EUR", "type": "dépôt"}, {"date": "2025-07-28", "broker": "IBKR", "amount": 600.0, "currency": "EUR", "type": "retrait"}, {"date": "2025-07-26", "broker": "IBKR", "amount": 569.7, "currency": "EUR", "type": "dépôt"}, {"date": "2025-07-16", "broker": "IBKR", "amount": 1600.0, "currency": "EUR", "type": "dépôt"}, {"date": "2025-07-15", "broker": "IBKR", "amount": 2026.0, "currency": "EUR", "type": "dépôt"}, {"date": "2025-06-23", "broker": "TRADING 212", "amount": 120.65, "currency": "EUR", "type": "dépôt"}, {"date": "2025-07-09", "broker": "IBKR", "amount": 9000.0, "currency": "EUR", "type": "dépôt"}, {"date": "2025-06-23", "broker": "TRADING 212", "amount": 120.65, "currency": "EUR", "type": "retrait"}, {"date": "2025-07-04", "broker": "IBKR", "amount": 4052.91, "currency": "EUR", "type": "dépôt"}, {"date": "2025-06-30", "broker": "TRADING 212", "amount": 22.18, "currency": "EUR", "type": "dépôt"}, {"date": "2025-07-07", "broker": "TRADING 212", "amount": 9001.83, "currency": "EUR", "type": "retrait"}, {"date": "2025-07-14", "broker": "TRADING 212", "amount": 2610.52, "currency": "EUR", "type": "retrait"}, {"date": "2025-06-17", "broker": "XTB", "amount": 900.0, "currency": "EUR", "type": "dépôt"}, {"date": "2025-06-16", "broker": "KB", "amount": 9506.77, "currency": "EUR", "type": "dépôt"}, {"date": "2025-07-31", "broker": "TRADING 212", "amount": 54.23, "currency": "EUR", "type": "dépôt"}, {"date": "2025-08-31", "broker": "TRADING 212", "amount": 129.02, "currency": "EUR", "type": "dépôt"}, {"date": "2025-09-30", "broker": "TRADING 212", "amount": 38.17, "currency": "EUR", "type": "dépôt"}, {"date": "2025-06-14", "broker": "KB", "amount": 10466.99, "currency": "EUR", "type": "dépôt"}, {"date": "2025-10-07", "broker": "TRADING 212", "amount": 1244.2, "currency": "EUR", "type": "dépôt"}, {"date": "2025-10-31", "broker": "TRADING 212", "amount": 44.3, "currency": "EUR", "type": "dépôt"}, {"date": "2025-11-06", "broker": "TRADING 212", "amount": 2226.3, "currency": "EUR", "type": "dépôt"}, {"date": "2025-06-10", "broker": "XTB", "amount": 4000.0, "currency": "EUR", "type": "dépôt"}, {"date": "2025-11-27", "broker": "TRADING 212", "amount": 3522.58, "currency": "EUR", "type": "retrait"}, {"date": "2025-12-17", "broker": "TRADING 212", "amount": 1123.62, "currency": "EUR", "type": "retrait"}, {"date": "2026-01-12", "broker": "TRADING 212", "amount": 2650.0, "currency": "EUR", "type": "retrait"}, {"date": "2026-03-30", "broker": "TRADING 212", "amount": 122.22, "currency": "EUR", "type": "retrait"}, {"date": "2026-04-09", "broker": "TRADING 212", "amount": 13967.9, "currency": "EUR", "type": "dépôt"}, {"date": "2026-04-26", "broker": "TRADING 212", "amount": 2119.92, "currency": "EUR", "type": "retrait"}, {"date": "2026-05-04", "broker": "TRADING 212", "amount": 650.0, "currency": "EUR", "type": "retrait"}, {"date": "2026-05-07", "broker": "TRADING 212", "amount": 2698.36, "currency": "EUR", "type": "retrait"}, {"date": "2025-11-30", "broker": "TRADING 212", "amount": 9.82, "currency": "EUR", "type": "dépôt"}, {"date": "2025-05-28", "broker": "XTB", "amount": 3000.0, "currency": "EUR", "type": "dépôt"}, {"date": "2025-05-27", "broker": "XTB", "amount": 7000.0, "currency": "EUR", "type": "dépôt"}, {"date": "2025-05-07", "broker": "KB", "amount": 32290, "currency": "EUR", "type": "dépôt"}, {"date": "2023-10-13", "broker": "LINXEA", "amount": 61500.0, "currency": "EUR", "type": "retrait"}, {"date": "2023-03-10", "broker": "LINXEA", "amount": 1000.0, "currency": "EUR", "type": "dépôt"}, {"date": "2023-02-13", "broker": "LINXEA", "amount": 1000.0, "currency": "EUR", "type": "dépôt"}, {"date": "2023-01-13", "broker": "LINXEA", "amount": 1000.0, "currency": "EUR", "type": "dépôt"}, {"date": "2022-12-14", "broker": "LINXEA", "amount": 1000.0, "currency": "EUR", "type": "dépôt"}, {"date": "2022-11-10", "broker": "LINXEA", "amount": 1000.0, "currency": "EUR", "type": "dépôt"}, {"date": "2022-10-10", "broker": "LINXEA", "amount": 1000.0, "currency": "EUR", "type": "dépôt"}, {"date": "2022-09-10", "broker": "LINXEA", "amount": 1000.0, "currency": "EUR", "type": "dépôt"}, {"date": "2022-08-15", "broker": "LINXEA", "amount": 1000.0, "currency": "EUR", "type": "dépôt"}, {"date": "2022-07-10", "broker": "LINXEA", "amount": 1000.0, "currency": "EUR", "type": "dépôt"}, {"date": "2022-06-10", "broker": "LINXEA", "amount": 1000.0, "currency": "EUR", "type": "dépôt"}, {"date": "2022-05-10", "broker": "LINXEA", "amount": 1000.0, "currency": "EUR", "type": "dépôt"}, {"date": "2022-04-10", "broker": "LINXEA", "amount": 1000.0, "currency": "EUR", "type": "dépôt"}, {"date": "2022-03-10", "broker": "LINXEA", "amount": 1000.0, "currency": "EUR", "type": "dépôt"}, {"date": "2022-02-10", "broker": "LINXEA", "amount": 1000.0, "currency": "EUR", "type": "dépôt"}, {"date": "2022-01-10", "broker": "LINXEA", "amount": 500.0, "currency": "EUR", "type": "dépôt"}, {"date": "2021-12-10", "broker": "LINXEA", "amount": 500.0, "currency": "EUR", "type": "dépôt"}, {"date": "2021-11-10", "broker": "LINXEA", "amount": 500.0, "currency": "EUR", "type": "dépôt"}, {"date": "2021-10-10", "broker": "LINXEA", "amount": 500.0, "currency": "EUR", "type": "dépôt"}, {"date": "2021-09-10", "broker": "LINXEA", "amount": 500.0, "currency": "EUR", "type": "dépôt"}, {"date": "2021-08-10", "broker": "LINXEA", "amount": 500.0, "currency": "EUR", "type": "dépôt"}, {"date": "2021-07-10", "broker": "LINXEA", "amount": 500.0, "currency": "EUR", "type": "dépôt"}, {"date": "2021-06-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2021-05-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2021-04-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2021-03-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2021-02-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2021-01-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2020-12-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2020-11-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2020-10-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2020-09-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2020-08-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2020-07-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2020-06-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2020-05-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2020-04-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2020-03-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2020-02-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2020-01-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2019-12-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2019-11-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2019-10-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2019-09-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2019-08-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2019-07-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2019-06-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2019-05-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2019-04-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2019-03-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2019-02-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2019-01-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2018-12-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2018-12-03", "broker": "LINXEA", "amount": 10000.0, "currency": "EUR", "type": "retrait"}, {"date": "2018-11-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2018-10-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2018-09-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2018-08-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2018-07-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2018-06-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2018-05-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2018-04-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2018-03-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2018-02-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2018-01-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2017-12-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2017-11-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2017-10-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2017-09-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2017-08-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2017-07-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2017-06-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2017-05-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2017-04-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2017-03-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2017-02-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2017-01-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2016-12-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2016-11-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2016-10-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2016-09-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2016-08-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2016-07-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2016-06-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2016-05-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2016-04-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2016-03-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2016-02-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2016-01-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2015-12-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2015-11-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2015-10-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2015-09-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2015-08-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2015-07-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2015-06-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2015-05-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2015-04-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2015-03-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2015-02-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2015-01-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2014-12-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2014-11-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2014-10-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2014-09-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2014-08-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2014-07-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2014-06-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2014-05-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2014-04-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2014-03-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2014-02-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2014-01-15", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2013-12-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2013-11-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2013-10-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2013-09-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2013-08-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2013-07-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2013-06-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2013-05-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2013-04-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2013-03-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2013-02-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2013-01-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2012-12-10", "broker": "LINXEA", "amount": 300.0, "currency": "EUR", "type": "dépôt"}, {"date": "2011-02-10", "broker": "LINXEA", "amount": 225.0, "currency": "EUR", "type": "dépôt"}, {"date": "2011-01-10", "broker": "LINXEA", "amount": 225.0, "currency": "EUR", "type": "dépôt"}, {"date": "2010-12-10", "broker": "LINXEA", "amount": 225.0, "currency": "EUR", "type": "dépôt"}, {"date": "2010-11-10", "broker": "LINXEA", "amount": 225.0, "currency": "EUR", "type": "dépôt"}, {"date": "2010-10-10", "broker": "LINXEA", "amount": 225.0, "currency": "EUR", "type": "dépôt"}, {"date": "2010-09-10", "broker": "LINXEA", "amount": 225.0, "currency": "EUR", "type": "dépôt"}, {"date": "2010-08-10", "broker": "LINXEA", "amount": 225.0, "currency": "EUR", "type": "dépôt"}, {"date": "2010-07-10", "broker": "LINXEA", "amount": 225.0, "currency": "EUR", "type": "dépôt"}, {"date": "2010-06-10", "broker": "LINXEA", "amount": 225.0, "currency": "EUR", "type": "dépôt"}, {"date": "2010-05-10", "broker": "LINXEA", "amount": 225.0, "currency": "EUR", "type": "dépôt"}, {"date": "2010-04-10", "broker": "LINXEA", "amount": 225.0, "currency": "EUR", "type": "dépôt"}, {"date": "2010-03-10", "broker": "LINXEA", "amount": 225.0, "currency": "EUR", "type": "dépôt"}, {"date": "2010-02-10", "broker": "LINXEA", "amount": 225.0, "currency": "EUR", "type": "dépôt"}, {"date": "2010-01-10", "broker": "LINXEA", "amount": 225.0, "currency": "EUR", "type": "dépôt"}, {"date": "2009-12-10", "broker": "LINXEA", "amount": 225.0, "currency": "EUR", "type": "dépôt"}, {"date": "2009-11-10", "broker": "LINXEA", "amount": 225.0, "currency": "EUR", "type": "dépôt"}, {"date": "2009-10-10", "broker": "LINXEA", "amount": 225.0, "currency": "EUR", "type": "dépôt"}, {"date": "2009-09-10", "broker": "LINXEA", "amount": 225.0, "currency": "EUR", "type": "dépôt"}, {"date": "2009-08-10", "broker": "LINXEA", "amount": 225.0, "currency": "EUR", "type": "dépôt"}, {"date": "2009-07-10", "broker": "LINXEA", "amount": 225.0, "currency": "EUR", "type": "dépôt"}, {"date": "2009-06-10", "broker": "LINXEA", "amount": 225.0, "currency": "EUR", "type": "dépôt"}, {"date": "2009-05-10", "broker": "LINXEA", "amount": 550.0, "currency": "EUR", "type": "dépôt"}, {"date": "2009-04-10", "broker": "LINXEA", "amount": 550.0, "currency": "EUR", "type": "dépôt"}, {"date": "2009-03-10", "broker": "LINXEA", "amount": 550.0, "currency": "EUR", "type": "dépôt"}, {"date": "2009-02-10", "broker": "LINXEA", "amount": 550.0, "currency": "EUR", "type": "dépôt"}, {"date": "2009-01-10", "broker": "LINXEA", "amount": 550.0, "currency": "EUR", "type": "dépôt"}, {"date": "2008-12-10", "broker": "LINXEA", "amount": 550.0, "currency": "EUR", "type": "dépôt"}, {"date": "2008-11-10", "broker": "LINXEA", "amount": 550.0, "currency": "EUR", "type": "dépôt"}, {"date": "2008-10-10", "broker": "LINXEA", "amount": 550.0, "currency": "EUR", "type": "dépôt"}, {"date": "2008-09-10", "broker": "LINXEA", "amount": 200.0, "currency": "EUR", "type": "dépôt"}, {"date": "2008-08-10", "broker": "LINXEA", "amount": 200.0, "currency": "EUR", "type": "dépôt"}, {"date": "2008-07-10", "broker": "LINXEA", "amount": 200.0, "currency": "EUR", "type": "dépôt"}, {"date": "2008-06-10", "broker": "LINXEA", "amount": 200.0, "currency": "EUR", "type": "dépôt"}, {"date": "2008-05-10", "broker": "LINXEA", "amount": 200.0, "currency": "EUR", "type": "dépôt"}, {"date": "2008-04-10", "broker": "LINXEA", "amount": 200.0, "currency": "EUR", "type": "dépôt"}, {"date": "2008-03-10", "broker": "LINXEA", "amount": 125.0, "currency": "EUR", "type": "dépôt"}, {"date": "2008-02-10", "broker": "LINXEA", "amount": 125.0, "currency": "EUR", "type": "dépôt"}, {"date": "2008-01-10", "broker": "LINXEA", "amount": 125.0, "currency": "EUR", "type": "dépôt"}, {"date": "2007-12-10", "broker": "LINXEA", "amount": 125.0, "currency": "EUR", "type": "dépôt"}, {"date": "2007-11-14", "broker": "LINXEA", "amount": 125.0, "currency": "EUR", "type": "dépôt"}, {"date": "2007-10-15", "broker": "LINXEA", "amount": 125.0, "currency": "EUR", "type": "dépôt"}, {"date": "2007-09-13", "broker": "LINXEA", "amount": 125.0, "currency": "EUR", "type": "dépôt"}, {"date": "2007-08-15", "broker": "LINXEA", "amount": 125.0, "currency": "EUR", "type": "dépôt"}, {"date": "2007-07-13", "broker": "LINXEA", "amount": 125.0, "currency": "EUR", "type": "dépôt"}, {"date": "2007-06-19", "broker": "LINXEA", "amount": 3600.0, "currency": "EUR", "type": "dépôt"}, {"date": "2007-06-13", "broker": "LINXEA", "amount": 125.0, "currency": "EUR", "type": "dépôt"}, {"date": "2007-05-23", "broker": "LINXEA", "amount": 2000.0, "currency": "EUR", "type": "dépôt"}, {"date": "2007-05-15", "broker": "LINXEA", "amount": 125.0, "currency": "EUR", "type": "dépôt"}, {"date": "2007-04-16", "broker": "LINXEA", "amount": 500.0, "currency": "EUR", "type": "dépôt"}, {"date": "2007-03-01", "broker": "LINXEA", "amount": 500.0, "currency": "EUR", "type": "dépôt"}];
 var CASH_DATA = { deposits: [], cash: {} };
@@ -9267,6 +9417,7 @@ const STOCK_SECTORS = {
   'SAN.MC':  'Finance · Banque de détail',
   'PUB.PA':  'Communication · Publicité & marketing digital',
   'STR.VI':  'Industrie · Construction & Infrastructures',
+  'SAF.PA':  'Industrie · Aéronautique & Défense',
   'VRT':     'Industrie · Infrastructure data centers',
   'C7A0.MU': 'Industrie · Batteries / véhicules électriques',
   'C7A0.DE': 'Industrie · Batteries / véhicules électriques',
@@ -9296,6 +9447,7 @@ const STOCK_COUNTRY = {
   'SAN.MC':  '🇪🇸 Espagne',
   'PUB.PA':  '🇫🇷 France',
   'STR.VI':  '🇦🇹 Autriche',
+  'SAF.PA':  '🇫🇷 France',
   'VRT':     '🇺🇸 États-Unis',
   'C7A0.MU': '🇨🇳 Chine',
   'C7A0.DE': '🇨🇳 Chine',
@@ -9323,6 +9475,7 @@ const STOCK_BADGE = {
   'VIE.PA':  'badge-green',
   'PUB.PA':  'badge-blue',
   'STR.VI':  'badge-green',
+  'SAF.PA':  'badge-blue',
 };
 
 // Country flag by exchange suffix / known ticker
@@ -9358,6 +9511,7 @@ const STOCK_COLORS = {
   'VIE.PA':  '#10b981',
   'PUB.PA':  '#60a5fa',
   'STR.VI':  '#f59e0b',
+  'SAF.PA':  '#0ea5e9',
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -10105,7 +10259,7 @@ const ETF_META = {
     positions:[['NVIDIA Corp.',6.1],['Apple',5.0],['Microsoft',3.3]] },
   'SC0J.DE': { name:'Invesco MSCI World',           short:'SC0J', ter:0.05, index:'MSCI World',                   type:'Cœur large',   badge:'badge-blue',
     geo:[['🇺🇸 États-Unis',71.4],['🇯🇵 Japon',5.6],['🇨🇦 Canada',3.4]], sectors:[['Technologie',28.1],['Finance',16.9],['Industrie',11.4]], positions:[] },
-  'EMXC.DE': { name:'Amundi Emerging ex China',     short:'EMXC', ter:0.20, index:'MSCI EM ex Chine',             type:'Émergents',    badge:'badge-purple',
+  'EMXC.DE': { name:'Amundi MSCI Emerging ex China',     short:'EMXC', ter:0.20, index:'MSCI EM ex Chine',             type:'Émergents',    badge:'badge-purple',
     geo:[['🇹🇼 Taïwan',36.0],['🇰🇷 Corée du Sud',26.8],['🇮🇳 Inde',13.2]],
     sectors:[['Technologie',51.5],['Finance',21.9],['Industrie',6.1]],
     positions:[['Taiwan Semiconductor Manufacturing Co., Ltd.',17.8],['Samsung Electronics Co., Ltd.',7.5],['SK hynix, Inc.',3.8]] },
@@ -10113,7 +10267,7 @@ const ETF_META = {
     geo:[['🇺🇸 États-Unis',100.0]],
     sectors:[['Technologie',45.2],['Finance',13.7],['Santé',9.1]],
     positions:[['NVIDIA Corp.',7.5],['Apple',6.6],['Microsoft',4.9]] },
-  'IQQH.DE': { name:'iShares Clean Energy',         short:'IQQH', ter:0.65, index:'S&P Global Clean Energy',      type:'Thématique',   badge:'badge-amber',
+  'IQQH.DE': { name:'iShares Global Clean Energy',         short:'IQQH', ter:0.65, index:'S&P Global Clean Energy',      type:'Thématique',   badge:'badge-amber',
     geo:[['🇺🇸 États-Unis',37.6],['🇨🇳 Chine',22.8],['🇧🇷 Brésil',7.3]],
     sectors:[['Services publics',41.0],['Industrie',34.6],['Technologie',22.2]],
     positions:[['Bloom Energy',13.7],['Nextpower',7.3],['First Solar',7.2]] },
@@ -10133,7 +10287,7 @@ const ETF_META = {
     geo:[['🇲🇽 Mexique',89.2]],
     sectors:[['Conso. disc.',28.3],['Matériaux',27.2],['Finance',14.8]],
     positions:[['Grupo México S.A.B. de C.V.',15.2],['Grupo Financiero Banorte',13.0],['America Movil SAB de CV',10.8]] },
-  'NUKL.DE': { name:'VanEck Uranium & Nuclear',     short:'NUKL', ter:0.55, index:'MarketVector Uranium',         type:'Thématique',   badge:'badge-amber',
+  'NUKL.DE': { name:'VanEck Uranium Nuclear',     short:'NUKL', ter:0.55, index:'MarketVector Uranium',         type:'Thématique',   badge:'badge-amber',
     geo:[['🇨🇦 Canada',38.0],['🇯🇵 Japon',24.2],['🇺🇸 États-Unis',21.7]],
     sectors:[['Énergie',52.3],['Industrie',41.5],['Services publics',6.2]],
     positions:[['Cameco',15.5],['NexGen Energy Ltd.',7.2],['Sprott Physical Uranium',6.7]] },
@@ -10141,19 +10295,19 @@ const ETF_META = {
     geo:[['🇺🇸 États-Unis',64.3],['🇹🇼 Taïwan',17.1],['🇳🇱 Pays-Bas',6.8]],
     sectors:[['Technologie',96.9]],
     positions:[['NVIDIA Corp.',27.4],['Taiwan Semiconductor Manufacturing Co., Ltd.',15.0],['Broadcom Inc.',13.1]] },
-  'MTPI.PA': { name:'iShares MSCI ex China',        short:'MTPI', ter:0.25, index:'MSCI ACWI ex China',           type:'Complément',   badge:'badge-gray',
+  'MTPI.PA': { name:'iShares MSCI Emerging ex China',        short:'MTPI', ter:0.25, index:'MSCI ACWI ex China',           type:'Complément',   badge:'badge-gray',
     geo:[['🇹🇼 Taïwan',36.0],['🇰🇷 Corée du Sud',26.8],['🇮🇳 Inde',13.2]],
     sectors:[['Technologie',51.5],['Finance',21.9],['Industrie',6.1]],
     positions:[['Taiwan Semiconductor Manufacturing Co., Ltd.',17.8],['Samsung Electronics Co., Ltd.',7.5],['SK hynix, Inc.',3.8]] },
-  'Q8Y0.DE': { name:'iShares Global Clean Energy Transition', short:'Q8Y0', isin:'IE000BI8OT95', ter:0.65, index:'S&P Global Clean Energy Transition', type:'Thématique', badge:'badge-amber',
+  'Q8Y0.DE': { name:'iShares Global Clean Energy Transition', short:'Q8Y0', isin:'IE000U58J0M1', ter:0.65, index:'S&P Global Clean Energy Transition', type:'Thématique', badge:'badge-amber',
     geo:[['🇺🇸 États-Unis',37.6],['🇨🇳 Chine',22.8],['🇧🇷 Brésil',7.3]],
     sectors:[['Services publics',41.0],['Industrie',34.6],['Technologie',22.2]],
     positions:[['Bloom Energy',13.7],['Nextpower',7.3],['First Solar',7.2]] },
-  'MWRE.DE': { name:'Amundi Core MSCI World', short:'MWRE', isin:'IE000U58J0M1', ter:0.12, index:'MSCI World', type:'Cœur large', badge:'badge-blue',
+  'MWRE.DE': { name:'Amundi Core MSCI World', short:'MWRE', isin:'IE000BI8OT95', ter:0.12, index:'MSCI World', type:'Cœur large', badge:'badge-blue',
     geo:[['🇺🇸 États-Unis',73.0],['🇯🇵 Japon',5.9],['🇬🇧 Royaume-Uni',3.4]],
     sectors:[['Technologie',31.7],['Finance',15.7],['Industrie',10.8]],
     positions:[['NVIDIA Corp.',5.6],['Apple',4.7],['Microsoft',3.4]] },
-  'XDWH.DE': { name:'Xtrackers MSCI World Health Care', short:'XDWH', isin:'IE00BM67HK77', ter:0.25, index:'MSCI World Health Care', type:'Thématique', badge:'badge-amber',
+  'XDWH.DE': { name:'Xtrackers MSCI World Health', short:'XDWH', isin:'IE00BM67HK77', ter:0.25, index:'MSCI World Health Care', type:'Thématique', badge:'badge-amber',
     geo:[['🇺🇸 États-Unis',74.8],['🇨🇭 Suisse',9.0],['🇬🇧 Royaume-Uni',4.7]],
     sectors:[['Santé',100.0]],
     positions:[['Eli Lilly',10.7],['Johnson & Johnson',6.1],['AbbVie',5.0]] },
@@ -10161,7 +10315,7 @@ const ETF_META = {
     geo:[['🇬🇷 Grèce',88.7],['🇬🇧 Royaume-Uni',11.2]],
     sectors:[['Finance',54.5],['Conso. staple',11.9],['Services publics',8.3]],
     positions:[['Eurobank Ergasias',14.0],['Nat. Bank of Greece',13.0],['Alpha Services',8.0]] },
-  'LEER.DE': { name:'Amundi MSCI Europe Est ex Russie', short:'LEER', isin:'LU1900066462', ter:0.50, index:'MSCI EM Europe Est ex Russie', type:'Pays', badge:'badge-amber',
+  'LEER.DE': { name:'Amundi MSCI Eastern Europe ex Russia', short:'LEER', isin:'LU1900066462', ter:0.50, index:'MSCI EM Europe Est ex Russie', type:'Pays', badge:'badge-amber',
     geo:[['🇵🇱 Pologne',71.3],['🇭🇺 Hongrie',21.5],['🇨🇿 Rép. tchèque',7.2]],
     sectors:[['Finance',51.9],['Énergie',15.0],['Conso. disc.',9.0]],
     positions:[['OTP Bank',17.95],['PKO Bank Polski',13.46],['PKN Orlen',10.96],['KGHM Polska',6.92],['Bank Pekao',6.04],['PZU',5.49],['Allegro',5.36],['CEZ',4.06],['Erste Bank Polska',3.93],['LPP',3.04]] },
@@ -10180,7 +10334,7 @@ const ETF_ISIN_MAP = {
   'LU0476289466':'D5BI.DE','IE00BJ0KDQ92':'XDWD.DE','IE00BM67HK77':'XDWH.DE',
   'FR0010405431':'GRE.PA','LU1900066462':'LEER.DE',
   'LU0292109344':'XMBR.DE',
-  'IE000U58J0M1':'MWRE.DE','IE000BI8OT95':'Q8Y0.DE',
+  'IE000BI8OT95':'MWRE.DE','IE000U58J0M1':'Q8Y0.DE',   // vérifié justETF 07/10/2026 (étaient inversés)
   'IE00B60SX394':'SC0J.DE',
 };
 
@@ -11275,7 +11429,7 @@ function exportEvoXlsx() {
     : ((r.act_total || 0) - (asc[i-1].act_total || 0)) - ((r.inv_total || 0) - (asc[i-1].inv_total || 0)); });
   const brokers = [['KB','kb'],['LUMO','lumo'],['LENDO.','lendo'],['ENERFIP','enerfip'],['LINXEA','linxea'],
                    ['SAXO','saxo'],['IBKR','ibkr'],['T212','t212'],['JITO','jito'],['XTB','xtb'],
-                   ['LEDGER','ledger'],['BINANCE','binance']];
+                   ['LEDGER','ledger'],['BINANCE','binance'],['FINST','finst']];
   const header = ['Date','Valeur actuelle totale','Valeur investie totale','P&L €','P&L %','Delta jour (hors dépôts)'];
   brokers.forEach(([lbl]) => { header.push(lbl + ' investi'); header.push(lbl + ' actuel'); });
   header.push('Statut');
@@ -11397,7 +11551,8 @@ window.addEventListener('load', () => {
       <!-- ISIN -->
       <div style="grid-column:1/-1">
         <label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">ISIN <span style="color:var(--text2);font-weight:400">(optionnel)</span></label>
-        <input id="nl_isin" type="text" placeholder="ex: IE00BJ0KDQ92" autocomplete="off"
+        <datalist id="nl_isin_list"></datalist>
+        <input id="nl_isin" type="text" placeholder="ex: IE00BJ0KDQ92" autocomplete="off" list="nl_isin_list"
           style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none;text-transform:uppercase"
           oninput="this.value=this.value.toUpperCase()">
       </div>
@@ -11414,7 +11569,8 @@ window.addEventListener('load', () => {
       <!-- TICKER -->
       <div>
         <label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Ticker</label>
-        <input id="nl_ticker" type="text" placeholder="ex: XDWD.DE" autocomplete="off"
+        <datalist id="nl_ticker_list"></datalist>
+        <input id="nl_ticker" type="text" placeholder="ex: XDWD.DE" autocomplete="off" list="nl_ticker_list"
           style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
       </div>
 
@@ -13267,9 +13423,9 @@ window.addEventListener('load', () => {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
           <div style="grid-column:1/-1"><label style="${_knlL}">Enfant</label><select id="knl_e" style="${_knlS}">${KIDS.map(k=>`<option>${k}</option>`).join('')}</select></div>
           <div style="grid-column:1/-1"><label style="${_knlL}">Type d'investissement</label><select id="knl_type" style="${_knlS}">${typeOpts.map(o=>`<option value="${o}">${o||'— Sélectionner —'}</option>`).join('')}</select></div>
-          <div style="grid-column:1/-1"><label style="${_knlL}">ISIN <span style="color:var(--text2);font-weight:400">(optionnel)</span></label><input id="knl_isin" type="text" placeholder="ex: IE00BJ0KDQ92" style="${_knlS};text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>
+          <div style="grid-column:1/-1"><label style="${_knlL}">ISIN <span style="color:var(--text2);font-weight:400">(optionnel)</span></label><input id="knl_isin" type="text" list="knl_isin_list" autocomplete="off" placeholder="ex: IE00BJ0KDQ92" style="${_knlS};text-transform:uppercase"><datalist id="knl_isin_list"></datalist></div>
           <div style="grid-column:1/-1"><label style="${_knlL}">Nom</label><input id="knl_nom" type="text" list="knl_nom_list" placeholder="ex: Amundi MSCI World" style="${_knlS}"><datalist id="knl_nom_list"></datalist></div>
-          <div><label style="${_knlL}">Ticker</label><input id="knl_ticker" type="text" placeholder="ex: XDWD.DE" style="${_knlS}"></div>
+          <div><label style="${_knlL}">Ticker</label><input id="knl_ticker" type="text" list="knl_ticker_list" autocomplete="off" placeholder="ex: XDWD.DE" style="${_knlS}"><datalist id="knl_ticker_list"></datalist></div>
           <div><label style="${_knlL}">Broker</label><input id="knl_broker" type="text" list="knl_broker_list" placeholder="ex: SAXO" style="${_knlS}"><datalist id="knl_broker_list"></datalist></div>
           <div><label style="${_knlL}">Date d'achat</label><input id="knl_date" type="date" style="${_knlS}"></div>
           <div><label style="${_knlL}">Devise</label><select id="knl_devise" style="${_knlS}"><option value="EUR">EUR €</option><option value="USD">USD $</option><option value="GBP">GBP £</option><option value="CZK">CZK Kč</option></select></div>
@@ -13326,24 +13482,8 @@ window.addEventListener('load', () => {
     document.getElementById('knl_submitBtn').textContent = isEdit ? '💾 Enregistrer' : '✓ Ajouter la ligne';
     const cur=sel(); const se=document.getElementById('knl_e');
     if(isEdit){ if(se&&h.e) se.value=h.e; } else if(cur && cur!=='Tous'){ if(se) se.value=cur; }
-    // Répertoire des investissements déjà connus (enfants + portefeuille principal) : nom -> {isin, ticker, type, devise}
-    const known={};
-    KIDS_HOLD.forEach(x=>{ const n=(x.nom||'').trim(); if(!n) return; if(!known[n]) known[n]={isin:x.isin||'',ticker:x.ticker||'',t:x.t||'',devise:x.devise||'EUR'}; else { if(!known[n].isin&&x.isin)known[n].isin=x.isin; if(!known[n].ticker&&x.ticker)known[n].ticker=x.ticker; } });
-    if(typeof BOOK2_ROWS!=='undefined') BOOK2_ROWS.forEach(r=>{ const n=(r.name||'').trim(); if(!n||known[n]) return; known[n]={isin:r.isin||'',ticker:r.ticker||'',t:r.typeInv||'',devise:r.currency||'EUR'}; });
-    if(typeof ETF_META!=='undefined') Object.keys(ETF_META).forEach(tk=>{ const m=ETF_META[tk]; const n=(m&&m.name||'').trim(); if(!n||known[n]) return; known[n]={isin:(m.isin||''),ticker:tk,t:'ETF',devise:'EUR'}; });
-    window._kidKnownInvest=known;
-    document.getElementById('knl_nom_list').innerHTML=Object.keys(known).sort().map(n=>`<option value="${String(n).replace(/"/g,'&quot;')}">`).join('');
+    // Menus déroulants Nom / ISIN / Ticker : référentiel unique partagé avec l'onglet Éditer (filtré par Type)
     document.getElementById('knl_broker_list').innerHTML=kidComptes().sort().map(bx=>`<option value="${String(bx).replace(/"/g,'&quot;')}">`).join('');
-    // Auto-remplissage ISIN / ticker / type / devise quand on choisit un investissement connu
-    const nomEl=document.getElementById('knl_nom');
-    if(nomEl) nomEl.oninput=function(){
-      const k=window._kidKnownInvest[nomEl.value.trim()]; if(!k) return;
-      const ti=document.getElementById('knl_ticker'), is=document.getElementById('knl_isin'), ty=document.getElementById('knl_type'), dv=document.getElementById('knl_devise');
-      if(ti && k.ticker) ti.value=k.ticker;
-      if(is && k.isin) is.value=(k.isin||'').toUpperCase();
-      if(ty && !ty.value && k.t) ty.value=k.t;
-      if(dv && k.devise){ dv.value=k.devise; if(dv.onchange) dv.onchange(); }
-    };
     // Édition : pré-remplir tous les champs de la ligne + FX à la date d'achat
     if(isEdit){
       const sv=(id,v)=>{ const e=document.getElementById(id); if(e) e.value=(v!=null?v:''); };
@@ -13358,6 +13498,7 @@ window.addEventListener('load', () => {
       if((h.devise||'EUR')!=='EUR'){ let fxv=h.fxRate; if((fxv==null||!(fxv>0)) && h.cout!=null && h.qty && h.pxAchat){ fxv=h.cout/(h.qty*h.pxAchat); } if(fxv!=null&&fxv>0) document.getElementById('knl_fx').value=(+fxv).toFixed(6); }
       kidNlPreview();
     }
+    refAttach(_REF_IDS_KNL);   // après le pré-remplissage : les listes suivent le Type déjà choisi
     document.getElementById('kidNlModal').style.display='flex';
   };
   window.kidNlSubmit=function(){
@@ -13372,6 +13513,8 @@ window.addEventListener('load', () => {
     if(qte==null||qte<=0) errs.push('Quantité invalide');
     if(prix==null||prix<0) errs.push("Prix d'achat invalide");   // 0 autorisé (actions gratuites)
     if(dev!=='EUR' && (fx==null||fx<=0)) errs.push('Taux de change requis');
+    // Référentiel : un ISIN / ticker = un seul nom
+    if(nom){ const _rc=refCheck(nom, isin, ticker, 'refApplyKnl'); if(_rc) errs.push(_rc); }
     if(errs.length){ err.innerHTML='⚠️ '+errs.join(' · '); err.style.display='block'; return; }
     const costDev=Math.round(qte*prix*100)/100;
     const costEur=Math.round((dev==='EUR'?costDev:costDev*fx)*100)/100;   // coût € au FX de la date d'achat
