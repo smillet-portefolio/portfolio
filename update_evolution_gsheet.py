@@ -377,12 +377,13 @@ def ech_cap_eur(p, e):
 
 
 def norm_broker(b):
-    """Réplique normBroker : replie 'KB*' -> 'KB' + map ledger/binance/trading 212."""
+    """Réplique normBroker : replie 'KB*' -> 'KB' + map ledger/binance/finst/trading 212."""
     if b and str(b).upper().startswith("KB"):
         return "KB"
     mapping = {
         "ledger": "Ledger", "LEDGER": "Ledger",
         "binance": "Binance", "BINANCE": "Binance",
+        "finst": "Finst", "FINST": "Finst",
         "trading 212": "TRADING 212",
     }
     return mapping.get(b, b)
@@ -459,6 +460,7 @@ def get_today_evo_row(book2_rows, cash_data, oblig_data, current_prices):
     act_linxea, act_saxo, act_ibkr, act_t212 = A("LINXEA"), A("SAXO"), A("IBKR"), A("TRADING 212")
     act_jito = A("TRADING 212 JITO")
     act_xtb, act_ledger, act_binance = A("XTB"), A("Ledger"), A("Binance")
+    act_finst = A("Finst")
     act_bonds = act_lumo + act_lendo + act_enerfip
     act_total = sum(pf_by_broker.values())
 
@@ -466,6 +468,7 @@ def get_today_evo_row(book2_rows, cash_data, oblig_data, current_prices):
     inv_linxea, inv_saxo, inv_ibkr, inv_t212 = I("LINXEA"), I("SAXO"), I("IBKR"), I("TRADING 212")
     inv_jito = I("TRADING 212 JITO")
     inv_xtb, inv_ledger, inv_binance = I("XTB"), I("Ledger"), I("Binance")
+    inv_finst = I("Finst")
     inv_bonds = inv_lumo + inv_lendo + inv_enerfip
     inv_total = sum(invested_by_broker.values())
 
@@ -475,12 +478,14 @@ def get_today_evo_row(book2_rows, cash_data, oblig_data, current_prices):
         "act_enerfip": act_enerfip, "act_bonds": act_bonds, "act_linxea": act_linxea,
         "act_saxo": act_saxo, "act_ibkr": act_ibkr, "act_t212": act_t212, "act_jito": act_jito,
         "act_xtb": act_xtb, "act_ledger": act_ledger, "act_binance": act_binance,
+        "act_finst": act_finst,
         "act_total": act_total,
         "act_delta": None,  # calculé après (vs dernière ligne précédente)
         "inv_kb": inv_kb, "inv_lumo": inv_lumo, "inv_lendo": inv_lendo,
         "inv_enerfip": inv_enerfip, "inv_bonds": inv_bonds, "inv_linxea": inv_linxea,
         "inv_saxo": inv_saxo, "inv_ibkr": inv_ibkr, "inv_t212": inv_t212, "inv_jito": inv_jito,
         "inv_xtb": inv_xtb, "inv_ledger": inv_ledger, "inv_binance": inv_binance,
+        "inv_finst": inv_finst,
         "inv_total": inv_total,
         "perf_total": (act_total - inv_total) / inv_total if inv_total > 0 else 0,
         "frozen": False,
@@ -740,7 +745,7 @@ def main():
         ("IBKR", "act_ibkr", "inv_ibkr"), ("TRADING 212", "act_t212", "inv_t212"),
         ("TRADING 212 JITO", "act_jito", "inv_jito"),
         ("XTB", "act_xtb", "inv_xtb"), ("Ledger", "act_ledger", "inv_ledger"),
-        ("Binance", "act_binance", "inv_binance"),
+        ("Binance", "act_binance", "inv_binance"), ("Finst", "act_finst", "inv_finst"),
     ]
     for label, ak, ik in brokers:
         print(f"    {label:<14s} : {snap[ak]:>12,.2f} €   /  {snap[ik]:>12,.2f} €")
