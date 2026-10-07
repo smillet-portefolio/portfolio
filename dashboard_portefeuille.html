@@ -422,6 +422,9 @@
       <span id="manualUpdateMsg" style="font-size:12px;color:var(--text2)"></span>
     </div>
 
+    <!-- Taux de change de la dernière mise à jour (onglet Prices, CNB) -->
+    <div id="db_fx" class="fx-strip" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;font-size:12px"></div>
+
     <!-- KPIs globaux -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:24px">
       <div class="card" style="padding:18px 16px">
@@ -547,8 +550,10 @@
     </div>
 
     <!-- Tableau par type + tableau par broker -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
 
+      <!-- Colonne gauche : Par type d'actif + Taux de change -->
+      <div style="display:flex;flex-direction:column;gap:20px;min-width:0">
       <!-- Par type d'actif -->
       <div class="card" style="padding:20px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
@@ -569,6 +574,16 @@
           </thead>
           <tbody id="db_type_body"></tbody>
         </table>
+      </div>
+
+      <!-- Taux de change : tableau complet (variations CNB, onglet Prices) -->
+      <div class="card" style="padding:20px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px;flex-wrap:wrap;gap:6px">
+          <p style="font-size:14px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0">💱 Taux de change</p>
+          <span id="db_fx_table_upd" style="font-size:11px;color:var(--text2)"></span>
+        </div>
+        <div style="overflow-x:auto"><table id="db_fx_table" style="width:100%;font-size:13px;border-collapse:collapse"></table></div>
+      </div>
       </div>
 
       <!-- Par broker -->
@@ -5700,6 +5715,74 @@ async function gsLoadPriceHistory() {
     }
   } catch(e) { console.error('gsLoadPriceHistory:', e); }
 }
+// Bandeau « Taux de change » : taux CNB de la dernière mise à jour (onglet Prices),
+// mémorisés pour s'afficher aussi avant la connexion Google. Affiché en haut des onglets
+// FX_STRIP_SECTIONS (+ tableau complet dans le Dashboard, sous « Par type d'actif »).
+const FX_STRIP_SECTIONS = ['dashboard', 'evolution', 'actetf', 'portefeuille', 'patrimoine', 'enfants'];
+let _fxStripHtml = '';
+function _fxStripEnsure(secId) {
+  const sec = document.getElementById(secId); if (!sec) return;
+  let el = sec.querySelector(':scope > .fx-strip');
+  if (!el) {
+    el = document.createElement('div'); el.className = 'fx-strip';
+    el.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;font-size:12px';
+    sec.insertBefore(el, sec.firstChild);
+  } else if (sec.firstElementChild !== el && secId !== 'dashboard') {
+    sec.insertBefore(el, sec.firstChild);   // reste en haut de l'onglet
+  }
+  if (el.innerHTML !== _fxStripHtml) el.innerHTML = _fxStripHtml;
+  // Onglets re-rendus via innerHTML (Patrimoine, Enfants, Actions ETFs…) : ré-insertion automatique
+  if (!sec._fxObs && typeof MutationObserver !== 'undefined') {
+    sec._fxObs = new MutationObserver(() => { const s = sec.querySelector(':scope > .fx-strip'); if (!s || (secId !== 'dashboard' && sec.firstElementChild !== s)) _fxStripEnsure(secId); });
+    sec._fxObs.observe(sec, { childList: true });
+  }
+}
+function renderFxStrip() {
+  let info = null; try { info = JSON.parse(localStorage.getItem('fx_info') || 'null'); } catch(_){}
+  const P = (info && info.pairs) || {};
+  // Repli : taux en mémoire (FX_RATES = € pour 1 unité)
+  if (!P['EUR/CZK'] && typeof FX_RATES !== 'undefined' && FX_RATES.CZK) {
+    const ec = 1 / FX_RATES.CZK;
+    P['EUR/CZK'] = { p: ec };
+    if (FX_RATES.USD) P['USD/CZK'] = { p: FX_RATES.USD * ec };
+    if (FX_RATES.GBP) P['GBP/CZK'] = { p: FX_RATES.GBP * ec };
+  }
+  if (!P['EUR/CZK']) { _fxStripHtml = ''; FX_STRIP_SECTIONS.forEach(_fxStripEnsure); return; }
+  const ec = P['EUR/CZK'].p, uc = P['USD/CZK'] && P['USD/CZK'].p, gc = P['GBP/CZK'] && P['GBP/CZK'].p;
+  const f = (n, d) => n.toLocaleString('fr', { minimumFractionDigits: d, maximumFractionDigits: d });
+  const chip = (lab, v, d, d1) => `<span style="display:inline-flex;align-items:baseline;gap:6px;padding:5px 11px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px">`
+    + `<span style="color:var(--text2);font-weight:600">${lab}</span><strong style="font-family:'DM Mono',monospace">${f(v, d)}</strong>`
+    + (d1 != null ? `<span style="font-size:10px;color:${d1 >= 0 ? '#4caf82' : '#e06c6c'}" title="Variation sur 1 jour">${d1 >= 0 ? '+' : ''}${f(d1, 2)}%</span>` : '') + `</span>`;
+  let h = `<span style="color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.5px;font-weight:600">💱 Taux de change</span>`;
+  h += chip('EUR/CZK', ec, 3, P['EUR/CZK'].d1);
+  if (uc) h += chip('USD/CZK', uc, 3, P['USD/CZK'].d1);
+  // Croisés : variation 1 jour = (1+var EUR/CZK)/(1+var XXX/CZK) − 1
+  const cross = k => { const a = P['EUR/CZK'].d1, b = P[k] && P[k].d1; return (a != null && b != null) ? ((1 + a / 100) / (1 + b / 100) - 1) * 100 : null; };
+  if (uc) h += chip('EUR/USD', ec / uc, 4, cross('USD/CZK'));
+  if (gc) h += chip('EUR/GBP', ec / gc, 4, cross('GBP/CZK'));
+  let upd = '';
+  if (info && info.upd) { const m = info.upd.match(/^(\d{4})-(\d{2})-(\d{2})\s*(\d{2}:\d{2})?/); upd = m ? `${m[3]}/${m[2]}/${m[1]}${m[4] ? ' ' + m[4] : ''}` : info.upd; }
+  h += `<span style="color:var(--text2);font-size:11px">${upd ? 'Mise à jour : ' + upd + ' · ' : ''}source CNB</span>`;
+  _fxStripHtml = h;
+  FX_STRIP_SECTIONS.forEach(_fxStripEnsure);
+
+  // ── Tableau complet (Dashboard) : valeur + variations 1D…YTD ──
+  const tbl = document.getElementById('db_fx_table'); if (!tbl) return;
+  const K = ['1D','1W','1M','3M','6M','1Y','YTD'], KL = { '1D':'1 jour','1W':'1 sem.','1M':'1 mois','3M':'3 mois','6M':'6 mois','1Y':'1 an','YTD':'YTD' };
+  const vOf = k => (P[k] && P[k].v) || {};
+  const crossV = (k, p) => { const a = vOf('EUR/CZK')[p], b = vOf(k)[p]; return (a != null && b != null) ? ((1 + a / 100) / (1 + b / 100) - 1) * 100 : null; };
+  const lines = [['EUR/CZK', ec, 3, p => vOf('EUR/CZK')[p]]];
+  if (uc) lines.push(['USD/CZK', uc, 3, p => vOf('USD/CZK')[p]]);
+  if (uc) lines.push(['EUR/USD', ec / uc, 4, p => crossV('USD/CZK', p)]);
+  if (gc) lines.push(['EUR/GBP', ec / gc, 4, p => crossV('GBP/CZK', p)]);
+  const pc = x => x == null ? '<span style="color:var(--text2)">—</span>' : `<span style="color:${x >= 0 ? '#4caf82' : '#e06c6c'}">${x >= 0 ? '+' : ''}${f(x, 2)}%</span>`;
+  const th = 'padding:7px 10px;text-align:right;white-space:nowrap';
+  tbl.innerHTML = `<thead><tr style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);background:var(--bg3)"><th style="padding:7px 12px;text-align:left">Taux</th><th style="${th}">Valeur</th>${K.map(k => `<th style="${th}">${KL[k]}</th>`).join('')}</tr></thead>`
+    + '<tbody>' + lines.map(([lab, v, d, fn]) => `<tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 12px;font-weight:600">${lab}</td><td style="padding:7px 10px;text-align:right;font-family:'DM Mono',monospace;font-weight:700">${f(v, d)}</td>${K.map(k => `<td style="padding:7px 10px;text-align:right;font-family:'DM Mono',monospace">${pc(fn(k))}</td>`).join('')}</tr>`).join('') + '</tbody>';
+  const u = document.getElementById('db_fx_table_upd'); if (u) u.textContent = (upd ? 'Mise à jour : ' + upd + ' · ' : '') + 'source CNB';
+}
+window.addEventListener('load', () => setTimeout(renderFxStrip, 600));
+
 async function gsLoadPrices() {
   const status = document.getElementById('fetchStatus');
   if (!_gsToken) return;
@@ -5726,6 +5809,8 @@ async function gsLoadPrices() {
     }
 
     let eurCzk = null, usdCzk = null, gbpCzk = null;
+    const iUpd = headers.findIndex(hh => hh.includes('update') || hh.includes('mise'));
+    const _fxInfo = { pairs: {}, upd: null };
     rows.slice(1).forEach(r => {
       const t = (r[iTicker] || '').trim().toUpperCase();
       const p = parseFloat(r[iPrice]);
@@ -5733,7 +5818,14 @@ async function gsLoadPrices() {
       if (t === 'EUR/CZK') eurCzk = p;
       if (t === 'USD/CZK') usdCzk = p;
       if (t === 'GBP/CZK') gbpCzk = p;
+      if (t === 'EUR/CZK' || t === 'USD/CZK' || t === 'GBP/CZK') {
+        const v = {};
+        VAR_KEYS.forEach(k => { const x = (iVar[k] >= 0 && r[iVar[k]] != null && String(r[iVar[k]]).trim() !== '') ? parseFloat(String(r[iVar[k]]).replace(',', '.')) : null; v[k] = (x == null || isNaN(x)) ? null : x; });
+        _fxInfo.pairs[t] = { p, d1: v['1D'], v };
+        if (iUpd >= 0 && r[iUpd]) _fxInfo.upd = String(r[iUpd]).trim();
+      }
     });
+    if (eurCzk) { try { localStorage.setItem('fx_info', JSON.stringify(_fxInfo)); } catch(_){} renderFxStrip(); }
 
     if (eurCzk && usdCzk)  { FX_RATES.USD = usdCzk / eurCzk; FX_RATES._source = 'GSheets (CNB)'; }
     if (eurCzk && gbpCzk)  { FX_RATES.GBP = gbpCzk / eurCzk; }
