@@ -4617,6 +4617,7 @@ function submitNewLine() {
   const errors = [];
   if (!nom)              errors.push('Nom requis');
   if (!ticker)           errors.push('Ticker requis');
+  if (!broker || broker === '—' || broker === '-') errors.push('Broker requis');
   if (!date)             errors.push('Date requise');
   if (isNaN(qte) || qte <= 0)  errors.push('Quantité invalide (doit être > 0)');
   if (isNaN(prix) || prix < 0) errors.push("Prix d'achat invalide (doit être ≥ 0)");   // 0 autorisé (actions gratuites)
@@ -4824,6 +4825,7 @@ function submitEditLine() {
   const errs = [];
   if (!nom) errs.push('Nom requis');
   if (!ticker) errs.push('Ticker requis');
+  if (!broker || broker === '—' || broker === '-') errs.push('Broker requis');
   if (isNaN(qte)||qte<=0) errs.push('Quantité invalide');
   if (isNaN(prix)||prix<=0) errs.push('Prix invalide');
   if (devise!=='EUR'&&(isNaN(fx)||fx<=0)) errs.push('Taux de change requis');
@@ -13602,6 +13604,7 @@ window.addEventListener('load', () => {
     const fx = dev!=='EUR'? gnum('knl_fx') : 1;
     const errs=[];
     if(!nom) errs.push('Nom requis');
+    if(!broker || broker==='—' || broker==='-') errs.push('Broker requis');
     if(qte==null||qte<=0) errs.push('Quantité invalide');
     if(prix==null||prix<0) errs.push("Prix d'achat invalide");   // 0 autorisé (actions gratuites)
     if(dev!=='EUR' && (fx==null||fx<=0)) errs.push('Taux de change requis');
