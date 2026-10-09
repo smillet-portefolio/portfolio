@@ -57,7 +57,7 @@ TICKERS = [
     ("PUB.PA",   "Publicis Groupe",               "EUR", "PUB.PA"),
     ("STR.VI",   "Strabag SE",                    "EUR", "STR.VI"),
     ("SAF.PA",   "Safran",                        "EUR", "SAF.PA"),
-    ("RR.L",     "Rolls-Royce",                   "GBp", "RR.L"),
+    ("RR.L",     "Rolls-Royce",                   "GBp", "RR.L"),   # Yahoo en pence -> converti en GBP à l'écriture
     ("MSFT",     "Microsoft",                     "USD", "MSFT"),
     ("ORCL",     "Oracle",                        "USD", "ORCL"),
     ("VST",      "Vistra Corp",                   "USD", "VST"),
@@ -522,6 +522,10 @@ def collecter_prix():
             _e = _native_to_eur(prix, cur, cnb)
             if _e and _e > 0:
                 PORTFOLIO_EUR_CLOSES[tick] = round(_e, 4)
+        # Cours londoniens en pence (GBp/GBX) -> livres (GBP), comme les achats saisis
+        # (ex. RR.L 1385.2 GBp -> 13.852 GBP). Le close EUR ci-dessus est déjà correct.
+        if prix and cur in ("GBp", "GBX"):
+            prix, cur = round(prix / 100.0, 6), "GBP"
         rows.append([tick, nom, fmt_prix(prix), cur, maintenant if prix else ""]
                     + [fmt_var(var[k]) for k in VAR_KEYS])
 
