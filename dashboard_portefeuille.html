@@ -7099,7 +7099,7 @@ function _csqTh(col,label,align){ return '<th onclick="csqSort(\''+col+'\')" dat
   sec.innerHTML=
     '<h2 style="font-size:18px;font-weight:700;margin:0 0 4px">🏦 Conseq Retraite</h2>'+
     '<p class="section-desc" style="margin-bottom:16px">Épargne retraite Conseq (DPS) — montants en CZK. Cotisations employeur, participant et allocations de l\'État.</p>'+
-    '<div class="sub-tabs" style="margin-bottom:16px"><button class="sub-tab active" data-v="main" onclick="csqSwitchView(\'main\')">Vue d\'ensemble</button><button class="sub-tab" data-v="evo" onclick="csqSwitchView(\'evo\')">Évolution</button><button class="sub-tab" data-v="hist" onclick="csqSwitchView(\'hist\')">Historique des versements</button><button class="sub-tab" data-v="funds" onclick="csqSwitchView(\'funds\')">Détail par fond</button></div>'+
+    '<div class="sub-tabs" style="margin-bottom:16px"><button class="sub-tab active" data-v="main" onclick="csqSwitchView(\'main\')">Vue d\'ensemble</button><button class="sub-tab" data-v="evo" onclick="csqSwitchView(\'evo\')">Évolution</button><button class="sub-tab" data-v="hist" onclick="csqSwitchView(\'hist\')">Historique des versements</button><button class="sub-tab" data-v="funds" onclick="csqSwitchView(\'funds\')">Détail par fond</button><button class="sub-tab" data-v="perf" onclick="csqSwitchView(\'perf\')">Performance fonds</button></div>'+
     '<div id="csq_view_main">'+
     '<div id="csq_kpis" style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:18px"></div>'+
     '<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:20px;margin-bottom:22px">'+
@@ -7147,6 +7147,16 @@ function _csqTh(col,label,align){ return '<th onclick="csqSort(\''+col+'\')" dat
       '<p id="csq_evo_note" style="font-size:11px;color:var(--text2);margin-top:8px">Valeur reconstruite mois par mois = parts cumulées × valeur de part historique (source conseq.cz), comparée au montant cumulé investi. Historique depuis juillet 2019.</p></div>'+
     '<div class="card" style="padding:18px;margin-bottom:22px"><p id="csq_evo_dtitle" style="'+TP+'">Delta mensuel (CZK) — hors dépôts</p><div class="chart-wrap" style="height:220px"><canvas id="csq_evo_delta"></canvas></div></div>'+
     '<div style="max-height:440px;overflow:auto"><table id="csq_evo_tbl"><thead><tr><th id="csq_evo_thlabel">Mois</th><th style="text-align:right">Investi cumulé</th><th style="text-align:right">Valeur</th><th style="text-align:right">Plus-value</th><th style="text-align:right">Perf.</th><th id="csq_evo_thdelta" style="text-align:right">Plus-value mois</th></tr></thead><tbody id="csq_evo_tbody"></tbody></table></div>'+
+    '</div>'+
+    // Performance par fonds : une ligne par fonds, sélection multiple
+    '<div id="csq_view_perf" style="display:none">'+
+    '<div id="csq_pf_filters" style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center"></div>'+
+    '<div class="card" style="padding:18px;margin-bottom:22px">'+
+      '<p id="csq_pf_title" style="'+TP+'">Évolution par fonds</p>'+
+      '<div id="csq_pf_funds" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:12px"></div>'+
+      '<div class="chart-wrap" style="height:380px"><canvas id="csq_pf_line"></canvas></div>'+
+      '<p id="csq_pf_note" style="font-size:11px;color:var(--text2);margin-top:8px"></p></div>'+
+    '<div style="overflow-x:auto"><table id="csq_pf_tbl"><thead><tr><th>Fonds</th><th style="text-align:right">1er investissement</th><th style="text-align:right">Investi</th><th style="text-align:right">Valeur actuelle</th><th style="text-align:right">Plus-value</th><th style="text-align:right">Perf.</th></tr></thead><tbody id="csq_pf_tbody"></tbody></table></div>'+
     '</div>';
   wrapper.appendChild(sec);
 
@@ -7182,10 +7192,11 @@ function _csqTh(col,label,align){ return '<th onclick="csqSort(\''+col+'\')" dat
 
 function csqSetFilter(f){ _csqFilter=f; renderConseqSection(); }
 function csqSwitchView(v){
-  ['main','hist','funds','evo'].forEach(function(k){ var el=document.getElementById('csq_view_'+k); if(el) el.style.display=(k===v)?'':'none'; });
+  ['main','hist','funds','evo','perf'].forEach(function(k){ var el=document.getElementById('csq_view_'+k); if(el) el.style.display=(k===v)?'':'none'; });
   document.querySelectorAll('#conseq .sub-tabs .sub-tab').forEach(function(b){ b.classList.toggle('active', b.dataset.v===v); });
   if(v==='funds') renderCsqDetail();
   if(v==='evo') renderCsqEvoTab();
+  if(v==='perf') renderCsqPerfTab();
 }
 function csqdFilter(f){ _csqdFilter=f; renderCsqDetail(); }
 function renderCsqDetail(){
@@ -7562,6 +7573,118 @@ function renderCsqEvoTab(){
 }
 
 function csqEvoSetRange(r){ _csqEvoRange=r; if(typeof renderCsqEvoTab==='function') renderCsqEvoTab(); }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Conseq — sous-onglet « Performance fonds » : une courbe par fonds détenu
+//   valeur = parts cumulées du fonds × VL historique (même source que l'onglet Évolution)
+//   investi = cumul des montants du fonds (comme « Détail des fonds »)
+//   Modes : Valeur (CZK) · Plus-value (CZK) · Performance (%) ; fonds sélectionnables.
+// ══════════════════════════════════════════════════════════════════════════════
+var _csqPfRange='all', _csqPfGran='week', _csqPfMode='val', _csqPfSel=null;
+var CSQ_PF_COL={GLAK:'#5a8dee',RAF:'#f97316',DL:'#4caf82',BOND35:'#a78bfa'};
+function csqPfSet(k,v){ if(k==='range')_csqPfRange=v; if(k==='gran')_csqPfGran=v; if(k==='mode')_csqPfMode=v; renderCsqPerfTab(); }
+function csqPfToggle(f){ if(!_csqPfSel) return; if(_csqPfSel[f]) delete _csqPfSel[f]; else _csqPfSel[f]=1; renderCsqPerfTab(); }
+function csqPfAll(on){ var s={}; if(on) (window._csqPfFunds||[]).forEach(function(f){s[f]=1;}); _csqPfSel=s; renderCsqPerfTab(); }
+function renderCsqPerfTab(){
+  if(typeof CSQ_NAV_W==='undefined'||typeof CSQ_DETAIL==='undefined') return;
+  var ALL=['GLAK','RAF','DL','BOND35'];
+  var CODE2NAME={}; Object.keys(CSQ_NAME2CODE).forEach(function(n){ CODE2NAME[CSQ_NAME2CODE[n]]=n.replace(/^Conseq\s+/,'').replace(/\s+účastnický fond$/,''); });
+  var txs=CSQ_DETAIL.filter(function(r){return r&&r.date&&r.fund;}).slice().sort(function(a,b){return a.date.localeCompare(b.date);});
+  if(!txs.length) return;
+  // Fonds détenus (au moins une transaction), dans l'ordre de l'onglet Évolution
+  var held=ALL.filter(function(f){ return txs.some(function(t){return t.fund===f;}); });
+  window._csqPfFunds=held;
+  if(!_csqPfSel){ _csqPfSel={}; held.forEach(function(f){_csqPfSel[f]=1;}); }
+  var today=new Date().toISOString().slice(0,10), startDate=txs[0].date;
+  var _CODE2TICK={GLAK:'CONSEQ_GLAK',RAF:'CONSEQ_RAF',DL:'CONSEQ_DL',BOND35:'CONSEQ_BOND35'};
+  var navArr={};
+  held.forEach(function(f){
+    var m={}; var s=CSQ_NAV_W[f]||{}; Object.keys(s).forEach(function(d){ m[d]=s[d]; });
+    try{ var ph=(typeof PRICE_HISTORY!=='undefined'&&PRICE_HISTORY[_CODE2TICK[f]])?PRICE_HISTORY[_CODE2TICK[f]]:null;
+      if(ph){ Object.keys(ph).forEach(function(d){ var v=+ph[d]; if(v>0 && m[d]==null) m[d]=v; }); } }catch(e){}
+    navArr[f]=Object.keys(m).sort().map(function(d){return [d,m[d]];});
+  });
+  var dset={}; held.forEach(function(f){ navArr[f].forEach(function(p){ if(p[0]>=startDate&&p[0]<=today) dset[p[0]]=1; }); });
+  var weeks=Object.keys(dset).sort(); if(!weeks.length) return;
+  var liveNav={};
+  if(typeof CONSEQ_DATA!=='undefined'&&CONSEQ_DATA&&CONSEQ_DATA.funds){ CONSEQ_DATA.funds.forEach(function(fo){ var c=CSQ_NAME2CODE[fo.name]; if(c&&fo.nav>0) liveNav[c]=fo.nav; }); }
+  // Points hebdo par fonds : {d, val:{f}, inv:{f}}
+  var navIdx={},navCur={},cu={},iv={},gross={},first={},sold={}; held.forEach(function(f){navIdx[f]=-1;navCur[f]=null;cu[f]=0;iv[f]=0;gross[f]=0;});
+  var ti=0, wk=[];
+  for(var i=0;i<weeks.length;i++){
+    var d=weeks[i];
+    while(ti<txs.length && txs[ti].date<=d){ var t=txs[ti]; if(cu[t.fund]!=null){ cu[t.fund]+=(t.units||0); iv[t.fund]+=(t.amount||0); if((t.amount||0)>0) gross[t.fund]+=t.amount; if(!first[t.fund]) first[t.fund]=t.date;
+        // Fonds entièrement vendu / transféré -> courbe arrêtée (plus-value réalisée au tableau)
+        if(Math.abs(cu[t.fund])<1e-6) sold[t.fund]=t.date; else delete sold[t.fund]; } ti++; }
+    held.forEach(function(f){ var a=navArr[f]; while(navIdx[f]+1<a.length && a[navIdx[f]+1][0]<=d){ navIdx[f]++; navCur[f]=a[navIdx[f]][1]; } });
+    var isLast=(i===weeks.length-1), p={d:d,val:{},inv:{}};
+    held.forEach(function(f){ var nv=navCur[f]; if(isLast&&liveNav[f]!=null) nv=liveNav[f];
+      var open=first[f] && !(sold[f] && sold[f]<d);
+      p.val[f]=(nv!=null && open) ? cu[f]*nv : null; p.inv[f]=open ? iv[f] : null; });
+    wk.push(p);
+  }
+  var pts=wk;
+  if(_csqPfGran==='month'){ var bm={}; wk.forEach(function(p){ var m=p.d.slice(0,7); if(!bm[m]||p.d>bm[m].d) bm[m]=p; }); pts=Object.keys(bm).sort().map(function(m){return bm[m];}); }
+  // Période
+  var curD=pts[pts.length-1].d;
+  function _dBack(ds,mm){ var y=+ds.slice(0,4),mo=+ds.slice(5,7),da=ds.slice(8,10); mo-=mm; while(mo<=0){mo+=12;y--;} return y+'-'+(mo<10?'0'+mo:mo)+'-'+da; }
+  var cut=null;
+  if(_csqPfRange==='ytd')cut=curD.slice(0,4)+'-01-01'; else if(_csqPfRange==='1m')cut=_dBack(curD,1); else if(_csqPfRange==='1a')cut=_dBack(curD,12); else if(_csqPfRange==='3a')cut=_dBack(curD,36);
+  var vrows=cut?pts.filter(function(r){return r.d>=cut;}):pts;
+  // Barre de filtres (période · granularité · mode)
+  var fb=function(lab,on,oc){ return '<button class="filter-btn'+(on?' active':'')+'" onclick="'+oc+'">'+lab+'</button>'; };
+  var sep='<span style="display:inline-block;width:1px;align-self:stretch;background:var(--border2);margin:2px 6px"></span>';
+  var fl=document.getElementById('csq_pf_filters');
+  if(fl) fl.innerHTML=[['all','Tout'],['3a','3A'],['1a','1A'],['ytd','YTD'],['1m','1M']].map(function(x){return fb(x[1],_csqPfRange===x[0],"csqPfSet('range','"+x[0]+"')");}).join('')+sep
+    +fb('Semaine',_csqPfGran==='week',"csqPfSet('gran','week')")+fb('Mois',_csqPfGran==='month',"csqPfSet('gran','month')")+sep
+    +fb('Valeur',_csqPfMode==='val',"csqPfSet('mode','val')")+fb('Plus-value',_csqPfMode==='pv',"csqPfSet('mode','pv')")+fb('Performance %',_csqPfMode==='pct',"csqPfSet('mode','pct')");
+  // Pastilles fonds (sélection / désélection)
+  var pe=document.getElementById('csq_pf_funds');
+  if(pe){
+    var nSel=held.filter(function(f){return _csqPfSel[f];}).length;
+    var pill=function(f){ var on=!!_csqPfSel[f], c=CSQ_PF_COL[f]||'#888';
+      return '<button onclick="csqPfToggle(\''+f+'\')" title="'+(CODE2NAME[f]||f)+'" style="display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:14px;font-size:12px;cursor:pointer;font-weight:600;border:1px solid '+(on?c:'var(--border2)')+';background:'+(on?c:'var(--bg3)')+';color:'+(on?'#fff':'var(--text2)')+'"><span style="width:9px;height:9px;border-radius:50%;background:'+(on?'#fff':c)+';display:inline-block"></span>'+(CODE2NAME[f]||f)+'</button>'; };
+    var mini=function(lab,oc,on){ return '<button onclick="'+oc+'" style="padding:4px 10px;border-radius:14px;font-size:11px;cursor:pointer;border:1px solid var(--border2);background:'+(on?'var(--blue)':'var(--bg3)')+';color:'+(on?'#fff':'var(--text2)')+';font-weight:600">'+lab+'</button>'; };
+    pe.innerHTML=mini('Tous','csqPfAll(true)',nSel===held.length)+mini('Aucun','csqPfAll(false)',nSel===0)+held.map(pill).join('');
+  }
+  var sel=held.filter(function(f){return _csqPfSel[f];});
+  var GT=(_csqPfGran==='month')?'mensuelle':'hebdomadaire';
+  var MT={val:'Valeur par fonds (CZK)',pv:'Plus-value par fonds (CZK)',pct:'Performance par fonds (%)'}[_csqPfMode];
+  var tt=document.getElementById('csq_pf_title'); if(tt) tt.textContent=MT+' — '+GT;
+  var nt=document.getElementById('csq_pf_note'); if(nt) nt.textContent='Par fonds : valeur = parts cumulées × valeur de part historique (source conseq.cz) ; investi = cumul des montants versés dans le fonds (y compris transferts entre fonds) ; performance = plus-value / investi. Chaque courbe démarre au 1er investissement dans le fonds.';
+  // Graphique
+  var cv=document.getElementById('csq_pf_line');
+  if(cv&&typeof Chart!=='undefined'){
+    var yOf=function(r,f){ var v=r.val[f], inv=r.inv[f]; if(v==null||inv==null) return null;
+      if(_csqPfMode==='val') return Math.round(v);
+      if(_csqPfMode==='pv') return Math.round(v-inv);
+      return inv>0 ? Math.round((v-inv)/inv*1000)/10 : null; };
+    var ds=sel.map(function(f){ var c=CSQ_PF_COL[f]||'#888';
+      return {label:CODE2NAME[f]||f,data:vrows.map(function(r){return yOf(r,f);}),borderColor:c,backgroundColor:c+'1a',fill:false,tension:0.2,borderWidth:2,pointRadius:0,spanGaps:false}; });
+    var fmtY=function(v){ return _csqPfMode==='pct' ? ((v>0?'+':'')+String(v).replace('.',',')+' %') : ((_csqPfMode==='pv'&&v>0?'+':'')+csqFmt(v)); };
+    if(window._csqPfChart){try{window._csqPfChart.destroy();}catch(e){}}
+    window._csqPfChart=new Chart(cv.getContext('2d'),{type:'line',data:{labels:vrows.map(function(r){return _csqPfGran==='month'?r.d.slice(0,7):r.d;}),datasets:ds},
+      options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){ return c.parsed.y==null?null:(c.dataset.label+' : '+fmtY(c.parsed.y)+(_csqPfMode==='pct'?'':' CZK')); }}}},
+        scales:{x:{ticks:{color:'#8b95a8',maxTicksLimit:12,autoSkip:true},grid:{display:false}},y:{ticks:{color:'#8b95a8',callback:fmtY},grid:{color:'rgba(120,120,120,0.12)'}}}}});
+  }
+  // Tableau récapitulatif (situation actuelle par fonds)
+  var tb=document.getElementById('csq_pf_tbody');
+  if(tb){
+    var last=pts[pts.length-1], col=function(n){return n>=0?'#4caf82':'#e06c6c';}, tI=0, tV=0;
+    tb.innerHTML=held.map(function(f){
+      var isSold=!!sold[f], v=isSold?0:(last.val[f]||0), invNet=iv[f]||0;
+      // Fonds vendu : investi = montants achetés, plus-value réalisée = −(investi net)
+      var inv=isSold?gross[f]:invNet, g=isSold?-invNet:(v-invNet), pf=inv>0?g/inv*100:null; tI+=invNet; tV+=v;
+      return '<tr><td><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:'+(CSQ_PF_COL[f]||'#888')+';margin-right:7px"></span><strong>'+(CODE2NAME[f]||f)+'</strong>'+(isSold?' <span style="font-size:10px;color:var(--text2)">(vendu le '+sold[f]+' — plus-value réalisée)</span>':'')+'</td>'
+        +'<td class="mono" style="text-align:right;color:var(--text2)">'+(first[f]||'—')+'</td>'
+        +'<td class="mono" style="text-align:right">'+csqFmt(inv)+'</td><td class="mono" style="text-align:right">'+csqFmt(v)+'</td>'
+        +'<td class="mono" style="text-align:right;color:'+col(g)+'">'+(g>=0?'+':'')+csqFmt(g)+'</td>'
+        +'<td class="mono" style="text-align:right;color:'+(pf==null?'var(--text2)':col(pf))+'">'+(pf==null?'—':(pf>=0?'+':'')+pf.toFixed(1).replace('.',',')+'%')+'</td></tr>'; }).join('')
+      +(function(){ var g=tV-tI, pf=tI>0?g/tI*100:0; return '<tr style="font-weight:700;border-top:2px solid var(--border2);background:var(--bg3)"><td>Total</td><td></td><td class="mono" style="text-align:right">'+csqFmt(tI)+'</td><td class="mono" style="text-align:right">'+csqFmt(tV)+'</td><td class="mono" style="text-align:right;color:'+col(g)+'">'+(g>=0?'+':'')+csqFmt(g)+'</td><td class="mono" style="text-align:right;color:'+col(pf)+'">'+(pf>=0?'+':'')+pf.toFixed(1).replace('.',',')+'%</td></tr>'; })();
+  }
+}
+
 function csqFundDetail(){
   var tb=document.getElementById('csq_fund_body'); if(!tb) return;
   var funds=CONSEQ_DATA.funds||[];
