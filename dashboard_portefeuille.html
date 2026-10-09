@@ -1538,6 +1538,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (saved) {
       const prices = JSON.parse(saved);
       Object.assign(CURRENT_PRICES, prices);
+      normalizePencePrices();
       const fx = JSON.parse(localStorage.getItem('portfolio_fx') || '{}');
       if (fx.USD) FX_RATES.USD = fx.USD;
       if (fx.GBP) FX_RATES.GBP = fx.GBP;
@@ -4062,8 +4063,8 @@ function restorePersistedPrices() {
     const savedDate = localStorage.getItem('portfolio_prices_date');
 
     Object.assign(CURRENT_PRICES, prices);
-    // Correctif : un cours LSE (ticker .L) enregistré en 'GBP' alors qu'il est en pence -> 'GBp'.
-    Object.keys(CURRENT_PRICES).forEach(t => { const p = CURRENT_PRICES[t]; if (p && /\.L$/i.test(t) && p.currency === 'GBP' && +p.price > 100) p.currency = 'GBp'; });
+    // Cours londoniens harmonisés en GBP (livres), comme les achats (ex. RR.L 1385,2 GBp -> 13,852 GBP)
+    normalizePencePrices();
     // Alias O/0 : cours publié sous 'SCOJ.DE' (lettre O) -> aussi 'SC0J.DE' (zéro).
     if (CURRENT_PRICES['SCOJ.DE'] && !CURRENT_PRICES['SC0J.DE']) CURRENT_PRICES['SC0J.DE'] = { ...CURRENT_PRICES['SCOJ.DE'], source:'alias' };
     try {
@@ -4210,6 +4211,17 @@ async function handlePriceFile(file) {
 }
 
 // ── Currency converter ──────────────────────────────────────
+// Harmonise les cours londoniens en livres : GBp/GBX (pence) -> GBP (÷100). Un cours .L
+// marqué 'GBP' mais > 100 est en réalité en pence (ancien format) -> converti aussi.
+function normalizePencePrices() {
+  if (typeof CURRENT_PRICES === 'undefined') return;
+  Object.keys(CURRENT_PRICES).forEach(t => {
+    const p = CURRENT_PRICES[t]; if (!p || !(+p.price > 0)) return;
+    if (p.currency === 'GBp' || p.currency === 'GBX' || (/\.L$/i.test(t) && p.currency === 'GBP' && +p.price > 100)) {
+      p.price = Math.round(+p.price / 100 * 1e6) / 1e6; p.currency = 'GBP';
+    }
+  });
+}
 function toEur(amount, currency) {
   if (amount == null || isNaN(amount)) return null;
   if (currency === 'EUR') return amount;
@@ -4849,8 +4861,7 @@ function submitEditLine() {
   const pxAct = parseFloat(document.getElementById('el_pxActuel')?.value);
   if (!isNaN(pxAct) && pxAct > 0) {
     // Ne réécrire le cours que s'il a réellement été modifié ; conserver la devise de cotation
-    // existante (ex. RR.L coté en pence 'GBp' alors que la ligne est en 'GBP') pour ne pas
-    // fausser la valorisation d'un facteur 100.
+    // existante pour ne pas fausser la valorisation (cours .L : toujours en GBP, cf. normalizePencePrices).
     const _prev = (typeof CURRENT_PRICES !== 'undefined') ? CURRENT_PRICES[ticker] : null;
     if (typeof CURRENT_PRICES !== 'undefined' && !(_prev && Math.abs((+_prev.price||0) - pxAct) < 1e-9)) {
       CURRENT_PRICES[ticker] = { price: pxAct, currency: (_prev && _prev.currency) ? _prev.currency : devise, source: 'manuel' };
@@ -5871,6 +5882,7 @@ async function gsLoadPrices() {
     Object.keys(priceMap).forEach(t => {
       CURRENT_PRICES[t] = { ...priceMap[t], source: 'gsheets' };
       if (varMap[t]) CURRENT_VARIATIONS[t] = varMap[t];
+      if (/\.L$/i.test(t)) normalizePencePrices();
     });
     // Alias O/0 : un cours publié sous 'SCOJ.DE' (lettre O) alimente aussi 'SC0J.DE' (zéro).
     if (CURRENT_PRICES['SCOJ.DE'] && !CURRENT_PRICES['SC0J.DE']) CURRENT_PRICES['SC0J.DE'] = { ...CURRENT_PRICES['SCOJ.DE'], source:'alias' };
@@ -11726,6 +11738,7 @@ window.addEventListener('load', () => {
       if (!Object.keys(prices).length) return;
       const fx = JSON.parse(localStorage.getItem('portfolio_fx') || '{}');
       Object.assign(CURRENT_PRICES, prices);
+      normalizePencePrices();
       if (fx.USD) FX_RATES.USD = fx.USD;
       if (fx.GBP)  FX_RATES.GBP = fx.GBP;
       if (fx._source) FX_RATES._source = fx._source;
