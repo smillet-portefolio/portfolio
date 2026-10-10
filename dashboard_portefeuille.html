@@ -6410,20 +6410,8 @@ function renderEvolution() {
               <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2)">P&L €</th>
               <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2)">P&L %</th>
               <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2)">Delta jour<br><span style="font-weight:400;color:var(--text2);font-size:9px">hors dépôts</span></th>
-              <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">KB<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
-              <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">LUMO<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
-              <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">LENDO.<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
-              <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">ENERFIP<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
-              <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">LINXEA<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
-              <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">SAXO<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
-              <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">IBKR<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
-              <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">T212<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
-              <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">JITO<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
-              <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">XTB<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
-              <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">LEDGER<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
-              <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">BINANCE<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
-              <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px">FINST<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span></th>
-              <th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2)">Statut</th>
+              <!-- Colonnes brokers : générées dans _renderEvoContent (triées par valeur actuelle décroissante) -->
+              <th id="evoHeadStatus" style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2)">Statut</th>
             </tr>
           </thead>
           <tbody id="evoTableBody"></tbody>
@@ -6433,6 +6421,16 @@ function renderEvolution() {
 
   const rows = mergeEvoRows();
   _renderEvoContent(rows, 'all');
+}
+
+// Colonnes brokers de l'historique Évolution : [libellé, suffixe act_/inv_]
+const EVO_BRK_COLS = [['KB','kb'],['LUMO','lumo'],['LENDO.','lendo'],['ENERFIP','enerfip'],['LINXEA','linxea'],['SAXO','saxo'],['IBKR','ibkr'],
+                      ['T212','t212'],['JITO','jito'],['XTB','xtb'],['LEDGER','ledger'],['BINANCE','binance'],['FINST','finst']];
+// Ordre = valeur actuelle de la ligne la plus récente, de la plus grande à la plus petite
+function evoBrokerOrder(rows) {
+  const last = (rows || []).filter(r => r && r.date).reduce((m, r) => (!m || r.date > m.date) ? r : m, null);
+  const v = k => (last && typeof last['act_' + k] === 'number') ? last['act_' + k] : 0;
+  return EVO_BRK_COLS.map((c, i) => [c, i]).sort((a, b) => (v(b[0][1]) - v(a[0][1])) || (a[1] - b[1])).map(x => x[0]);
 }
 
 function _renderEvoContent(rows, period) {
@@ -6567,7 +6565,18 @@ function _renderEvoContent(rows, period) {
     });
   }
 
-  // Tableau
+  // Tableau — colonnes brokers triées par valeur actuelle (ligne la plus récente), décroissante
+  const _brkOrder = evoBrokerOrder(rows);
+  const _hs = document.getElementById('evoHeadStatus');
+  if (_hs && _hs.parentElement) {
+    _hs.parentElement.querySelectorAll('th.evo-brk-th').forEach(th => th.remove());
+    _brkOrder.forEach(([lbl]) => {
+      const th = document.createElement('th'); th.className = 'evo-brk-th';
+      th.style.cssText = 'padding:7px 8px;text-align:right;border-bottom:2px solid var(--border2);min-width:96px';
+      th.innerHTML = lbl + '<br><span style="font-weight:400;color:var(--text2);font-size:9px">investi / actuel</span>';
+      _hs.parentElement.insertBefore(th, _hs);
+    });
+  }
   const tbody = document.getElementById('evoTableBody');
   if (tbody) {
     tbody.innerHTML = [...filtered].sort((a,b) => b.date.localeCompare(a.date)).map((r, i) => {
@@ -6586,19 +6595,7 @@ function _renderEvoContent(rows, period) {
         <td style="padding:6px 8px;text-align:right;font-family:'DM Mono',monospace;color:${pnl>=0?'#4caf82':'#e06c6c'}">${fmtE(pnl)}</td>
         <td style="padding:6px 8px;text-align:right;color:${pnlPct>=0?'#4caf82':'#e06c6c'}">${fmtP(pnlPct)}</td>
         <td style="padding:6px 8px;text-align:right">${fmtD(adjDeltaByDate[r.date])}</td>
-        <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_kb, r.act_kb)}</td>
-        <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_lumo, r.act_lumo)}</td>
-        <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_lendo, r.act_lendo)}</td>
-        <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_enerfip, r.act_enerfip)}</td>
-        <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_linxea, r.act_linxea)}</td>
-        <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_saxo, r.act_saxo)}</td>
-        <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_ibkr, r.act_ibkr)}</td>
-        <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_t212, r.act_t212)}</td>
-        <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_jito, r.act_jito)}</td>
-        <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_xtb, r.act_xtb)}</td>
-        <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_ledger, r.act_ledger)}</td>
-        <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_binance, r.act_binance)}</td>
-        <td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r.inv_finst, r.act_finst)}</td>
+        ${_brkOrder.map(([, k]) => `<td style="padding:6px 8px;text-align:right;white-space:nowrap">${fmtIA(r['inv_' + k], r['act_' + k])}</td>`).join('')}
         <td style="padding:6px 8px;white-space:nowrap">${statusBadge}<button onclick="evoEditRow('${r.date}')" title="Modifier" style="margin-left:6px;padding:2px 7px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);border-radius:8px;font-size:10px;cursor:pointer">✏️</button></td>
       </tr>`;
     }).join('');
@@ -11656,9 +11653,7 @@ function exportEvoXlsx() {
   const delta = {};
   asc.forEach((r, i) => { delta[r.date] = (i === 0) ? null
     : ((r.act_total || 0) - (asc[i-1].act_total || 0)) - ((r.inv_total || 0) - (asc[i-1].inv_total || 0)); });
-  const brokers = [['KB','kb'],['LUMO','lumo'],['LENDO.','lendo'],['ENERFIP','enerfip'],['LINXEA','linxea'],
-                   ['SAXO','saxo'],['IBKR','ibkr'],['T212','t212'],['JITO','jito'],['XTB','xtb'],
-                   ['LEDGER','ledger'],['BINANCE','binance'],['FINST','finst']];
+  const brokers = evoBrokerOrder(rows);   // même ordre que le tableau (valeur actuelle décroissante)
   const header = ['Date','Valeur actuelle totale','Valeur investie totale','P&L €','P&L %','Delta jour (hors dépôts)'];
   brokers.forEach(([lbl]) => { header.push(lbl + ' investi'); header.push(lbl + ' actuel'); });
   header.push('Statut');
