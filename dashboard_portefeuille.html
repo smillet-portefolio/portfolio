@@ -1118,12 +1118,12 @@ function _reRent2Table(a){
   const TH='padding:8px 12px;position:sticky;top:0;background:var(--bg2);z-index:2';
   const THr='padding:8px 12px;text-align:right;position:sticky;top:0;background:var(--bg2);z-index:2';
   const THc='padding:8px 12px;text-align:center;position:sticky;top:0;background:var(--bg2);z-index:2';
-  const act2=(fnE,fnD)=>`<td style="padding:6px 8px;text-align:center;white-space:nowrap"><button onclick="${fnE}" title="Modifier" style="border:1px solid var(--border2);background:var(--bg2);border-radius:5px;cursor:pointer;font-size:12px;padding:2px 7px">✏️</button> <button onclick="${fnD}" title="Annuler" style="border:1px solid var(--border2);background:var(--bg2);border-radius:5px;cursor:pointer;font-size:12px;padding:2px 7px;color:#e06c6c">✕</button></td>`;
+  const act2=(fnE,fnD)=>`<td style="padding:6px 8px;text-align:center;white-space:nowrap"><button onclick="${fnE}" title="Modifier" style="border:1px solid var(--border2);background:var(--bg2);border-radius:5px;cursor:pointer;font-size:12px;padding:2px 7px">✏️</button> <button onclick="${fnD}" title="Annuler" style="border:1px solid var(--border2);background:var(--bg2);border-radius:5px;cursor:pointer;font-size:12px;padding:2px 7px;color:#e06c6c">🗑</button></td>`;
   let rr=''; arr.map((x,i)=>[x,i]).reverse().forEach(([x,i])=>{ const n=(+x.rev||0)-(+x.ins||0)-(+x.fees||0); rr+=`<tr style="border-bottom:1px solid var(--border)"><td style="padding:6px 12px">${x.m}</td><td style="padding:6px 12px;text-align:right;font-family:'DM Mono',monospace;color:#e06c6c">${_reCZK(x.ins)}</td><td style="padding:6px 12px;text-align:right;font-family:'DM Mono',monospace;color:#e06c6c">${_reCZK(x.fees)}</td><td style="padding:6px 12px;text-align:right;font-family:'DM Mono',monospace;color:#4caf82">${_reCZK(x.rev)}</td><td style="padding:6px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:600;color:${n>=0?'#4caf82':'#e06c6c'}">${n>=0?'+':''}${_reCZK(n)}</td>${act2(`reEditRent2('${a.id}',${i})`,`reDelRent2('${a.id}',${i})`)}</tr>`; });
   const btn=(fn,txt,c)=>`<button onclick="${fn}" style="padding:6px 12px;border:1px solid var(--border2);border-radius:6px;background:${c||'var(--bg2)'};color:var(--text);cursor:pointer;font-size:12px;font-weight:600">${txt}</button>`;
-  return `<div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 8px;flex-wrap:wrap;gap:8px"><h4 style="margin:0">Revenus locatifs</h4><div style="display:flex;gap:8px">${btn(`reAddRent2('${a.id}')`,'+ Ajouter un mois','var(--blue)')}${btn(`reDelRent2('${a.id}')`,'↩ Retirer dernier')}</div></div>
+  return `<div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 8px;flex-wrap:wrap;gap:8px"><h4 style="margin:0">Revenus locatifs</h4><div style="display:flex;gap:8px">${btn(`reAddRent2('${a.id}')`,'+ Ajouter un mois','var(--blue)')}${btn(`reDelRent2('${a.id}')`,'🗑 Retirer dernier')}</div></div>
     <div class="card" style="padding:0;overflow:auto;max-height:420px"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-transform:uppercase;font-size:10px;color:var(--text2)"><th style="${TH};text-align:left">Mois</th><th style="${THr}">Assurance</th><th style="${THr}">Charges mensuelles</th><th style="${THr}">Revenus</th><th style="${THr}">Net</th><th style="${THc}">Action</th></tr></thead><tbody>${rr}</tbody><tfoot><tr style="border-top:2px solid var(--border2);font-weight:700"><td style="padding:8px 12px">TOTAL (${arr.length} mois)</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:#e06c6c">${_reCZK(ti)}</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:#e06c6c">${_reCZK(tf)}</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:#4caf82">${_reCZK(tr)}</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:${net>=0?'#4caf82':'#e06c6c'}">${net>=0?'+':''}${_reCZK(net)}</td><td></td></tr></tfoot></table></div>
-    <p style="font-size:11px;color:var(--text2);margin:6px 0 0">💡 « Modifier » édite la ligne, « ✕ » l'annule. Historique importé de l'Excel.</p>`;
+    <p style="font-size:11px;color:var(--text2);margin:6px 0 0">💡 « Modifier » édite la ligne, « 🗑 » l'annule. Historique importé de l'Excel.</p>`;
 }
 const RE_RENT3_SEED = { tisno:[{"d":"31/12/2024","rev":2267,"label":"Revenus locatif 2024"}] };
 function _reRent3List(id){ const m=_reLoadJSON('re_rental3'); return Array.isArray(m[id])? m[id] : ((RE_RENT3_SEED[id]||[]).map(x=>({...x}))); }
@@ -1145,7 +1145,7 @@ function _reRent3Table(a){
   const arr=_reRent3List(a.id); const tr=arr.reduce((s,x)=>s+(+x.rev||0),0);
   let rr=''; arr.forEach((x,i)=>{ const alt=_reCur(a)==='EUR'? _reCZK(x.rev*a.acq) : _reEUR(x.rev/a.acq); rr+=`<tr style="border-bottom:1px solid var(--border);cursor:pointer" onclick="reEditRent3('${a.id}',${i})" title="Cliquer pour modifier"><td style="padding:6px 12px">${x.d||''}</td><td style="padding:6px 12px;text-align:right;font-family:'DM Mono',monospace;color:#4caf82">${_reP(a,x.rev)}</td><td style="padding:6px 12px;font-size:12px;color:var(--text2)">${x.label||''}</td></tr>`; });
   const btn=(fn,txt,c)=>`<button onclick="${fn}" style="padding:6px 12px;border:1px solid var(--border2);border-radius:6px;background:${c||'var(--bg2)'};color:var(--text);cursor:pointer;font-size:12px;font-weight:600">${txt}</button>`;
-  return `<div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 8px;flex-wrap:wrap;gap:8px"><h4 style="margin:0">Revenus locatifs</h4><div style="display:flex;gap:8px">${btn(`reAddRent3('${a.id}')`,'+ Ajouter une ligne','var(--blue)')}${btn(`reDelRent3('${a.id}')`,'↩ Retirer dernier')}</div></div>
+  return `<div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 8px;flex-wrap:wrap;gap:8px"><h4 style="margin:0">Revenus locatifs</h4><div style="display:flex;gap:8px">${btn(`reAddRent3('${a.id}')`,'+ Ajouter une ligne','var(--blue)')}${btn(`reDelRent3('${a.id}')`,'🗑 Retirer dernier')}</div></div>
     <div class="card" style="padding:0;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:var(--bg2);text-transform:uppercase;font-size:10px;color:var(--text2)"><th style="padding:8px 12px;text-align:left">Date</th><th style="padding:8px 12px;text-align:right">Revenus</th><th style="padding:8px 12px;text-align:left">Description</th></tr></thead><tbody>${rr}</tbody><tfoot><tr style="border-top:2px solid var(--border2);font-weight:700"><td style="padding:8px 12px">TOTAL</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:#4caf82">${_reP(a,tr)}</td><td></td></tr></tfoot></table></div>
     <p style="font-size:11px;color:var(--text2);margin:6px 0 0">💡 Clique une ligne pour modifier ; « + Ajouter une ligne » pour un nouveau revenu.</p>`;
 }
@@ -1170,7 +1170,7 @@ function _reLedgerPane(a,act){
   const TH='padding:8px 12px;position:sticky;top:0;background:var(--bg2);z-index:2';
   const THr='padding:8px 12px;text-align:right;position:sticky;top:0;background:var(--bg2);z-index:2';
   const THc='padding:8px 12px;text-align:center;position:sticky;top:0;background:var(--bg2);z-index:2';
-  const act2=(fnE,fnD)=>`<td style="padding:6px 8px;text-align:center;white-space:nowrap"><button onclick="${fnE}" title="Modifier" style="border:1px solid var(--border2);background:var(--bg2);border-radius:5px;cursor:pointer;font-size:12px;padding:2px 7px">✏️</button> <button onclick="${fnD}" title="Annuler" style="border:1px solid var(--border2);background:var(--bg2);border-radius:5px;cursor:pointer;font-size:12px;padding:2px 7px;color:#e06c6c">✕</button></td>`;
+  const act2=(fnE,fnD)=>`<td style="padding:6px 8px;text-align:center;white-space:nowrap"><button onclick="${fnE}" title="Modifier" style="border:1px solid var(--border2);background:var(--bg2);border-radius:5px;cursor:pointer;font-size:12px;padding:2px 7px">✏️</button> <button onclick="${fnD}" title="Annuler" style="border:1px solid var(--border2);background:var(--bg2);border-radius:5px;cursor:pointer;font-size:12px;padding:2px 7px;color:#e06c6c">🗑</button></td>`;
   let dr=''; a.details.forEach(d=>{ dr+=`<tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 12px">${d[0]}</td><td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(d[1])}</td><td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${_reEUR(_reHistE(d[1],a))}</td></tr>`; });
   dr+=`<tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 12px">Coût hypothèque (intérêts cumulés)</td><td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:#f0956e">${_reCZK(mortCost)}</td><td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${_reEUR(_reHistE(mortCost,a))}</td></tr>`;
   dr+=`<tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 12px">Assurance hypothèque (cumulée)</td><td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:#f0956e">${_reCZK(mortIns)}</td><td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${_reEUR(_reHistE(mortIns,a))}</td></tr>`;
@@ -1182,12 +1182,12 @@ function _reLedgerPane(a,act){
     ${_reBandCards({P:_reCZK, initial:a.initial, total:a.total, capitalDue:(6900000-sumCap), rev:rRev, cost:rCost, net:rNet, est:est, pv:pvCzk, initialSub:_reEUR(iE)+' · taux achat', totalSub:'prix initial + intérêts + assurance', capitalSub:'6 900 000 − capital remboursé', estSub:_reEUR(sE)+' · taux courant', pvSub:(pvE>=0?'+':'')+_reEUR(pvE)})}
     <h4 style="margin:14px 0 8px">Coût total</h4>
     <div class="card" style="padding:0;overflow:auto;max-height:420px"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-transform:uppercase;font-size:10px;color:var(--text2)"><th style="${TH};text-align:left">Poste</th><th style="${THr}">Montant (CZK)</th><th style="${THr}">EUR (taux achat)</th></tr></thead><tbody>${dr}</tbody><tfoot><tr style="border-top:2px solid var(--border2);font-weight:700"><td style="padding:8px 12px">TOTAL coût total</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(coutTotal)}</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${_reEUR(_reHistE(coutTotal,a))}</td></tr></tfoot></table></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 8px;flex-wrap:wrap;gap:8px"><h4 style="margin:0">Hypothèque — remboursement mensuel</h4><div style="display:flex;gap:8px">${btn(`reAddMort('${a.id}')`,'+ Ajouter mensualité','var(--blue)')}${btn(`reDelMort('${a.id}')`,'↩ Retirer dernier')}</div></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 8px;flex-wrap:wrap;gap:8px"><h4 style="margin:0">Hypothèque — remboursement mensuel</h4><div style="display:flex;gap:8px">${btn(`reAddMort('${a.id}')`,'+ Ajouter mensualité','var(--blue)')}${btn(`reDelMort('${a.id}')`,'🗑 Retirer dernier')}</div></div>
     <div class="card" style="padding:0;overflow:auto;max-height:380px"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-transform:uppercase;font-size:10px;color:var(--text2)"><th style="${TH};text-align:left">Mois</th><th style="${THr}">Mensualité</th><th style="${THr}">Part capital</th><th style="${THr}">Intérêts</th><th style="${THr}">Assurance</th><th style="${THc}">Action</th></tr></thead><tbody>${mr}</tbody><tfoot><tr style="border-top:2px solid var(--border2);font-weight:700"><td style="padding:8px 12px">TOTAL (${mort.length} mois)</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(sumPay)}</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(sumCap)}</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:#f0956e">${_reCZK(mortCost)}</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:#f0956e">${_reCZK(mortIns)}</td><td></td></tr></tfoot></table></div>
     <p style="font-size:11px;color:var(--text2);margin:6px 0 0">💡 Chaque mois : mensualité ${_reCZK(a.mortPay||54376)}. « Modifier » ajuste la part capital et l'assurance ; les intérêts (mensualité − capital) alimentent le coût total.</p>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 8px;flex-wrap:wrap;gap:8px"><h4 style="margin:0">Revenus & coûts locatifs</h4><div style="display:flex;gap:8px">${btn(`reAddRent('${a.id}')`,'+ Ajouter un mois','var(--blue)')}${btn(`reDelRent('${a.id}')`,'↩ Retirer dernier')}</div></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 8px;flex-wrap:wrap;gap:8px"><h4 style="margin:0">Revenus & coûts locatifs</h4><div style="display:flex;gap:8px">${btn(`reAddRent('${a.id}')`,'+ Ajouter un mois','var(--blue)')}${btn(`reDelRent('${a.id}')`,'🗑 Retirer dernier')}</div></div>
     <div class="card" style="padding:0;overflow:auto;max-height:380px"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-transform:uppercase;font-size:10px;color:var(--text2)"><th style="${TH};text-align:left">Mois</th><th style="${THr}">Revenus</th><th style="${THr}">Électricité</th><th style="${THr}">Charges mensuelles</th><th style="${THr}">Assurance</th><th style="${THr}">Total coûts</th><th style="${THr}">Net</th><th style="${THc}">Action</th></tr></thead><tbody>${rr}</tbody><tfoot><tr style="border-top:2px solid var(--border2);font-weight:700"><td style="padding:8px 12px">TOTAL (${rent.length} mois)</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:#4caf82">${_reCZK(rRev)}</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(rElec)}</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(rFees)}</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(rIns)}</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:#e06c6c">${_reCZK(rCost)}</td><td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;color:${rNet>=0?'#4caf82':'#e06c6c'}">${rNet>=0?'+':''}${_reCZK(rNet)}</td><td></td></tr></tfoot></table></div>
-    <p style="font-size:11px;color:var(--text2);margin:6px 0 0">💡 « Modifier » édite la ligne, « ✕ » l'annule. Électricité conservée dans l'historique (payée par les locataires actuellement).</p>
+    <p style="font-size:11px;color:var(--text2);margin:6px 0 0">💡 « Modifier » édite la ligne, « 🗑 » l'annule. Électricité conservée dans l'historique (payée par les locataires actuellement).</p>
   </div>`;
 }
 
@@ -5159,7 +5159,7 @@ function renderClosedPositions() {
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${p.taxe?Math.round(p.taxe).toLocaleString('fr')+' '+_sym(p.currencyFrais||'EUR'):'—'}</td>
       <td style="padding:7px 12px;text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:${col}">${sign}${Math.round(p.pnl).toLocaleString('fr')} €</td>
       <td style="padding:7px 12px;text-align:right;color:${col}">${sign}${p.pnlPct.toFixed(1)}%</td>
-      <td style="padding:7px 12px;text-align:center"><button onclick="openEditClosed('${p._id}')" title="Modifier la clôture (tous les champs)" style="background:none;border:none;cursor:pointer;font-size:13px;line-height:1">✏️</button></td>`;
+      <td style="padding:4px 8px;text-align:center;white-space:nowrap"><button onclick="openEditClosed('${p._id}')" title="Modifier la clôture (tous les champs)" style="padding:3px 8px;font-size:11px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;color:var(--text);cursor:pointer;margin-right:4px">✏️</button><button onclick="deleteClosedPos('${p._id}')" title="Annuler (supprimer cette clôture)" style="padding:3px 8px;font-size:11px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;color:#e06c6c;cursor:pointer">🗑</button></td>`;
     tbody.appendChild(tr);
     totCost += p.costEur; totVal += p.saleEur; totPnl += p.pnl;
     { const _cc=p.currencyFrais||'EUR';
@@ -5223,6 +5223,22 @@ function editClosedPos(id) {
       (p.pnl>=0?'+':'') + Math.round(p.pnl).toLocaleString('fr') + ' €';
     st.style.color = '#4caf82';
   }
+}
+
+// ── Annuler (supprimer) une position clôturée — comme 🗑 de l'onglet Éditer ─────
+function deleteClosedPos(id) {
+  let all = []; try { all = JSON.parse(localStorage.getItem('closed_positions') || '[]'); } catch(e) { return; }
+  const i = all.findIndex(p => String(p._id) === String(id)); if (i < 0) { alert('Position introuvable'); return; }
+  const p = all[i];
+  const info = (p.name || p.ticker || '') + '\n' + (p.broker || '') + ' · achat ' + (p.dateAchat || '?') + ' · vente ' + (p.dateSell || '?') + ' · ' +
+               (p.qty != null ? p.qty : '?') + ' titres · P&L ' + ((p.pnl || 0) >= 0 ? '+' : '') + Math.round(p.pnl || 0).toLocaleString('fr') + ' €';
+  if (!confirm('Supprimer définitivement cette position clôturée ?\n\n' + info + '\n\nLa ligne ne sera PAS remise dans le portefeuille.')) return;
+  all.splice(i, 1);
+  try { localStorage.setItem('closed_positions', JSON.stringify(all)); } catch(e) {}
+  renderClosedPositions();
+  if (typeof _gsToken !== 'undefined' && _gsToken && typeof gsSaveAll === 'function') gsSaveAll({ silent: true });
+  const st = document.getElementById('fetchStatus');
+  if (st) { st.innerHTML = '🗑 Clôture supprimée : <strong>' + (p.name || p.ticker) + '</strong>'; setTimeout(() => { st.innerHTML = ''; }, 7000); }
 }
 
 // ── Édition complète d'une position clôturée (modale, tous les champs) ────────
@@ -6913,7 +6929,7 @@ function renderDividendSection(){
       '<td class="mono">'+fmt2(d.brutEur)+'</td>'+
       '<td class="mono" style="color:#e06c6c">'+fmt2(d.taxeEur)+'</td>'+
       '<td class="mono" style="color:#4caf82;font-weight:600">'+fmt2(d.netEur)+'</td>'+
-      '<td style="white-space:nowrap"><span onclick="divOpenEdit(\''+d.id+'\')" title="Modifier" style="cursor:pointer;font-size:13px;margin-right:12px">✏️</span><span onclick="divDelete(\''+d.id+'\')" title="Supprimer" style="cursor:pointer;color:var(--text2);font-size:13px">✕</span></td>'+
+      '<td style="white-space:nowrap"><span onclick="divOpenEdit(\''+d.id+'\')" title="Modifier" style="cursor:pointer;font-size:13px;margin-right:12px">✏️</span><span onclick="divDelete(\''+d.id+'\')" title="Supprimer" style="cursor:pointer;color:#e06c6c;font-size:13px">🗑</span></td>'+
     '</tr>';
   }).join('')+
   '<tr style="border-top:2px solid var(--border2);font-weight:700;background:var(--bg3)"><td colspan="5">Total ('+rows.length+')</td><td class="mono">'+fmt2(totBrut)+'</td><td class="mono" style="color:#e06c6c">'+fmt2(totTax)+'</td><td class="mono" style="color:#4caf82">'+fmt2(totNet)+'</td><td></td></tr>';
@@ -8387,7 +8403,7 @@ function obligAddEcheanceRow(date, interet, capital) {
   row.innerHTML = '<input type="date" class="ec-date" value="' + (date||'') + '" style="padding:7px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:12px;outline:none">'
     + '<input type="number" step="0.01" placeholder="0.00" class="ec-interet" value="' + (interet||'') + '" style="padding:7px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:12px;outline:none">'
     + '<input type="number" step="0.01" placeholder="0.00" class="ec-capital" value="' + (capital||'') + '" style="padding:7px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:12px;outline:none">'
-    + '<button onclick="this.closest(\'div\').remove()" style="padding:5px 9px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;color:#e06c6c;cursor:pointer;font-size:12px">x</button>';
+    + '<button onclick="this.closest(\'div\').remove()" title="Supprimer" style="padding:5px 9px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;color:#e06c6c;cursor:pointer;font-size:12px">🗑</button>';
   ec.appendChild(row);
 }
 
@@ -8756,7 +8772,7 @@ function renderObligCharts(data) {
             <th style="padding:8px 12px;text-align:right">Taxe</th>
             <th onclick="closedSort('pnl',this)" data-csort="pnl" style="padding:8px 12px;text-align:right;cursor:pointer;user-select:none;font-weight:700">P&amp;L €<span class="cs-arr" style="font-size:9px"></span></th>
             <th onclick="closedSort('pnlPct',this)" data-csort="pnlPct" style="padding:8px 12px;text-align:right;cursor:pointer;user-select:none">P&amp;L %<span class="cs-arr" style="font-size:9px"></span></th>
-            <th style="padding:8px 12px;text-align:center">Modifier</th>
+            <th style="padding:8px 12px;text-align:center">Actions</th>
           </tr>
           <tr style="background:var(--bg2)">
             <td style="padding:3px 8px"><input type="text" placeholder="Filtrer nom..." oninput="closedFilter('nom',this.value)" style="width:100%;box-sizing:border-box;padding:4px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>
@@ -9049,16 +9065,19 @@ var CASH_DATA = { deposits: [], cash: {} };
     <div style="max-height:70vh;overflow:auto">
       <table id="cashHistTable" style="font-size:12px;width:100%;border-collapse:collapse">
         <thead>
-          <tr style="background:var(--bg3);text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2)">
-            <th style="padding:7px 14px;text-align:left">Date</th>
-            <th style="padding:7px 14px;text-align:left">Broker</th>
-            <th style="padding:7px 14px;text-align:left">Type</th>
-            <th style="padding:7px 14px;text-align:right">Montant</th>
-            <th style="padding:7px 14px;text-align:left">Devise</th>
+          <tr id="cashHistHead" style="background:var(--bg3);text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2)">
+            <th data-chcol="date"   onclick="cashHistSort('date')"   style="padding:7px 14px;text-align:left;cursor:pointer;user-select:none">Date <span class="ch-arr" style="font-size:9px;opacity:.35">⇅</span></th>
+            <th data-chcol="broker" onclick="cashHistSort('broker')" style="padding:7px 14px;text-align:left;cursor:pointer;user-select:none">Broker <span class="ch-arr" style="font-size:9px;opacity:.35">⇅</span></th>
+            <th data-chcol="type"   onclick="cashHistSort('type')"   style="padding:7px 14px;text-align:left;cursor:pointer;user-select:none">Type <span class="ch-arr" style="font-size:9px;opacity:.35">⇅</span></th>
+            <th data-chcol="amount" onclick="cashHistSort('amount')" style="padding:7px 14px;text-align:right;cursor:pointer;user-select:none">Montant <span class="ch-arr" style="font-size:9px;opacity:.35">⇅</span></th>
+            <th data-chcol="eur"    onclick="cashHistSort('eur')"    style="padding:7px 14px;text-align:right;cursor:pointer;user-select:none">Montant € <span class="ch-arr" style="font-size:9px;opacity:.35">⇅</span></th>
+            <th data-chcol="currency" onclick="cashHistSort('currency')" style="padding:7px 14px;text-align:left;cursor:pointer;user-select:none">Devise <span class="ch-arr" style="font-size:9px;opacity:.35">⇅</span></th>
             <th style="padding:7px 14px;text-align:center"></th>
           </tr>
+          <tr id="cashHistFilters" style="background:var(--bg3)"></tr>
         </thead>
         <tbody id="cashHistBody"></tbody>
+        <tfoot id="cashHistFoot"></tfoot>
       </table>
       <p id="cashHistEmpty" style="text-align:center;color:var(--text2);padding:30px;display:none">Aucune opération enregistrée.</p>
     </div>
@@ -9201,39 +9220,138 @@ function cashClearHistory() {
   renderCashSection();
 }
 
+// ── Historique dépôts / retraits : tri, filtres et modification (comme l'onglet Éditer) ──
+// (var / function : la section est rendue au chargement, avant ces lignes)
+var _cashHistSort = _cashHistSort || { col: 'date', dir: -1 };
+var _cashHistFilter = _cashHistFilter || {};
+function _chEur(d) { return d.amountEur != null ? +d.amountEur : (d.currency === 'EUR' ? +d.amount : (toEur(+d.amount, d.currency) || +d.amount)); }
+function _chSigned(d) { return (d.type === 'retrait' ? -1 : 1) * _chEur(d); }
+function cashHistSort(col) {
+  if (_cashHistSort.col === col) _cashHistSort.dir *= -1;
+  else _cashHistSort = { col, dir: (col === 'date' || col === 'amount' || col === 'eur') ? -1 : 1 };
+  renderCashSection();
+}
+function cashHistFilter(col, val) {
+  if (String(val).trim() === '') delete _cashHistFilter[col]; else _cashHistFilter[col] = String(val).trim().toLowerCase();
+  _cashHistRender([...CASH_BASE_DEPOSITS, ...CASH_DATA.deposits], true);
+}
+function _cashHistRender(allDeposits, keepFilters) {
+  if (!_cashHistSort) _cashHistSort = { col: 'date', dir: -1 };
+  if (!_cashHistFilter) _cashHistFilter = {};
+  const histBody = document.getElementById('cashHistBody'), histEmpty = document.getElementById('cashHistEmpty');
+  if (!histBody) return;
+  // Ligne de filtres (construite une fois, conservée pendant la saisie)
+  const fr = document.getElementById('cashHistFilters');
+  if (fr && !keepFilters) {
+    const inp = 'width:100%;box-sizing:border-box;padding:3px 6px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:10px;outline:none';
+    const fi = (c, ph, al) => `<td style="padding:2px 6px"><input type="text" placeholder="${ph}" value="${(_cashHistFilter[c] || '').replace(/"/g, '&quot;')}" oninput="cashHistFilter('${c}',this.value)" style="${inp}${al ? ';text-align:right' : ''}"></td>`;
+    fr.innerHTML = fi('date', 'AAAA-MM-JJ') + fi('broker', 'Broker…') + fi('type', 'dépôt / retrait') + fi('amount', '≥ montant', 1) + fi('eur', '≥ €', 1) + fi('currency', 'EUR/CZK…') + '<td></td>';
+  }
+  // Filtres
+  const F = _cashHistFilter, num = s => parseFloat(String(s).replace(',', '.'));
+  let rows = allDeposits.filter(d => {
+    if (F.date && !String(d.date || '').includes(F.date)) return false;
+    if (F.broker && !String(d.broker || '').toLowerCase().includes(F.broker)) return false;
+    if (F.type && !String(d.type || '').toLowerCase().includes(F.type)) return false;
+    if (F.currency && !String(d.currency || '').toLowerCase().includes(F.currency)) return false;
+    if (F.amount && !isNaN(num(F.amount)) && !(+d.amount >= num(F.amount))) return false;
+    if (F.eur && !isNaN(num(F.eur)) && !(_chEur(d) >= num(F.eur))) return false;
+    return true;
+  });
+  // Tri
+  const { col, dir } = _cashHistSort;
+  const key = d => col === 'eur' ? _chSigned(d) : col === 'amount' ? (d.type === 'retrait' ? -1 : 1) * (+d.amount || 0) : String(d[col] || '').toLowerCase();
+  rows.sort((a, b) => { const x = key(a), y = key(b); const c = (typeof x === 'number') ? (x - y) : x.localeCompare(y); return (c || String(b.date).localeCompare(String(a.date))) * (c ? dir : 1); });
+  document.querySelectorAll('#cashHistHead th[data-chcol]').forEach(th => { const a = th.querySelector('.ch-arr'); if (!a) return; const on = th.dataset.chcol === col; a.textContent = on ? (dir === 1 ? '▲' : '▼') : '⇅'; a.style.opacity = on ? '1' : '.35'; });
+  if (!allDeposits.length) { histBody.innerHTML = ''; if (histEmpty) histEmpty.style.display = ''; return; }
+  if (histEmpty) histEmpty.style.display = 'none';
+  const btn = 'padding:2px 7px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;color:var(--text2);cursor:pointer;font-size:11px';
+  histBody.innerHTML = rows.map(d => {
+    const isBase = CASH_BASE_DEPOSITS.includes(d), isDeposit = d.type === 'dépôt';
+    const c = isDeposit ? '#4caf82' : '#e06c6c', sign = isDeposit ? '+' : '-';
+    const realIdx = isBase ? -1 : CASH_DATA.deposits.indexOf(d);
+    const actions = isBase
+      ? `<span style="font-size:10px;color:var(--text3);padding:2px 7px" title="Ligne d'origine (fichier xlsx) — non modifiable">xlsx</span>`
+      : `<button onclick="cashEditDeposit(${realIdx})" title="Modifier" style="${btn};margin-right:6px">✏️</button><button onclick="cashDeleteDeposit(${realIdx})" title="Supprimer" style="${btn};color:#e06c6c">🗑</button>`;
+    return `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:7px 14px;color:var(--text2)">${d.date}</td>
+      <td style="padding:7px 14px;font-weight:600">${d.broker}</td>
+      <td style="padding:7px 14px"><span style="padding:2px 8px;border-radius:4px;font-size:11px;background:${c}22;color:${c}">${d.type}</span></td>
+      <td style="padding:7px 14px;text-align:right;font-family:'DM Mono',monospace;font-weight:600;color:${c}">${sign}${(+d.amount).toLocaleString('fr')} ${d.currency}</td>
+      <td style="padding:7px 14px;text-align:right;font-family:'DM Mono',monospace;color:${c}">${sign}${(Math.round(_chEur(d) * 100) / 100).toLocaleString('fr', { maximumFractionDigits: 2 })} €</td>
+      <td style="padding:7px 14px;color:var(--text2)">${d.currency}</td>
+      <td style="padding:7px 14px;text-align:center;white-space:nowrap">${actions}</td>
+    </tr>`;
+  }).join('');
+  // Total des lignes affichées
+  const ft = document.getElementById('cashHistFoot');
+  if (ft) {
+    const dep = rows.filter(d => d.type === 'dépôt').reduce((s, d) => s + _chEur(d), 0), wit = rows.filter(d => d.type === 'retrait').reduce((s, d) => s + _chEur(d), 0);
+    const f = n => Math.round(n).toLocaleString('fr') + ' €';
+    ft.innerHTML = `<tr style="border-top:2px solid var(--border2);font-weight:700;background:var(--bg3)"><td colspan="3" style="padding:8px 14px">Total (${rows.length} lignes)</td>`
+      + `<td style="padding:8px 14px;text-align:right;font-size:11px;font-weight:600"><span style="color:#4caf82">+${f(dep)}</span> / <span style="color:#e06c6c">−${f(wit)}</span></td>`
+      + `<td style="padding:8px 14px;text-align:right;font-family:'DM Mono',monospace">${(dep - wit) >= 0 ? '+' : ''}${f(dep - wit)}</td><td colspan="2" style="padding:8px 14px;color:var(--text2);font-weight:400;font-size:11px">net</td></tr>`;
+  }
+}
+// Modification d'un dépôt / retrait saisi
+function cashEditDeposit(idx) {
+  const d = CASH_DATA.deposits[idx]; if (!d) return;
+  let m = document.getElementById('cashEditModal');
+  if (!m) { m = document.createElement('div'); m.id = 'cashEditModal'; m.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10000;align-items:center;justify-content:center'; m.onclick = e => { if (e.target === m) m.style.display = 'none'; }; document.body.appendChild(m); }
+  const S = 'width:100%;box-sizing:border-box;padding:8px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px';
+  const L = 'font-size:11px;color:var(--text2);display:block;margin-bottom:4px';
+  const curs = ['EUR', 'USD', 'GBP', 'CZK'], fx0 = (d.currency !== 'EUR' && d.amountEur != null && d.amount) ? (d.amountEur / d.amount) : '';
+  const brks = [...new Set([...CASH_BROKERS, d.broker])];
+  m.innerHTML = `<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:24px 28px;width:440px;max-width:94vw">
+    <h3 style="margin:0 0 16px;font-size:16px">✏️ Modifier l'opération</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div><label style="${L}">Date</label><input id="ced_date" type="date" value="${d.date || ''}" style="${S}"></div>
+      <div><label style="${L}">Type</label><select id="ced_type" style="${S}"><option value="dépôt"${d.type === 'dépôt' ? ' selected' : ''}>dépôt</option><option value="retrait"${d.type === 'retrait' ? ' selected' : ''}>retrait</option></select></div>
+      <div style="grid-column:1/-1"><label style="${L}">Broker</label><select id="ced_broker" style="${S}">${brks.map(b => `<option value="${b}"${b === d.broker ? ' selected' : ''}>${b}</option>`).join('')}</select></div>
+      <div><label style="${L}">Montant</label><input id="ced_amount" type="number" step="0.01" value="${d.amount}" oninput="cashEditPreview()" style="${S}"></div>
+      <div><label style="${L}">Devise</label><select id="ced_currency" onchange="cashEditPreview(true)" style="${S}">${curs.map(c => `<option${c === d.currency ? ' selected' : ''}>${c}</option>`).join('')}</select></div>
+      <div id="ced_fx_row" style="grid-column:1/-1;display:${d.currency === 'EUR' ? 'none' : 'grid'};grid-template-columns:1fr 1fr;gap:12px">
+        <div><label style="${L}">Taux de change (1 <span id="ced_ccy">${d.currency}</span> = ? €)</label><input id="ced_fx" type="number" step="0.000001" value="${fx0 ? (+fx0).toFixed(6) : ''}" oninput="cashEditPreview()" style="${S}"></div>
+        <div><label style="${L}">Équivalent €</label><div id="ced_eur" style="${S};font-weight:700;color:#4caf82">—</div></div>
+      </div>
+    </div>
+    <div id="ced_err" style="display:none;margin-top:12px;color:#e06c6c;font-size:12px"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+      <button onclick="document.getElementById('cashEditModal').style.display='none'" style="padding:8px 16px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;cursor:pointer">Annuler</button>
+      <button onclick="cashEditSave(${idx})" style="padding:8px 16px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">💾 Enregistrer</button>
+    </div></div>`;
+  m.style.display = 'flex';
+  cashEditPreview();
+}
+function cashEditPreview(curChanged) {
+  const cur = document.getElementById('ced_currency').value, row = document.getElementById('ced_fx_row'), fxEl = document.getElementById('ced_fx');
+  row.style.display = cur === 'EUR' ? 'none' : 'grid';
+  document.getElementById('ced_ccy').textContent = cur;
+  if (curChanged && cur !== 'EUR') { const r = { USD: FX_RATES.USD, GBP: FX_RATES.GBP, CZK: FX_RATES.CZK }[cur]; if (r) fxEl.value = (+r).toFixed(6); }
+  const a = parseFloat(document.getElementById('ced_amount').value), fx = parseFloat(fxEl.value);
+  document.getElementById('ced_eur').textContent = (cur !== 'EUR' && !isNaN(a) && fx > 0) ? (Math.round(Math.abs(a) * fx * 100) / 100).toLocaleString('fr') + ' €' : '—';
+}
+function cashEditSave(idx) {
+  const d = CASH_DATA.deposits[idx]; if (!d) return;
+  const g = id => document.getElementById(id).value, err = document.getElementById('ced_err');
+  const date = g('ced_date'), type = g('ced_type'), broker = g('ced_broker'), cur = g('ced_currency');
+  const amount = parseFloat(g('ced_amount')), fx = parseFloat(g('ced_fx'));
+  const errs = [];
+  if (!date) errs.push('Date requise'); if (!broker) errs.push('Broker requis');
+  if (isNaN(amount) || amount === 0) errs.push('Montant invalide');
+  if (cur !== 'EUR' && !(fx > 0)) errs.push('Taux de change requis');
+  if (errs.length) { err.textContent = '⚠️ ' + errs.join(' · '); err.style.display = 'block'; return; }
+  Object.assign(d, { date, type, broker, currency: cur, amount: Math.round(Math.abs(amount) * 100) / 100,
+                     amountEur: cur === 'EUR' ? null : Math.round(Math.abs(amount) * fx * 100) / 100 });
+  cashSave();
+  document.getElementById('cashEditModal').style.display = 'none';
+  renderCashSection();
+}
+
 function renderCashSection() {
   // Fusionner les données de base + les dépôts manuels
   const allDeposits = [...CASH_BASE_DEPOSITS, ...CASH_DATA.deposits];
-  const histBody  = document.getElementById('cashHistBody');
-  const histEmpty = document.getElementById('cashHistEmpty');
-  if (histBody) {
-    const sorted = [...allDeposits].sort((a,b) => b.date.localeCompare(a.date));
-    if (sorted.length === 0) {
-      histBody.innerHTML = '';
-      if (histEmpty) histEmpty.style.display = '';
-    } else {
-      if (histEmpty) histEmpty.style.display = 'none';
-      histBody.innerHTML = sorted.map((d) => {
-        const isBase    = CASH_BASE_DEPOSITS.includes(d);
-        const isDeposit = d.type === 'dépôt';
-        const col       = isDeposit ? '#4caf82' : '#e06c6c';
-        const sign      = isDeposit ? '+' : '-';
-        const realIdx   = isBase ? -1 : CASH_DATA.deposits.indexOf(d);
-        const deleteBtn = isBase
-          ? `<span style="font-size:10px;color:var(--text3);padding:2px 7px">xlsx</span>`
-          : `<button onclick="cashDeleteDeposit(${realIdx})" title="Supprimer"
-              style="padding:2px 7px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;color:var(--text2);cursor:pointer;font-size:11px">✕</button>`;
-        return `<tr style="border-bottom:1px solid var(--border)">
-          <td style="padding:7px 14px;color:var(--text2)">${d.date}</td>
-          <td style="padding:7px 14px;font-weight:600">${d.broker}</td>
-          <td style="padding:7px 14px"><span style="padding:2px 8px;border-radius:4px;font-size:11px;background:${col}22;color:${col}">${d.type}</span></td>
-          <td style="padding:7px 14px;text-align:right;font-family:'DM Mono',monospace;font-weight:600;color:${col}">${sign}${d.amount.toLocaleString('fr')} ${d.currency}${d.amountEur != null ? `<span style="font-size:10px;color:var(--text2);margin-left:4px">= ${d.amountEur.toLocaleString('fr')} €</span>` : ''}</td>
-          <td style="padding:7px 14px;color:var(--text2)">${d.currency}</td>
-          <td style="padding:7px 14px;text-align:center">${deleteBtn}</td>
-        </tr>`;
-      }).join('');
-    }
-  }
+  _cashHistRender(allDeposits);
 
   // ── Synthèse par broker ─────────────────────────────────────────────────────
   const summaryBody = document.getElementById('cashSummaryBody');
@@ -12420,7 +12538,7 @@ window.addEventListener('load', () => {
         '<td class="mono">'+fmt2(d.brutEur)+'</td>'+
         '<td class="mono" style="color:#e06c6c">'+fmt2(d.taxeEur)+'</td>'+
         '<td class="mono" style="color:#4caf82;font-weight:600">'+fmt2(d.netEur)+'</td>'+
-        '<td style="white-space:nowrap"><span onclick="kdivOpenEdit(\''+d.id+'\')" title="Modifier" style="cursor:pointer;font-size:13px;margin-right:12px">✏️</span><span onclick="kdivDelete(\''+d.id+'\')" title="Supprimer" style="cursor:pointer;color:var(--text2);font-size:13px">✕</span></td>'+
+        '<td style="white-space:nowrap"><span onclick="kdivOpenEdit(\''+d.id+'\')" title="Modifier" style="cursor:pointer;font-size:13px;margin-right:12px">✏️</span><span onclick="kdivDelete(\''+d.id+'\')" title="Supprimer" style="cursor:pointer;color:#e06c6c;font-size:13px">🗑</span></td>'+
       '</tr>';
     }).join('')+
     '<tr style="border-top:2px solid var(--border2);font-weight:700;background:var(--bg3)"><td colspan="6">Total ('+rows.length+')</td><td class="mono">'+fmt2(totBrut)+'</td><td class="mono" style="color:#e06c6c">'+fmt2(totTax)+'</td><td class="mono" style="color:#4caf82">'+fmt2(totNet)+'</td><td></td></tr>';
@@ -12911,49 +13029,126 @@ window.addEventListener('load', () => {
       </div>
       <div style="max-height:70vh;overflow:auto">
         <table style="font-size:12px;width:100%;border-collapse:collapse">
-          <thead><tr style="text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2)">
-            <th style="padding:7px 14px;text-align:left;${stk}">Date</th>
-            <th style="padding:7px 14px;text-align:left;${stk}">Broker</th>
-            <th style="padding:7px 14px;text-align:left;${stk}">Enfant</th>
-            <th style="padding:7px 14px;text-align:left;${stk}">Type</th>
-            <th style="padding:7px 14px;text-align:right;${stk}">Montant</th>
-            <th style="padding:7px 14px;text-align:left;${stk}">Devise</th>
+          <thead><tr id="kidCashHistHead" style="text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2)">
+            ${[['date','Date','left'],['broker','Broker','left'],['enfant','Enfant','left'],['type','Type','left'],['amount','Montant','right'],['eur','Montant €','right'],['currency','Devise','left']]
+              .map(([k,l,a])=>`<th data-kchcol="${k}" onclick="kidCashHistSort('${k}')" style="padding:7px 14px;text-align:${a};cursor:pointer;user-select:none;${stk}">${l} <span class="kch-arr" style="font-size:9px;opacity:.35">⇅</span></th>`).join('')}
             <th style="padding:7px 14px;text-align:center;${stk}"></th>
-          </tr></thead>
+          </tr>
+          <tr id="kidCashHistFilters" style="background:var(--bg3)"></tr></thead>
           <tbody id="kidCashHistBody"></tbody>
+          <tfoot id="kidCashHistFoot"></tfoot>
         </table>
         <p id="kidCashHistEmpty" style="text-align:center;color:var(--text2);padding:30px;display:none">Aucune opération enregistrée.</p>
       </div>`;
     kidCashRender();
   }
 
+  // ── Historique dépôts / retraits enfants : tri, filtres, modification (comme Dépôts & Cash) ──
+  if(!window._kchSort) window._kchSort={col:'date',dir:-1};
+  if(!window._kchFilter) window._kchFilter={};
+  const _kchEur = d => d.amountEur!=null ? +d.amountEur : (d.currency==='EUR' ? +d.amount : (te(+d.amount,d.currency)||+d.amount));
+  window.kidCashHistSort=function(col){ const s=window._kchSort; if(s.col===col) s.dir*=-1; else window._kchSort={col, dir:(col==='date'||col==='amount'||col==='eur')?-1:1}; kidCashRender(); };
+  window.kidCashHistFilter=function(col,val){ if(String(val).trim()==='') delete window._kchFilter[col]; else window._kchFilter[col]=String(val).trim().toLowerCase(); const sfl=sel(); kidCashHistRender(kidAllDeps().filter(d=> sfl==='Tous' || d.enfant===sfl), true); };
+  function kidCashHistRender(all, keepFilters){
+    const hb=document.getElementById('kidCashHistBody'), he=document.getElementById('kidCashHistEmpty'); if(!hb) return;
+    const F=window._kchFilter, fr=document.getElementById('kidCashHistFilters');
+    if(fr && !keepFilters){
+      const inp='width:100%;box-sizing:border-box;padding:3px 6px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:10px;outline:none';
+      const fi=(c,ph,al)=>`<td style="padding:2px 6px"><input type="text" placeholder="${ph}" value="${(F[c]||'').replace(/"/g,'&quot;')}" oninput="kidCashHistFilter('${c}',this.value)" style="${inp}${al?';text-align:right':''}"></td>`;
+      fr.innerHTML=fi('date','AAAA-MM-JJ')+fi('broker','Broker…')+fi('enfant','Enfant…')+fi('type','dépôt / retrait')+fi('amount','≥ montant',1)+fi('eur','≥ €',1)+fi('currency','EUR/CZK…')+'<td></td>';
+    }
+    const num=s=>parseFloat(String(s).replace(',','.'));
+    let rows=all.filter(d=>{
+      for(const k of ['date','broker','enfant','type','currency']) if(F[k] && !String(d[k]||'').toLowerCase().includes(F[k])) return false;
+      if(F.amount && !isNaN(num(F.amount)) && !(+d.amount>=num(F.amount))) return false;
+      if(F.eur && !isNaN(num(F.eur)) && !(_kchEur(d)>=num(F.eur))) return false;
+      return true;
+    });
+    const {col,dir}=window._kchSort, sg=d=>d.type==='retrait'?-1:1;
+    const key=d=> col==='eur'? sg(d)*_kchEur(d) : col==='amount'? sg(d)*(+d.amount||0) : String(d[col]||'').toLowerCase();
+    rows.sort((a,b2)=>{ const x=key(a),y=key(b2); const c=(typeof x==='number')?(x-y):x.localeCompare(y); return c? c*dir : String(b2.date).localeCompare(String(a.date)); });
+    document.querySelectorAll('#kidCashHistHead th[data-kchcol]').forEach(th=>{ const a=th.querySelector('.kch-arr'); if(!a) return; const on=th.dataset.kchcol===col; a.textContent=on?(dir===1?'▲':'▼'):'⇅'; a.style.opacity=on?'1':'.35'; });
+    if(!all.length){ hb.innerHTML=''; if(he) he.style.display=''; const ft0=document.getElementById('kidCashHistFoot'); if(ft0) ft0.innerHTML=''; return; }
+    if(he) he.style.display='none';
+    const btn='padding:2px 8px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;cursor:pointer;font-size:11px';
+    hb.innerHTML=rows.map(d=>{
+      const isDep=d.type==='dépôt', cc=isDep?'#4caf82':'#e06c6c', sign=isDep?'+':'−';
+      const act = d._i!=null
+        ? `<button onclick="kidCashEditDep(${d._i})" title="Modifier" style="${btn};color:var(--text);margin-right:6px">✏️</button><button onclick="kidCashDelDep(${d._i})" title="Annuler" style="${btn};color:#e06c6c">🗑</button>`
+        : `<span style="font-size:10px;color:var(--text3);padding:2px 7px" title="Ligne d'origine (fichier) — non modifiable">fichier</span>`;
+      return `<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:7px 14px;color:var(--text2)">${d.date}</td>
+        <td style="padding:7px 14px;font-weight:600">${d.broker}</td>
+        <td style="padding:7px 14px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COL[d.enfant]};margin-right:5px"></span>${d.enfant}</td>
+        <td style="padding:7px 14px"><span style="padding:2px 8px;border-radius:4px;font-size:11px;background:${cc}22;color:${cc}">${d.type}</span></td>
+        <td style="padding:7px 14px;text-align:right;font-family:'DM Mono',monospace;font-weight:600;color:${cc}">${sign}${(+d.amount).toLocaleString('fr')} ${d.currency}</td>
+        <td style="padding:7px 14px;text-align:right;font-family:'DM Mono',monospace;color:${cc}">${sign}${(Math.round(_kchEur(d)*100)/100).toLocaleString('fr',{maximumFractionDigits:2})} €</td>
+        <td style="padding:7px 14px;color:var(--text2)">${d.currency}</td>
+        <td style="padding:7px 14px;text-align:center;white-space:nowrap">${act}</td></tr>`;
+    }).join('');
+    const ft=document.getElementById('kidCashHistFoot');
+    if(ft){
+      const dep=rows.filter(d=>d.type==='dépôt').reduce((s,d)=>s+_kchEur(d),0), wit=rows.filter(d=>d.type==='retrait').reduce((s,d)=>s+_kchEur(d),0), f=n=>Math.round(n).toLocaleString('fr')+' €';
+      ft.innerHTML=`<tr style="border-top:2px solid var(--border2);font-weight:700;background:var(--bg3)"><td colspan="4" style="padding:8px 14px">Total (${rows.length} lignes)</td>`
+        +`<td style="padding:8px 14px;text-align:right;font-size:11px;font-weight:600"><span style="color:#4caf82">+${f(dep)}</span> / <span style="color:#e06c6c">−${f(wit)}</span></td>`
+        +`<td style="padding:8px 14px;text-align:right;font-family:'DM Mono',monospace">${(dep-wit)>=0?'+':''}${f(dep-wit)}</td><td colspan="2" style="padding:8px 14px;color:var(--text2);font-weight:400;font-size:11px">net</td></tr>`;
+    }
+  }
+  // Modification d'un dépôt / retrait saisi (les deux formats {d,c,e,m} et {date,broker,…} sont gérés)
+  window.kidCashEditDep=function(i){
+    const r=KIDS_DEP[i]; if(!r) return;
+    const old = (r.m!==undefined) ? {date:r.d, broker:r.c, type:(r.m>=0?'dépôt':'retrait'), amount:Math.abs(r.m), currency:'EUR', amountEur:Math.abs(r.m)}
+                                  : {date:r.date, broker:r.broker, type:r.type, amount:r.amount, currency:r.currency||'EUR', amountEur:r.amountEur};
+    let m=document.getElementById('kidCashEditModal');
+    if(!m){ m=document.createElement('div'); m.id='kidCashEditModal'; m.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10000;align-items:center;justify-content:center'; m.onclick=e=>{ if(e.target===m) m.style.display='none'; }; document.body.appendChild(m); }
+    const S='width:100%;box-sizing:border-box;padding:8px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px', L='font-size:11px;color:var(--text2);display:block;margin-bottom:4px';
+    const brks=[...new Set([...kidComptes(), old.broker].filter(Boolean))], fx0=(old.currency!=='EUR'&&old.amountEur!=null&&old.amount)?(old.amountEur/old.amount):'';
+    m.innerHTML=`<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:24px 28px;width:440px;max-width:94vw">
+      <h3 style="margin:0 0 16px;font-size:16px">✏️ Modifier l'opération</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><label style="${L}">Date</label><input id="kced_date" type="date" value="${old.date||''}" style="${S}"></div>
+        <div><label style="${L}">Type</label><select id="kced_type" style="${S}"><option value="dépôt"${old.type==='dépôt'?' selected':''}>dépôt</option><option value="retrait"${old.type==='retrait'?' selected':''}>retrait</option></select></div>
+        <div style="grid-column:1/-1"><label style="${L}">Broker (compte)</label><select id="kced_broker" style="${S}">${brks.map(b=>`<option value="${b}"${b===old.broker?' selected':''}>${b}</option>`).join('')}</select></div>
+        <div><label style="${L}">Montant</label><input id="kced_amount" type="number" step="0.01" value="${old.amount}" oninput="kidCashEditPreview()" style="${S}"></div>
+        <div><label style="${L}">Devise</label><select id="kced_currency" onchange="kidCashEditPreview(true)" style="${S}">${['EUR','USD','GBP','CZK'].map(c=>`<option${c===old.currency?' selected':''}>${c}</option>`).join('')}</select></div>
+        <div id="kced_fx_row" style="grid-column:1/-1;display:${old.currency==='EUR'?'none':'grid'};grid-template-columns:1fr 1fr;gap:12px">
+          <div><label style="${L}">Taux de change (1 <span id="kced_ccy">${old.currency}</span> = ? €)</label><input id="kced_fx" type="number" step="0.000001" value="${fx0?(+fx0).toFixed(6):''}" oninput="kidCashEditPreview()" style="${S}"></div>
+          <div><label style="${L}">Équivalent €</label><div id="kced_eur" style="${S};font-weight:700;color:#4caf82">—</div></div>
+        </div>
+      </div>
+      <div id="kced_err" style="display:none;margin-top:12px;color:#e06c6c;font-size:12px"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+        <button onclick="document.getElementById('kidCashEditModal').style.display='none'" style="padding:8px 16px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;cursor:pointer">Annuler</button>
+        <button onclick="kidCashEditSave(${i})" style="padding:8px 16px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">💾 Enregistrer</button>
+      </div></div>`;
+    m.style.display='flex'; window.kidCashEditPreview();
+  };
+  window.kidCashEditPreview=function(curChanged){
+    const cur=document.getElementById('kced_currency').value, fxEl=document.getElementById('kced_fx');
+    document.getElementById('kced_fx_row').style.display=cur==='EUR'?'none':'grid'; document.getElementById('kced_ccy').textContent=cur;
+    if(curChanged && cur!=='EUR'){ const R=(typeof FX_RATES!=='undefined'&&FX_RATES)?FX_RATES:{}; const r={USD:R.USD,GBP:R.GBP,CZK:R.CZK}[cur]; if(r) fxEl.value=(+r).toFixed(6); }
+    const a=parseFloat(document.getElementById('kced_amount').value), fx=parseFloat(fxEl.value);
+    document.getElementById('kced_eur').textContent=(cur!=='EUR'&&!isNaN(a)&&fx>0)?(Math.round(Math.abs(a)*fx*100)/100).toLocaleString('fr')+' €':'—';
+  };
+  window.kidCashEditSave=function(i){
+    if(!KIDS_DEP[i]) return;
+    const g=id=>document.getElementById(id).value, err=document.getElementById('kced_err');
+    const date=g('kced_date'), type=g('kced_type'), broker=g('kced_broker'), cur=g('kced_currency'), amount=parseFloat(g('kced_amount')), fx=parseFloat(g('kced_fx'));
+    const errs=[]; if(!date) errs.push('Date requise'); if(!broker) errs.push('Broker requis'); if(isNaN(amount)||amount===0) errs.push('Montant invalide'); if(cur!=='EUR'&&!(fx>0)) errs.push('Taux de change requis');
+    if(errs.length){ err.textContent='⚠️ '+errs.join(' · '); err.style.display='block'; return; }
+    const amt=Math.round(Math.abs(amount)*100)/100;
+    // Enregistré au format « Dépôts & Cash enfants » (lu par la synthèse ET par le montant investi)
+    KIDS_DEP[i]={date, broker, enfant:compteEnfant(broker), type, amount:amt, currency:cur, amountEur:(cur==='EUR'?amt:Math.round(amt*fx*100)/100)};
+    kidsDepSave(); window.KIDS_DEP=KIDS_DEP;
+    document.getElementById('kidCashEditModal').style.display='none';
+    kidCashRender();
+  };
+
   function kidCashRender(){
     const sfl=sel();
     const all = kidAllDeps().filter(d=> sfl==='Tous' || d.enfant===sfl);
     // Historique
-    const hb=document.getElementById('kidCashHistBody');
-    const he=document.getElementById('kidCashHistEmpty');
-    if(hb){
-      const sorted=all.slice().sort((a,b2)=> b2.date.localeCompare(a.date));
-      if(!sorted.length){ hb.innerHTML=''; if(he) he.style.display=''; }
-      else { if(he) he.style.display='none';
-        hb.innerHTML = sorted.map(d=>{
-          const isDep=d.type==='dépôt'; const cc=isDep?'#4caf82':'#e06c6c'; const sign=isDep?'+':'−';
-          const del = d._i!=null
-            ? `<button onclick="kidCashDelDep(${d._i})" title="Annuler" style="padding:2px 8px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;color:var(--text2);cursor:pointer;font-size:11px">✕</button>`
-            : `<span style="font-size:10px;color:var(--text3);padding:2px 7px">fichier</span>`;
-          const eq = (d.currency!=='EUR' && d.amountEur!=null) ? ` <span style="font-size:10px;color:var(--text2)">= ${Math.round(d.amountEur).toLocaleString('fr')} €</span>` : '';
-          return `<tr style="border-bottom:1px solid var(--border)">
-            <td style="padding:7px 14px;color:var(--text2)">${d.date}</td>
-            <td style="padding:7px 14px;font-weight:600">${d.broker}</td>
-            <td style="padding:7px 14px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COL[d.enfant]};margin-right:5px"></span>${d.enfant}</td>
-            <td style="padding:7px 14px"><span style="padding:2px 8px;border-radius:4px;font-size:11px;background:${cc}22;color:${cc}">${d.type}</span></td>
-            <td style="padding:7px 14px;text-align:right;font-family:'DM Mono',monospace;font-weight:600;color:${cc}">${sign}${d.amount.toLocaleString('fr')} ${d.currency}${eq}</td>
-            <td style="padding:7px 14px;color:var(--text2)">${d.currency}</td>
-            <td style="padding:7px 14px;text-align:center">${del}</td></tr>`;
-        }).join('');
-      }
-    }
+    kidCashHistRender(all);
     // Synthèse par broker
     const sb=document.getElementById('kidCashSummaryBody'); const sf=document.getElementById('kidCashSummaryFoot');
     if(!sb) return;
