@@ -4797,7 +4797,7 @@ function openEditLine(i) {
   document.getElementById('el_broker').value = r.broker  || '';
   document.getElementById('el_date').value   = r.date    || '';
   document.getElementById('el_qte').value    = r.qty     || '';
-  document.getElementById('el_prix').value   = r.pxAchat || '';
+  document.getElementById('el_prix').value   = (r.pxAchat != null) ? r.pxAchat : '';   // 0 affiché (et non vide)
   { const _ec=document.getElementById('el_comm'); if(_ec) _ec.value = (r.comm!=null?r.comm:''); const _et=document.getElementById('el_taxe'); if(_et) _et.value = (r.taxe!=null?r.taxe:''); const _fc=document.getElementById('el_feecur'); if(_fc) _fc.value = (r.commCur||r.currency||'EUR'); }
   if (document.getElementById('el_pxActuel')) {
     const _cp = (typeof CURRENT_PRICES !== 'undefined' && CURRENT_PRICES[r.ticker]) ? CURRENT_PRICES[r.ticker].price : null;
@@ -4839,7 +4839,7 @@ function submitEditLine() {
   if (!ticker) errs.push('Ticker requis');
   if (!broker || broker === '—' || broker === '-') errs.push('Broker requis');
   if (isNaN(qte)||qte<=0) errs.push('Quantité invalide');
-  if (isNaN(prix)||prix<=0) errs.push('Prix invalide');
+  if (isNaN(prix)||prix<0) errs.push("Prix d'achat invalide (doit être ≥ 0)");   // 0 autorisé (gratuit, récompense…), comme à la création
   if (devise!=='EUR'&&(isNaN(fx)||fx<=0)) errs.push('Taux de change requis');
   if (errs.length) { err.innerHTML='⚠️ '+errs.join(' · '); err.style.display='block'; return; }
 
