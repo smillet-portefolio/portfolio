@@ -397,7 +397,7 @@
     <button class="tab" onclick="sw('positions',this)">Positions</button>
     <button class="tab" onclick="sw('geo',this)">Géographie</button>
     <button class="tab" onclick="sw('sect',this)">Secteurs</button>
-    <button class="tab" onclick="sw('oblig',this)">📋 Obligations non cotées</button>
+    <button class="tab" onclick="sw('oblig',this)">📋 Obligations</button>
     <button class="tab" onclick="sw('conseq',this)">🏦 Conseq Retraite</button>
     <button class="tab" onclick="sw('jito',this)">🏦 Retraite Jito</button>
     <button class="tab" onclick="sw('immo',this)">🏠 Immobilier</button>
@@ -6704,7 +6704,7 @@ let _obligEditId = null;
   sec.id = 'oblig';
   sec.className = 'section';
 
-  sec.innerHTML = '<h2 style="font-size:18px;font-weight:700;margin:0 0 4px">📋 Obligations non cotées</h2>'
+  sec.innerHTML = '<h2 style="font-size:18px;font-weight:700;margin:0 0 4px">📋 Obligations</h2>'
     + '<p class="section-desc" style="margin-bottom:20px">Projets financement participatif — Lendosphere, Enerfip, Lumo…</p>'
     + '<button onclick="obligOpenModal()" style="margin-bottom:20px;padding:9px 18px;background:#2563eb;color:#fff;border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer">＋ Nouveau projet</button>'
     + '<div style="overflow-x:auto;margin-bottom:28px">'
