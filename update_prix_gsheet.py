@@ -82,7 +82,10 @@ TICKERS = [
     ("IWDA.AS",  "iShares Core MSCI World",       "EUR", "IWDA.AS"),   # détenu par Corentin
     ("Q8Y0",     "iShares Global Clean Energy Transition", "EUR", "Q8Y0.DE"),
     ("MWRE",     "Amundi Core MSCI World",        "EUR", "MWRE.DE"),
-    ("C7A0.DE",  "CATL",                          "EUR", "C7A0.MU"),
+    # CATL : prix lu à la bourse de VIENNE (CATL.VI, EUR) ; ticker interne inchangé (C7A0.MU / C7A0.DE)
+    ("CATL.VI",  "CATL",                          "EUR", "CATL.VI"),   # ticker du portefeuille (renommé le 11/10/2026)
+    ("C7A0.MU",  "CATL",                          "EUR", "CATL.VI"),   # anciens tickers encore présents -> même cours
+    ("C7A0.DE",  "CATL",                          "EUR", "CATL.VI"),
     ("XMBR.DE",  "Xtrackers MSCI Brazil",         "EUR", "XMBR.DE"),
     ("4BRZ.MI",  "iShares MSCI Brazil",           "EUR", "4BRZ.MI"),
     ("BTC/EUR",  "Bitcoin",                       "EUR", "BTC-EUR"),
@@ -253,10 +256,12 @@ YS_OVERRIDE = {t: y for (t, n, c, y) in TICKERS if t != y}
 # Symbole Yahoo dédié au CALCUL DES VARIATIONS (1D..YTD) quand la cotation utilisée
 # pour le prix n'a pas d'historique exploitable. Le prix reste inchangé ; seules les
 # variations % (indépendantes de la devise) sont lues sur ce symbole.
-# CATL (C7A0.DE/.MU en EUR) : cotation secondaire européenne récente, sans historique
-# Yahoo -> on lit les variations sur la ligne H de Hong Kong 3750.HK.
+# CATL : prix sur CATL.VI (Vienne), cotée seulement depuis le 16/09/2026 -> historique trop
+# court pour 3M/6M/1Y/YTD -> on lit les variations sur la ligne H de Hong Kong 3750.HK.
 VAR_OVERRIDE = {
+    "CATL.VI": "3750.HK",
     "C7A0.DE": "3750.HK",
+    "C7A0.MU": "3750.HK",
 }
 # Tickers internes "non actions" (crypto / FX) gérés en statique
 STATIC_TICKS = {"BTC/EUR", "ETH/EUR", "EUR/CZK", "USD/CZK", "GBP/CZK"}
