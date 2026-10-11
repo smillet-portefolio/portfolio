@@ -991,7 +991,16 @@ let FX_RATES = { USD: null, GBP: null, CZK: null };
 let CURRENT_PRICES = {};
 let CURRENT_VARIATIONS = {};   // { ticker: {'1D':x,'1W':x,'1M':x,'3M':x,'6M':x,'1Y':x,'YTD':x} }
 let PRICE_HISTORY = {};        // { ticker: { 'YYYY-MM-DD': closeEur } } — onglet Historique_Prix
-try { const _ph = localStorage.getItem('price_history'); if (_ph) PRICE_HISTORY = JSON.parse(_ph) || {}; } catch(e){}
+// Changement de cotation : le nouveau ticker reprend l'historique (close EUR) de l'ancien pour les dates manquantes
+const PRICE_HIST_ALIASES = { 'CATL.VI': ['C7A0.MU', 'C7A0.DE'] };
+function applyPriceHistAliases(h) {
+  Object.keys(PRICE_HIST_ALIASES).forEach(nt => PRICE_HIST_ALIASES[nt].forEach(ot => {
+    const o = h[ot]; if (!o) return; const n = h[nt] = h[nt] || {};
+    Object.keys(o).forEach(d => { if (n[d] == null) n[d] = o[d]; });
+  }));
+  return h;
+}
+try { const _ph = localStorage.getItem('price_history'); if (_ph) PRICE_HISTORY = applyPriceHistAliases(JSON.parse(_ph) || {}); } catch(e){}
 
 const chartInited = {};
 // ══ PATRIMOINE IMMOBILIER ═══════════════════════════════════════════════════
@@ -1835,7 +1844,8 @@ const DIRECT_COUNTRY = {
   'SAF.PA':'France',         // Safran
   'VRT':'United States',     // Vertiv Holdings
   'C7A0.DE':'China',         // CATL (Contemporary Amperex)
-  'C7A0.MU':'China',         // CATL (cotation Munich = ticker du portefeuille)
+  'C7A0.MU':'China',         // CATL (ancienne cotation Munich)
+  'CATL.VI':'China',         // CATL (cotation Vienne = ticker du portefeuille)
 };
 let _geoCharts = {};
 
@@ -2805,7 +2815,8 @@ const DIRECT_SECTOR = {
   'SAF.PA':'Industrie',        // Safran (aéronautique & défense)
   'VRT':'Industrie',           // Vertiv Holdings
   'C7A0.DE':'Industrie',       // CATL (batteries)
-  'C7A0.MU':'Industrie',       // CATL (cotation Munich = ticker du portefeuille)
+  'C7A0.MU':'Industrie',       // CATL (ancienne cotation Munich)
+  'CATL.VI':'Industrie',       // CATL (cotation Vienne = ticker du portefeuille)
 };
 
 // Palette secteurs — utilise SECTOR_UNIFIED_COLORS déjà déclaré (noms FR)
@@ -5737,7 +5748,7 @@ async function gsLoadPriceHistory() {
       (hist[tk] = hist[tk] || {})[d] = v;
     }
     if (Object.keys(hist).length) {
-      PRICE_HISTORY = hist;
+      PRICE_HISTORY = applyPriceHistAliases(hist);
       try { localStorage.setItem('price_history', JSON.stringify(hist)); localStorage.setItem('price_history_date', new Date().toISOString()); } catch(e){}
       const sec = document.getElementById('actetf');
       if (sec && sec.classList.contains('active') && typeof renderActEtf === 'function') renderActEtf();
@@ -9764,6 +9775,7 @@ const STOCK_SECTORS = {
   'SAF.PA':  'Industrie · Aéronautique & Défense',
   'VRT':     'Industrie · Infrastructure data centers',
   'C7A0.MU': 'Industrie · Batteries / véhicules électriques',
+  'CATL.VI': 'Industrie · Batteries / véhicules électriques',
   'C7A0.DE': 'Industrie · Batteries / véhicules électriques',
 };
 
@@ -9794,6 +9806,7 @@ const STOCK_COUNTRY = {
   'SAF.PA':  '🇫🇷 France',
   'VRT':     '🇺🇸 États-Unis',
   'C7A0.MU': '🇨🇳 Chine',
+  'CATL.VI': '🇨🇳 Chine',
   'C7A0.DE': '🇨🇳 Chine',
 };
 
@@ -9825,6 +9838,7 @@ const STOCK_BADGE = {
 // Country flag by exchange suffix / known ticker
 function stockFlag(ticker) {
   if (['ORCL','MSFT','VST'].includes(ticker))       return '🇺🇸';
+  if (['CATL.VI','C7A0.MU','C7A0.DE'].includes(ticker)) return '🇨🇳';   // société chinoise cotée en Europe
   if (ticker.endsWith('.PA'))                        return '🇫🇷';
   if (ticker.endsWith('.DE'))                        return '🇩🇪';
   if (ticker.endsWith('.MI'))                        return '🇮🇹';
@@ -10308,7 +10322,7 @@ function renderAePnlChart(){
   }
   // Ligne 2 : pastilles par titre — 3 lignes distinctes (Actions / ETFs / Crypto) dans un ordre personnalisé
   if(toolbar){
-    const ACT_ORDER = ['FGR','SPIE','SGO','VIE','VST','IBE','SU','VRT','ENR','C7A0','RACE','EL','RR','IDL','ABVX','VU','SAN','DTE'];
+    const ACT_ORDER = ['FGR','SPIE','SGO','VIE','VST','IBE','SU','VRT','ENR','C7A0','CATL','RACE','EL','RR','IDL','ABVX','VU','SAN','DTE'];
     const ETF_ORDER = ['MWRE','XDWD','SC0J','VGWE','I500','EMXC','MTPI','LEER','XMBR','GRE','IQQH','Q8Y0','NUKL','XDWH'];
     const _short = t => (typeof ETF_META!=='undefined' && ETF_META[t] && ETF_META[t].short) ? ETF_META[t].short : t;
     const _base  = t => String(t).split('.')[0];
