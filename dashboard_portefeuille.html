@@ -2076,6 +2076,39 @@ function renderPatrimoine(){
   }catch(e){ console.warn('patRevChart', e); }
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// Performance de période — MODIFIED DIETZ
+//   R = (V_fin − V_début − F) / (V_début + Σ w_i · F_i)
+//   F_i = dépôts nets (variation de l'investi) au jour t_i ; w_i = part de la période
+//   restant après t_i ( (T − t_i) / T ). Le gain (numérateur) est inchangé : plus-value
+//   actuelle − plus-value au départ. Source : historique quotidien de l'onglet Évolution.
+//   suffixes = null -> totaux (act_total / inv_total) ; sinon somme des act_<s> / inv_<s>.
+// ══════════════════════════════════════════════════════════════════════════════
+function modifiedDietz(evo, cut, valNow, invNow, suffixes, today) {
+  if (!evo || !evo.length) return null;
+  let base = null; for (const r of evo) { if (r.date < cut) base = r; else break; }
+  if (!base) base = evo[0];
+  const A = r => suffixes ? suffixes.reduce((s, k) => s + (typeof r['act_' + k] === 'number' ? r['act_' + k] : 0), 0) : (r.act_total || 0);
+  const I = r => suffixes ? suffixes.reduce((s, k) => s + (typeof r['inv_' + k] === 'number' ? r['inv_' + k] : 0), 0) : (r.inv_total || 0);
+  const day = d => Date.parse(d + 'T00:00:00Z') / 86400000;
+  const t0 = day(base.date), T = day(today) - t0;
+  if (!(T > 0)) return null;
+  const V0 = A(base), I0 = I(base);
+  let prevInv = I0, wFlows = 0, last = base;
+  for (const r of evo) {
+    if (r.date <= base.date || r.date > today) continue;
+    const f = I(r) - prevInv; prevInv = I(r); last = r;
+    if (f) wFlows += f * (T - (day(r.date) - t0)) / T;
+  }
+  // Flux non encore historisés (dépôts saisis après la dernière ligne Évolution) : poids ≈ 0
+  const fLast = invNow - prevInv;
+  if (fLast && last.date < today) wFlows += fLast * (T - (day(today) - t0)) / T;
+  const gain = (valNow - invNow) - (V0 - I0);
+  const denom = V0 + wFlows;
+  if (!(denom > 0)) return null;
+  return { pct: gain / denom * 100, gain, denom, base: base.date };
+}
+
 function renderDashboard() {
   _registerPortfolioETFs();
   const today  = new Date().toISOString().slice(0,10);
@@ -2271,13 +2304,11 @@ function renderDashboard() {
       return base || evo[0] || null;   // si rien avant la coupure, prendre la 1re ligne dispo
     };
     const calc = (cut, elV, elE) => {
-      const b = baseBefore(cut);
-      if (!b) { set(elV, '—'); set(elE, '—'); return; }
-      const pnlBase = (b.act_total || 0) - (b.inv_total || 0);
-      const gain    = pnlNow - pnlBase;                          // gain hors dépôts sur la période
-      const pct     = b.act_total > 0 ? (gain / b.act_total * 100) : null;
-      set(elV, fmtP(pct), colPnl(pct));
-      set(elE, `${gain >= 0 ? '+' : ''}${fmtE(gain)}`, colPnl(gain));
+      // Modified Dietz : gain hors dépôts / (valeur de départ + dépôts pondérés par leur durée d'investissement)
+      const md = modifiedDietz(evo, cut, totalValue, totalInvested, null, today);
+      if (!md) { set(elV, '—'); set(elE, '—'); return; }
+      set(elV, fmtP(md.pct), colPnl(md.pct));
+      set(elE, `${md.gain >= 0 ? '+' : ''}${fmtE(md.gain)}`, colPnl(md.gain));
     };
     // ── Performance journalière : variation entre les 2 derniers jours COMPLETS ──
     // Avant l'update de 18:00 (ligne du jour pas encore gelée) -> variation n-2 -> n-1.
@@ -2654,20 +2685,20 @@ function renderDashboard() {
     return ok ? { act, inv } : null;
   };
   const periodCell = (valNow, invNow, suffixes, cut) => {
-    const base = evoBaseSum(suffixes, cut);
-    if (!base || base.act <= 0) return `<td style="padding:7px 10px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">—</td>`;
-    const pct = ((valNow - invNow) - (base.act - base.inv)) / base.act * 100;
+    const pct = periodPct(valNow, invNow, suffixes, cut);
+    if (pct == null) return `<td style="padding:7px 10px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">—</td>`;
     return `<td style="padding:7px 10px;text-align:right;font-family:'DM Mono',monospace;white-space:nowrap;color:${colPnl(pct)}">${fmtP(pct)}</td>`;
   };
   const catSuffixes = (cat) => Object.keys(BROKER_EVO).filter(k => BROKER_TO_CAT[k] === cat).map(k => BROKER_EVO[k]);
   const catCell = (cat, val, inv, cut) => periodCell(val, inv, catSuffixes(cat), cut);
   const brkCell = (b,   val, inv, cut) => periodCell(val, inv, BROKER_EVO[b] ? [BROKER_EVO[b]] : [], cut);
 
-  const periodPct = (valNow, invNow, suffixes, cut) => {
-    const base = evoBaseSum(suffixes, cut);
-    if (!base || base.act <= 0) return null;
-    return ((valNow - invNow) - (base.act - base.inv)) / base.act * 100;
-  };
+  // Performance de période (YTD / MTD) en Modified Dietz, par catégorie ou broker (suffixes act_/inv_)
+  function periodPct(valNow, invNow, suffixes, cut) {
+    if (!suffixes || !suffixes.length) return null;
+    const md = modifiedDietz(EVO_SRC, cut, valNow, invNow, suffixes, today);
+    return md ? md.pct : null;
+  }
 
   const typeData = CATS.map(cat => {
     const inv = investedByCat[cat] || 0, val = valueByCat[cat] || 0;
