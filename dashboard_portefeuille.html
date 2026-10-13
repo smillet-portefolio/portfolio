@@ -2084,27 +2084,46 @@ function renderPatrimoine(){
 //   actuelle − plus-value au départ. Source : historique quotidien de l'onglet Évolution.
 //   suffixes = null -> totaux (act_total / inv_total) ; sinon somme des act_<s> / inv_<s>.
 // ══════════════════════════════════════════════════════════════════════════════
+// Broker (onglet Dépôts & Cash) -> suffixe des colonnes Évolution
+function _brokerEvoSuffix(b) {
+  b = String(b || '');
+  if (b.toUpperCase().startsWith('KB')) return 'kb';
+  return ({ 'LUMO':'lumo', 'LENDOSPHERE':'lendo', 'ENERFIP':'enerfip', 'LINXEA':'linxea', 'SAXO':'saxo', 'IBKR':'ibkr',
+            'TRADING 212':'t212', 'trading 212':'t212', 'TRADING 212 JITO':'jito', 'XTB':'xtb', 'Ledger':'ledger', 'LEDGER':'ledger', 'ledger':'ledger',
+            'Binance':'binance', 'BINANCE':'binance', 'binance':'binance', 'Finst':'finst', 'FINST':'finst', 'finst':'finst' })[b] || null;
+}
 function modifiedDietz(evo, cut, valNow, invNow, suffixes, today) {
   if (!evo || !evo.length) return null;
+  if (suffixes && suffixes.indexOf('total') >= 0) suffixes = null;   // ligne Total = tous les brokers
   let base = null; for (const r of evo) { if (r.date < cut) base = r; else break; }
   if (!base) base = evo[0];
-  const A = r => suffixes ? suffixes.reduce((s, k) => s + (typeof r['act_' + k] === 'number' ? r['act_' + k] : 0), 0) : (r.act_total || 0);
-  const I = r => suffixes ? suffixes.reduce((s, k) => s + (typeof r['inv_' + k] === 'number' ? r['inv_' + k] : 0), 0) : (r.inv_total || 0);
+  // Pseudo-colonnes pour séparer KB (épargne) et KB obligations, regroupés dans la colonne « kb » de l'historique :
+  //   kbobl  = capital restant des obligations KB à la date de départ (onglet Obligations)
+  //   kbonly = kb − kbobl
+  const kbOblAt = d => (typeof OBLIG_DATA !== 'undefined' ? OBLIG_DATA : [])
+    .filter(p => /^KB/i.test(p.plateforme || '') && (!p.date || p.date <= d))
+    .reduce((s, p) => s + ((typeof obCapRestEur === 'function') ? (obCapRestEur(p, d) || 0) : 0), 0);
+  const actOf = k => k === 'kbobl' ? kbOblAt(base.date)
+                   : k === 'kbonly' ? (typeof base.act_kb === 'number' ? base.act_kb : 0) - kbOblAt(base.date)
+                   : (typeof base['act_' + k] === 'number' ? base['act_' + k] : 0);
+  // Valeur de départ = historique Évolution (dernière ligne avant la période)
+  const V0 = suffixes ? suffixes.reduce((s, k) => s + actOf(k), 0) : (base.act_total || 0);
+  // Flux = dépôts / retraits À LEUR DATE (onglet Dépôts & Cash) — même source que « Performance par année civile »
   const day = d => Date.parse(d + 'T00:00:00Z') / 86400000;
-  const t0 = day(base.date), T = day(today) - t0;
-  if (!(T > 0)) return null;
-  const V0 = A(base), I0 = I(base);
-  let prevInv = I0, wFlows = 0, last = base;
-  for (const r of evo) {
-    if (r.date <= base.date || r.date > today) continue;
-    const f = I(r) - prevInv; prevInv = I(r); last = r;
-    if (f) wFlows += f * (T - (day(r.date) - t0)) / T;
-  }
-  // Flux non encore historisés (dépôts saisis après la dernière ligne Évolution) : poids ≈ 0
-  const fLast = invNow - prevInv;
-  if (fLast && last.date < today) wFlows += fLast * (T - (day(today) - t0)) / T;
-  const gain = (valNow - invNow) - (V0 - I0);
-  const denom = V0 + wFlows;
+  const tagsOf = b => { const s = _brokerEvoSuffix(b); if (s !== 'kb') return [s]; return /oblig/i.test(b) ? ['kb', 'kbobl'] : ['kb', 'kbonly']; };
+  const deps = [...(typeof CASH_BASE_DEPOSITS !== 'undefined' ? CASH_BASE_DEPOSITS : []), ...((typeof CASH_DATA !== 'undefined' && CASH_DATA.deposits) || [])]
+    .filter(d => d && d.date && d.date > base.date && d.date <= today && (!suffixes || tagsOf(d.broker).some(t => suffixes.indexOf(t) >= 0)))
+    .map(d => ({ date: d.date, f: (d.type === 'dépôt' ? 1 : -1) * (d.amountEur != null ? +d.amountEur : (d.currency === 'EUR' ? +d.amount : (toEur(+d.amount, d.currency) || +d.amount || 0))) }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  // Début = 1er jour de la période (comme le tableau annuel) ; compte OUVERT en cours de période
+  // (rien au départ) -> la période démarre à son 1er dépôt (sinon % artificiellement gonflé)
+  let tStart = day(cut);
+  if (V0 <= 1 && deps.length) tStart = Math.max(tStart, day(deps[0].date));
+  const T = Math.max(1, day(today) - tStart);
+  let F = 0, wF = 0;
+  deps.forEach(x => { F += x.f; wF += x.f * Math.min(1, Math.max(0, (T - (day(x.date) - tStart)) / T)); });
+  const gain = valNow - V0 - F;          // = plus-value actuelle − plus-value au départ (investi de départ = investi actuel − F)
+  const denom = V0 + wF;
   if (!(denom > 0)) return null;
   return { pct: gain / denom * 100, gain, denom, base: base.date };
 }
@@ -2689,7 +2708,12 @@ function renderDashboard() {
     if (pct == null) return `<td style="padding:7px 10px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">—</td>`;
     return `<td style="padding:7px 10px;text-align:right;font-family:'DM Mono',monospace;white-space:nowrap;color:${colPnl(pct)}">${fmtP(pct)}</td>`;
   };
-  const catSuffixes = (cat) => Object.keys(BROKER_EVO).filter(k => BROKER_TO_CAT[k] === cat).map(k => BROKER_EVO[k]);
+  // Catégories : KB (épargne) et KB obligations partagent la colonne « kb » de l'historique -> pseudo-colonnes kbonly / kbobl
+  const catSuffixes = (cat) => {
+    const s = Object.keys(BROKER_EVO).filter(k => BROKER_TO_CAT[k] === cat).map(k => BROKER_EVO[k] === 'kb' ? 'kbonly' : BROKER_EVO[k]);
+    if (cat === 'Obligations non cotées') s.push('kbobl');
+    return s;
+  };
   const catCell = (cat, val, inv, cut) => periodCell(val, inv, catSuffixes(cat), cut);
   const brkCell = (b,   val, inv, cut) => periodCell(val, inv, BROKER_EVO[b] ? [BROKER_EVO[b]] : [], cut);
 
@@ -12774,12 +12798,24 @@ window.addEventListener('load', () => {
       // Montant investi = net déposé (onglet Dépôts & Cash : dépôts − retraits)
       const invest=allDeps().filter(x=>x.e===c).reduce((t,x)=>t+(+x.m||0),0);
       const gain=valeur-invest; const perf=invest?gain/invest*100:null;
-      // Performance YTD : variation de marché des titres détenus depuis le 1er janvier (feed quotidien)
+      // Performance YTD (approche Modified Dietz, par ligne) :
+      //  • titre détenu AVANT le 1er janvier : gain = variation de cours depuis le 1er janvier (YTD du feed),
+      //    capital = valeur au 1er janvier (pondération 100 %)
+      //  • titre acheté EN COURS D'ANNÉE : gain = valeur actuelle − coût d'achat,
+      //    capital = coût × part de l'année restant après l'achat
+      //  YTD % = Σ gains ÷ Σ capitaux pondérés. Lignes sans cours ni coût (fonds non cotés) ignorées.
       let _ytdG=0,_ytdBase=0,_ytdHas=false;
-      rows.forEach(r=>{ const v=+r.val||0; if(v<=0) return;
-        const cv=(typeof CURRENT_VARIATIONS!=='undefined')?((r.ticker&&CURRENT_VARIATIONS[r.ticker])||(r.isin&&CURRENT_VARIATIONS[r.isin])||null):null;
-        const y=(cv&&cv.YTD!=null)?+cv.YTD:null; if(y==null||isNaN(y)) return;
-        const st=v/(1+y/100); _ytdG+=(v-st); _ytdBase+=st; _ytdHas=true; });
+      { const _today=new Date().toISOString().slice(0,10), _y0=_today.slice(0,4)+'-01-01';
+        const _day=d=>Date.parse(d+'T00:00:00Z')/86400000, _T=Math.max(1,_day(_today)-_day(_y0));
+        rows.forEach(r=>{ const v=+r.val||0; if(v<=0) return;
+          const d=String(r.date||'').slice(0,10);
+          if(d && d>=_y0 && (+r.coutEur||0)>0){
+            const w=Math.max(0,(_T-(_day(d)-_day(_y0)))/_T);
+            _ytdG+=(v-r.coutEur); _ytdBase+=r.coutEur*w; _ytdHas=true; return;
+          }
+          const cv=(typeof CURRENT_VARIATIONS!=='undefined')?((r.ticker&&CURRENT_VARIATIONS[r.ticker])||(r.isin&&CURRENT_VARIATIONS[r.isin])||null):null;
+          const y=(cv&&cv.YTD!=null)?+cv.YTD:null; if(y==null||isNaN(y)) return;
+          const st=v/(1+y/100); _ytdG+=(v-st); _ytdBase+=st; _ytdHas=true; }); }
       const ytdPct=(_ytdHas&&_ytdBase>0)?_ytdG/_ytdBase*100:null;
       // Performance annuelle moyenne = XIRR (money-weighted) des versements jusqu'à la valeur actuelle
       let xirrPct=null;
