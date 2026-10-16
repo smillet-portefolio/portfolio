@@ -7652,17 +7652,21 @@ function renderCsqEvoTab(){
   var cv=document.getElementById('csq_evo_line');
   if(cv&&typeof Chart!=='undefined'){
     var labels=vrows.map(_lab);
-    var valD=vrows.map(function(r){return Math.round(r.val);});
-    var invD=vrows.map(function(r){return Math.round(r.inv);});
+    // Période sélectionnée : les 3 courbes repartent de 0 au début de la période (même axe)
+    //   valeur = variation de valeur · investi = versements de la période · plus-value = différence
+    var valD=vrows.map(function(r){return Math.round(_per&&_b ? r.val-_b.val : r.val);});
+    var invD=vrows.map(function(r){return Math.round(_per&&_b ? r.inv-_b.inv : r.inv);});
+    var pvAx=_per?'y':'y1', sg=function(v){return (_per&&v>0?'+':'')+csqFmt(v);};
     if(window._csqEvoLine){try{window._csqEvoLine.destroy();}catch(e){}}
+    var _sc={x:{ticks:{color:'#8b95a8',maxTicksLimit:12,autoSkip:true},grid:{display:false}},y:{ticks:{color:'#8b95a8',callback:function(v){return sg(v);}},grid:{color:'rgba(120,120,120,0.12)'}}};
+    if(!_per) _sc.y1={position:'right',title:{display:true,text:'Plus-value',color:'#4caf82',font:{size:11}},ticks:{color:'#4caf82',callback:function(v){return (v>0?'+':'')+csqFmt(v);}},grid:{drawOnChartArea:false}};
     window._csqEvoLine=new Chart(cv.getContext('2d'),{type:'line',data:{labels:labels,datasets:[
       // Couleurs alignées sur le graphe « Valeur actuelle vs Investi » (onglet Évolution)
-      {label:'Valeur totale',data:valD,borderColor:'#5a8dee',backgroundColor:'rgba(90,141,238,0.1)',fill:true,tension:0.2,borderWidth:2,pointRadius:0},
-      {label:'Investi cumulé',data:invD,borderColor:'#f97316',backgroundColor:'transparent',borderDash:[4,4],fill:false,tension:0.2,borderWidth:1.5,pointRadius:0},
-      // Plus-value = valeur − investi cumulé, sur l'axe de droite (échelle propre)
-      {label:_per?'Plus-value de la période':'Plus-value',yAxisID:'y1',data:vrows.map(function(r){return Math.round(_pvOf(r));}),borderColor:'#4caf82',backgroundColor:'transparent',fill:false,tension:0.2,borderWidth:2,pointRadius:0}
-    ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:true,position:'top',labels:{color:'#8b95a8',font:{size:12},boxWidth:14,usePointStyle:true}},tooltip:{callbacks:{label:function(ctx){return ctx.dataset.label+': '+(ctx.dataset.yAxisID==='y1'&&ctx.parsed.y>=0?'+':'')+csqFmt(ctx.parsed.y)+' CZK';}}}},scales:{x:{ticks:{color:'#8b95a8',maxTicksLimit:12,autoSkip:true},grid:{display:false}},y:{ticks:{color:'#8b95a8',callback:function(v){return csqFmt(v);}},grid:{color:'rgba(120,120,120,0.12)'}},
-      y1:{position:'right',title:{display:true,text:'Plus-value',color:'#4caf82',font:{size:11}},ticks:{color:'#4caf82',callback:function(v){return (v>0?'+':'')+csqFmt(v);}},grid:{drawOnChartArea:false}}}}});
+      {label:_per?'Variation de valeur':'Valeur totale',data:valD,borderColor:'#5a8dee',backgroundColor:'rgba(90,141,238,0.1)',fill:_per?'origin':true,tension:0.2,borderWidth:2,pointRadius:0},
+      {label:_per?'Investi sur la période':'Investi cumulé',data:invD,borderColor:'#f97316',backgroundColor:'transparent',borderDash:[4,4],fill:false,tension:0.2,borderWidth:1.5,pointRadius:0},
+      // Plus-value = valeur − investi ; « Tout » : axe de droite (échelle propre)
+      {label:_per?'Plus-value de la période':'Plus-value',yAxisID:pvAx,data:vrows.map(function(r){return Math.round(_pvOf(r));}),borderColor:'#4caf82',backgroundColor:'transparent',fill:false,tension:0.2,borderWidth:2,pointRadius:0}
+    ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:true,position:'top',labels:{color:'#8b95a8',font:{size:12},boxWidth:14,usePointStyle:true}},tooltip:{callbacks:{label:function(ctx){var v=ctx.parsed.y;return ctx.dataset.label+': '+((_per||ctx.dataset.yAxisID==='y1')&&v>=0?'+':'')+csqFmt(v)+' CZK';}}}},scales:_sc}});
   }
   // graphe delta
   var dv=document.getElementById('csq_evo_delta');
