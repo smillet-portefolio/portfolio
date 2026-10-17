@@ -398,8 +398,8 @@
     <button class="tab" onclick="sw('geo',this)">Géographie</button>
     <button class="tab" onclick="sw('sect',this)">Secteurs</button>
     <button class="tab" onclick="sw('oblig',this)">📋 Obligations</button>
-    <button class="tab" onclick="sw('conseq',this)">🏦 Conseq Retraite</button>
-    <button class="tab" onclick="sw('jito',this)">🏦 Retraite Jito</button>
+    <button class="tab" onclick="sw('conseq',this)">🏦 Retraite Seb Conseq</button>
+    <button class="tab" onclick="sw('jito',this)">🏦 Retraite Jito Conseq</button>
     <button class="tab" onclick="sw('immo',this)">🏠 Immobilier</button>
     <button class="tab" onclick="sw('enfants',this)">👶 Investissements enfants</button>
   </div>
@@ -7191,7 +7191,7 @@ function _csqTh(col,label,align){ return '<th onclick="csqSort(\''+col+'\')" dat
   var sec=document.createElement('div'); sec.id='conseq'; sec.className='section';
   var TP='font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:12px';
   sec.innerHTML=
-    '<h2 style="font-size:18px;font-weight:700;margin:0 0 4px">🏦 Conseq Retraite</h2>'+
+    '<h2 style="font-size:18px;font-weight:700;margin:0 0 4px">🏦 Retraite Seb Conseq</h2>'+
     '<p class="section-desc" style="margin-bottom:16px">Épargne retraite Conseq (DPS) — montants en CZK. Cotisations employeur, participant et allocations de l\'État.</p>'+
     '<div class="sub-tabs" style="margin-bottom:16px"><button class="sub-tab active" data-v="main" onclick="csqSwitchView(\'main\')">Vue d\'ensemble</button><button class="sub-tab" data-v="evo" onclick="csqSwitchView(\'evo\')">Évolution</button><button class="sub-tab" data-v="hist" onclick="csqSwitchView(\'hist\')">Historique des versements</button><button class="sub-tab" data-v="funds" onclick="csqSwitchView(\'funds\')">Détail par fond</button><button class="sub-tab" data-v="perf" onclick="csqSwitchView(\'perf\')">Performance fonds</button></div>'+
     '<div id="csq_view_main">'+
@@ -8087,7 +8087,7 @@ function jtInvestedNow(){ return JITO_STATE?jtTotals().inv:0; }
   var BTN='background:var(--blue);color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer';
   var BTN2='background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:8px;padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer';
   sec.innerHTML=
-    '<h2 style="font-size:18px;font-weight:700;margin:0 0 4px">🏦 Retraite Jito — NN Penzijní připojištění</h2>'+
+    '<h2 style="font-size:18px;font-weight:700;margin:0 0 4px">🏦 Retraite Jito Conseq</h2><p style="font-size:12px;color:var(--text2);margin:0 0 4px">Ancien contrat NN Penzijní připojištění (transfert vers Conseq en cours) + nouveau contrat Conseq</p>'+
     '<p class="section-desc" style="margin-bottom:16px">Contrat 0053635715 (ING Penzijní fond → NN Penzijní společnost), effet 1.2.2004 — montants en CZK. Fonds transformé : compte en CZK sans parts, valorisation créditée chaque 1er janvier. Contributions participant, employeur et allocations de l\'État.</p>'+
     '<div class="sub-tabs" style="margin-bottom:16px"><button class="sub-tab active" data-v="main" onclick="jtSwitchView(\'main\')">Vue d\'ensemble</button><button class="sub-tab" data-v="evo" onclick="jtSwitchView(\'evo\')">Évolution</button><button class="sub-tab" data-v="hist" onclick="jtSwitchView(\'hist\')">Historique des versements</button><button class="sub-tab" data-v="stmt" onclick="jtSwitchView(\'stmt\')">Relevés annuels</button><button class="sub-tab" data-v="src" onclick="jtSwitchView(\'src\')">Détail par source</button><button class="sub-tab" data-v="csq" onclick="jtSwitchView(\'csq\')" style="border-color:#4caf82">🟢 Conseq (nouveau contrat)</button></div>'+
     '<div id="jt_view_csq" style="display:none">'+
