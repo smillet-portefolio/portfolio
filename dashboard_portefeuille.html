@@ -7156,6 +7156,9 @@ function csqRecalc(){
   });
   CONSEQ_DATA.valueNow=Math.round(tot*100)/100;
   var years=CONSEQ_DATA.years||[];
+  // Investi par année = somme de l'Historique des versements (source unique) : un versement dont la
+  // date est corrigée change automatiquement d'année (évite les écarts entre les deux onglets)
+  if(CONSEQ_DATA.tx && CONSEQ_DATA.tx.length && typeof csqRecomputeYears==='function'){ csqRecomputeYears(); years=CONSEQ_DATA.years; }
   if(years.length){ var ly=years.reduce(function(a,b){return b.year>a.year?b:a;}); ly.valueEnd=CONSEQ_DATA.valueNow; }
   csqSave();
 }
