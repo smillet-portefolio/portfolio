@@ -7518,6 +7518,10 @@ function csqFundsChart(){
 }
 
 function csqEvoChart(){
+  // Versements mensuels planifiés (CZK, janvier → décembre) — mis à jour le 17/10/2026 : 1 505 738 CZK/an
+  var CSQ_PROJ_PLAN=[94598.99,100884.3272,345324.2682,94598.99,183578.99,93578.99,100918.2675,100918.2675,94450.5698,94450.5698,95470.5698,106965.3305];
+  // 2026 : versements RÉELS janvier → octobre, puis nouveau plan pour novembre et décembre
+  var CSQ_PROJ_PLAN_2026=[74152,68745,73075,371983,93745,201964,92725,100425,101003,94434,95470.5698,106965.3305];
   var cv=document.getElementById('csq_evo'); if(!cv||typeof Chart==='undefined') return;
   var years=(CONSEQ_DATA.years||[]).slice().sort(function(a,b){return a.year-b.year;});
   var labels=years.map(function(y){return String(y.year);});
@@ -7525,12 +7529,64 @@ function csqEvoChart(){
   var vals=years.map(function(y){return y.valueEnd!=null?Math.round(y.valueEnd):null;});
   var pv=0; var pvAnn=years.map(function(y){ var v=y.valueEnd; if(v==null) return null; var r=Math.round((v-pv)-(y.invested||0)); pv=v; return r; });
   var barCols=pvAnn.map(function(x){return x==null?'rgba(0,0,0,0)':(x>=0?'rgba(76,175,130,0.55)':'rgba(224,108,108,0.6)');});
+  // ── PROJECTION jusqu'en 2032 : versements mensuels planifiés + 3 scénarios de rendement ──
+  //   départ = valeur actuelle, aujourd'hui ; chaque mois : V = V×(1+r)^(1/12) + versement du mois
+  var PROJ_END=2032, PLAN=CSQ_PROJ_PLAN;
+  // Rendements annuels hypothèses (fournis) — taux de l'année appliqué mois par mois
+  var CSQ_PROJ_RATES={2026:7.88,2027:7.22,2028:6.56,2029:5.90,2030:5.24,2031:4.58,2032:4.12};
+  var SCEN=[{k:'cen',lab:'Projection (rendements annuels hypothèses)',rate:function(y){ return (CSQ_PROJ_RATES[y]!=null?CSQ_PROJ_RATES[y]:4.12)/100; },col:'#2f9e6e'}];
+  var nowD=new Date(), y0=nowD.getFullYear(), m0=nowD.getMonth();          // mois en cours (0-11) déjà versé
+  var lastY=years.length?years[years.length-1].year:y0;
+  for(var yy=lastY+1; yy<=PROJ_END; yy++) labels.push(String(yy));
+  var nL=labels.length, iCur=labels.indexOf(String(y0));
+  var pad=function(arr){ while(arr.length<nL) arr.push(null); return arr; };
+  pad(vals); pad(cumInv); pad(pvAnn); pad(barCols);
+  // ── Simulation 1 — FIGÉE le 17/10/2026 : départ = valeur réelle fin 2025 (9 686 853 CZK), 2026 entièrement
+  //    simulée (calendrier mensuel + 7,88 %), puis 2027-2032. Valeurs fixes, ne changent plus.
+  //    Recalculée le 17/10/2026 avec le plan de versements mis à jour (1 505 738 CZK/an ; 2026 : réel jan-oct + nov-déc planifiés).
+  var CSQ_SIM_FROZEN={date:'17/10/2026',
+    val:{2025:9686853,2026:11979596,2027:14405179,2028:16905848,2029:19454005,2030:22019118,2031:24568318,2032:27117767},
+    inv:{2025:7485401,2026:8960088,2027:10465826,2028:11971564,2029:13477302,2030:14983040,2031:16488779,2032:17994517}};
+  var frozen=labels.map(function(l){ return CSQ_SIM_FROZEN.val[l]!=null?CSQ_SIM_FROZEN.val[l]:null; });
+  // ── Simulation 2 — DYNAMIQUE : départ = valeur ACTUELLE (aujourd'hui), mois restants de l'année
+  //    (le mois en cours est considéré versé) puis mêmes versements futurs et mêmes rendements.
+  var V0=(typeof CONSEQ_DATA!=='undefined'&&CONSEQ_DATA.valueNow)?CONSEQ_DATA.valueNow:(vals[iCur]||0);
+  var projInv=new Array(nL).fill(null), proj={}; SCEN.forEach(function(s){ proj[s.k]=new Array(nL).fill(null); });
+  if(iCur>=0){
+    var inv=cumInv[iCur]||0;
+    var V={}; SCEN.forEach(function(s){ V[s.k]=V0; });
+    for(var y=y0; y<=PROJ_END; y++){
+      var _pl=(y===2026)?CSQ_PROJ_PLAN_2026:PLAN;
+      for(var m=(y===y0?m0+1:0); m<12; m++){
+        SCEN.forEach(function(s){ V[s.k]=V[s.k]*Math.pow(1+s.rate(y),1/12)+_pl[m]; });
+        inv+=_pl[m];
+      }
+      var idx=labels.indexOf(String(y)); if(idx<0) continue;
+      projInv[idx]=Math.round(inv);
+      SCEN.forEach(function(s){ proj[s.k][idx]=Math.round(V[s.k]); });
+    }
+  }
+  // Plus-value annuelle projetée (années futures) : barres atténuées
+  for(var ip=Math.max(iCur,0)+1; ip>0 && ip<nL; ip++){ if(proj.cen[ip]!=null&&proj.cen[ip-1]!=null){ var g=Math.round((proj.cen[ip]-proj.cen[ip-1])-(projInv[ip]-projInv[ip-1])); pvAnn[ip]=g; barCols[ip]=g>=0?'rgba(76,175,130,0.22)':'rgba(224,108,108,0.25)'; } }
   if(window._csqEvoChart){try{window._csqEvoChart.destroy();}catch(e){}}
+  var _projDs=SCEN.map(function(s,i){ return {type:'line',label:'Simulation actuelle (départ aujourd\'hui)',data:proj[s.k],borderColor:s.col,backgroundColor:'transparent',borderDash:[6,4],fill:false,tension:0.25,borderWidth:2.5,pointRadius:3,spanGaps:false,yAxisID:'y',order:0}; });
+  _projDs.push({type:'line',label:'Simulation figée '+CSQ_SIM_FROZEN.date+' (départ fin 2025)',data:frozen,borderColor:'#a78bfa',backgroundColor:'transparent',borderDash:[3,3],fill:false,tension:0.25,borderWidth:1.8,pointRadius:2,pointStyle:'rectRot',spanGaps:false,yAxisID:'y',order:0});
+  _projDs.push({type:'line',label:'Investi projeté',data:projInv,borderColor:'#5a8dee',backgroundColor:'transparent',borderDash:[2,4],fill:false,tension:0.25,borderWidth:1.5,pointRadius:2,spanGaps:false,yAxisID:'y',order:2});
+  window._csqProj={labels:labels, scen:SCEN, proj:proj, inv:projInv, plan:PLAN, frozen:frozen};
+  // Note des hypothèses sous le graphique
+  var _wrap=cv.closest('.card'); if(_wrap){ var nt=_wrap.querySelector('.csq-proj-note'); if(!nt){ nt=document.createElement('p'); nt.className='csq-proj-note'; nt.style.cssText='font-size:11px;color:var(--text2);margin:8px 0 0'; _wrap.appendChild(nt); }
+    var i32=labels.indexOf(String(PROJ_END));
+    var i26=labels.indexOf(String(y0));
+    var _mn=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'][(m0+1)%12];
+    nt.innerHTML='<strong>Simulation figée ('+CSQ_SIM_FROZEN.date+')</strong> : départ valeur réelle fin '+(y0-1)+' ('+csqFmt(CSQ_SIM_FROZEN.val[y0-1])+' CZK), 2026 simulée en entier → fin '+PROJ_END+' : <strong>'+csqFmt(CSQ_SIM_FROZEN.val[PROJ_END])+' CZK</strong> ('+csqFmt(CSQ_SIM_FROZEN.inv[PROJ_END])+' investis). '
+      +'<strong>Simulation actuelle</strong> : départ valeur actuelle ('+csqFmt(V0)+' CZK, recalculée chaque jour), versements à partir de '+_mn+' → fin '+y0+' : '+csqFmt(proj.cen[i26])+' CZK · fin '+PROJ_END+' : <strong>'+csqFmt(proj.cen[i32])+' CZK</strong> ('+csqFmt(projInv[i32])+' investis, plus-value '+csqFmt(proj.cen[i32]-projInv[i32])+'). '
+      +'Écart actuelle − figée fin '+PROJ_END+' : <strong>'+(proj.cen[i32]-CSQ_SIM_FROZEN.val[PROJ_END]>=0?'+':'')+csqFmt(proj.cen[i32]-CSQ_SIM_FROZEN.val[PROJ_END])+' CZK</strong>. '
+      +'Hypothèses communes : versements '+csqFmt(PLAN.reduce(function(a,b){return a+b;},0))+' CZK/an (calendrier mensuel), rendements '+Object.keys(CSQ_PROJ_RATES).map(function(y){return y+' '+String(CSQ_PROJ_RATES[y]).replace('.',',')+' %';}).join(' · ')+', appliqués mois par mois. Simulation indicative, non garantie.'; }
   window._csqEvoChart=new Chart(cv.getContext('2d'),{type:'bar',data:{labels:labels,datasets:[
     {type:'bar',label:'Plus-value annuelle',data:pvAnn,backgroundColor:barCols,yAxisID:'y1',borderRadius:4,order:3,categoryPercentage:0.55,barPercentage:0.8},
-    {type:'line',label:'Valeur',data:vals,borderColor:'#4caf82',backgroundColor:'rgba(76,175,130,0.12)',fill:true,tension:0.25,borderWidth:2,pointRadius:3,spanGaps:true,yAxisID:'y',order:1},
+    {type:'line',label:'Valeur',data:vals,borderColor:'#4caf82',backgroundColor:'rgba(76,175,130,0.12)',fill:true,tension:0.25,borderWidth:2,pointRadius:3,spanGaps:false,yAxisID:'y',order:1},
     {type:'line',label:'Investi cumulé',data:cumInv,borderColor:'#5a8dee',backgroundColor:'transparent',borderDash:[5,4],fill:false,tension:0.25,borderWidth:2,pointRadius:3,yAxisID:'y',order:2}
-  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{color:'#8b95a8',font:{size:12},boxWidth:14,usePointStyle:true}},tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+csqFmt(c.parsed.y)+' CZK';}}}},scales:{y:{position:'left',ticks:{callback:function(v){return (v/1e6).toFixed(1)+'M';},color:'#8b95a8'},grid:{color:'rgba(0,0,0,0.05)'}},y1:{position:'right',grid:{display:false},ticks:{callback:function(v){return (v/1e3).toFixed(0)+'k';},color:'#8b95a8'},title:{display:true,text:'Plus-value annuelle',color:'#8b95a8',font:{size:10}}},x:{grid:{display:false},ticks:{color:'#8b95a8'}}}}});
+  ].concat(_projDs)},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{color:'#8b95a8',font:{size:11},boxWidth:14,usePointStyle:true}},tooltip:{callbacks:{label:function(c){return c.parsed.y==null?null:(c.dataset.label+': '+csqFmt(c.parsed.y)+' CZK');}}}},scales:{y:{position:'left',ticks:{callback:function(v){return (v/1e6).toFixed(1)+'M';},color:'#8b95a8'},grid:{color:'rgba(0,0,0,0.05)'}},y1:{position:'right',grid:{display:false},ticks:{callback:function(v){return (v/1e3).toFixed(0)+'k';},color:'#8b95a8'},title:{display:true,text:'Plus-value annuelle',color:'#8b95a8',font:{size:10}}},x:{grid:{display:false},ticks:{color:'#8b95a8'}}}}});
 }
 
 var _csqEvoRange='all';
@@ -7913,6 +7969,7 @@ function renderConseqSection(){
     var _r=(typeof _xirrAnnual==='function')?_xirrAnnual(_cfs):null;
     if(_r!=null) avgAnnPerf=_r*100;
   })();
+  window._csqAvgAnn=avgAnnPerf;   // utilisé par la projection 2026-2032 (scénario central)
   var kel=document.getElementById('csq_kpis');
   if(kel){
     var cards=[
