@@ -7114,7 +7114,9 @@ function divTickerSelected(){
 // ONGLET CONSEQ RETRAITE (épargne retraite DPS, CZK)
 // ==============================================================================
 const _csqInp='style="width:100%;padding:7px 9px;border:1px solid var(--border2);border-radius:7px;background:var(--bg2);color:var(--text);font-size:13px;box-sizing:border-box"';
-const CSQ_LABELS={employer:"Cotisation de l'employeur",participant:"Contribution du participant",state:"Allocation de l'État",transfer:"Transfert initial",other:"Autre"};
+const CSQ_LABELS={employer:"Cotisation de l'employeur",participant:"Contribution du participant",state:"Allocation de l'État",transfer:"Transfert initial",insurance:"Assurance capital investi",other:"Autre"};
+// Catégories qui ne sont PAS investies dans les fonds (coût) : exclues de l'investi et des performances
+function csqIsInv(t){ return t && t.cat!=='insurance'; }
 const CSQ_CATCOL={employer:'#5a8dee',participant:'#4caf82',state:'#f0956e',transfer:'#9b87d4',other:'#9ca3af'};
 const CSQ_FUNDCOL=['#5a8dee','#f0956e','#4caf82','#9b87d4'];
 var CONSEQ_DATA=null;
@@ -7177,7 +7179,25 @@ function _csqTh(col,label,align){ return '<th onclick="csqSort(\''+col+'\')" dat
   if(raw===null){ CONSEQ_DATA=JSON.parse(JSON.stringify(CONSEQ_SEED)); csqSave(); }
   else { try{ CONSEQ_DATA=JSON.parse(raw); }catch(e){ CONSEQ_DATA=null; } }
   if(!CONSEQ_DATA || !CONSEQ_DATA.tx) CONSEQ_DATA=JSON.parse(JSON.stringify(CONSEQ_SEED));
-  (CONSEQ_DATA.tx||[]).forEach(function(t){ if(t.date==='2026-08-28') t.date='2025-08-28'; });
+  // Migration 17/10/2026 (validée) — rapprochement avec le relevé Conseq :
+  //  1) la part « assurance capital investi » incluse dans la contribution du participant (08/2019 → 09/2025)
+  //     est isolée dans la catégorie 'insurance' (100 CZK/mois jusqu'en 2021, 150 jusqu'à 06/2024, 285 ensuite, 500 le 09/09/2025)
+  //  2) rétablit l'allocation de l'État du 28/08/2026 (1 020 CZK) supprimée par erreur
+  if(CONSEQ_DATA.tx && !CONSEQ_DATA._migIns20261017){
+    var _insOf=function(d){ return d<'2022-01-01'?100:(d<'2024-07-01'?150:(d<'2025-09-01'?285:(d<'2025-10-01'?500:0))); };
+    var _add=[];
+    CONSEQ_DATA.tx.forEach(function(t){
+      if(t.cat!=='participant'||t.date<'2019-08-01'||t.date>='2025-10-01') return;
+      if([2100,3100,5985,10500].indexOf(t.amount)<0) return;
+      var ins=_insOf(t.date); if(!ins) return;
+      t.amount=Math.round((t.amount-ins)*100)/100;
+      _add.push({date:t.date,cat:'insurance',label:CSQ_LABELS.insurance,amount:ins});
+    });
+    CONSEQ_DATA.tx=CONSEQ_DATA.tx.concat(_add);
+    if(!CONSEQ_DATA.tx.some(function(t){return t.date==='2026-08-28'&&t.cat==='state';}))
+      CONSEQ_DATA.tx.push({date:'2026-08-28',cat:'state',label:CSQ_LABELS.state,amount:1020});
+    CONSEQ_DATA._migIns20261017=true;
+  }
   if(CONSEQ_DATA.funds && !CONSEQ_DATA.funds.some(function(f){return (f.name||'').indexOf('Target Bond')>=0;})){
     CONSEQ_DATA.funds.push({name:'Conseq Target Bond 2035 účastnický fond',nav:1.1685,nonInvest:0});
   }
@@ -7217,7 +7237,7 @@ function _csqTh(col,label,align){ return '<th onclick="csqSort(\''+col+'\')" dat
     '</div>'+
     '<div id="csq_filters" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap"></div>'+
     '<div class="csq-scroll1"><table id="csq_tx_tbl"><thead><tr>'+
-      _csqTh('date','Date','left')+_csqTh('employer','Cotisation employeur','right')+_csqTh('participant','Contribution participant','right')+_csqTh('state',"Allocation de l'État",'right')+_csqTh('transfer','Transfert','right')+_csqTh('total','Total','right')+'<th style="text-align:center">Actions</th>'+
+      _csqTh('date','Date','left')+_csqTh('employer','Cotisation employeur','right')+_csqTh('participant','Contribution participant','right')+_csqTh('state',"Allocation de l'État",'right')+_csqTh('transfer','Transfert','right')+_csqTh('insurance','Assurance capital','right')+_csqTh('total','Total','right')+'<th style="text-align:center">Actions</th>'+
     '</tr></thead><tbody id="csq_tx_body"></tbody></table></div>'+
     '</div>'+
     '<div id="csq_view_funds" style="display:none">'+
@@ -7259,7 +7279,7 @@ function _csqTh(col,label,align){ return '<th onclick="csqSort(\''+col+'\')" dat
   modal.innerHTML='<div style="background:var(--bg);border-radius:12px;padding:22px;width:420px;max-width:92vw;border:1px solid var(--border2)">'+
     '<h3 style="margin:0 0 14px;font-size:16px">Nouveau versement</h3>'+
     '<div style="margin-bottom:10px"><label style="display:block;font-size:11px;color:var(--text2);margin-bottom:3px">Type</label>'+
-      '<select id="csqf_type" '+_csqInp+'><option value="employer">Cotisation de l\'employeur</option><option value="participant">Contribution du participant</option><option value="state">Allocation de l\'État</option></select></div>'+
+      '<select id="csqf_type" '+_csqInp+'><option value="employer">Cotisation de l\'employeur</option><option value="participant">Contribution du participant</option><option value="state">Allocation de l\'État</option><option value="insurance">Assurance capital investi</option></select></div>'+
     '<div style="margin-bottom:10px"><label style="display:block;font-size:11px;color:var(--text2);margin-bottom:3px">Date</label><input id="csqf_date" type="date" '+_csqInp+'></div>'+
     '<div style="margin-bottom:14px"><label style="display:block;font-size:11px;color:var(--text2);margin-bottom:3px">Montant (CZK)</label><input id="csqf_amount" type="number" step="0.01" oninput="csqPreview()" '+_csqInp+'><div id="csqf_prev" style="font-size:11px;color:var(--text2);margin-top:5px"></div></div>'+
     '<div style="display:flex;gap:8px;justify-content:flex-end"><button onclick="csqCloseModal()" style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:8px 14px;cursor:pointer">Annuler</button>'+
@@ -7358,7 +7378,7 @@ function _csqActCell(editFn,delFn,arg){
     +'<button onclick="'+delFn+'('+a+')" title="Supprimer la ligne" style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#e06c6c">🗑</button></td>';
 }
 function csqRecomputeYears(){
-  var byY={}; (CONSEQ_DATA.tx||[]).forEach(function(t){ var y=+String(t.date).slice(0,4); byY[y]=(byY[y]||0)+(t.amount||0); });
+  var byY={}; (CONSEQ_DATA.tx||[]).forEach(function(t){ if(!csqIsInv(t)) return; var y=+String(t.date).slice(0,4); byY[y]=(byY[y]||0)+(t.amount||0); });
   if(!CONSEQ_DATA.years) CONSEQ_DATA.years=[];
   CONSEQ_DATA.years.forEach(function(yr){ yr.invested = byY[yr.year]!=null ? byY[yr.year] : 0; });
   Object.keys(byY).forEach(function(y){ if(!CONSEQ_DATA.years.some(function(o){return o.year==+y;})) CONSEQ_DATA.years.push({year:+y,invested:byY[y],valueEnd:null}); });
@@ -7371,12 +7391,12 @@ function csqDelTx(date){
   csqRecomputeYears(); csqSave(); renderConseqSection();
 }
 function csqEditTx(date){
-  var sums={employer:0,participant:0,state:0,transfer:0};
+  var sums={employer:0,participant:0,state:0,transfer:0,insurance:0};
   (CONSEQ_DATA.tx||[]).forEach(function(t){ if(t.date===date && sums[t.cat]!=null) sums[t.cat]+=(t.amount||0); });
   var m=document.getElementById('csqEditTxModal');
   if(!m){ m=document.createElement('div'); m.id='csqEditTxModal'; m.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center'; document.body.appendChild(m); }
-  var lab={employer:"Cotisation de l'employeur",participant:'Contribution du participant',state:"Allocation de l'État",transfer:'Transfert'};
-  var fields=['employer','participant','state','transfer'].map(function(k){
+  var lab={employer:"Cotisation de l'employeur",participant:'Contribution du participant',state:"Allocation de l'État",transfer:'Transfert',insurance:'Assurance capital investi (coût, non investi)'};
+  var fields=['employer','participant','state','transfer','insurance'].map(function(k){
     return '<div style="margin-bottom:8px"><label style="display:block;font-size:11px;color:var(--text2);margin-bottom:3px">'+lab[k]+' (CZK)</label><input id="csqet_'+k+'" type="number" step="0.01" value="'+(sums[k]||0)+'" '+_csqInp+'></div>';
   }).join('');
   m.innerHTML='<div style="background:var(--bg);border-radius:12px;padding:22px;width:420px;max-width:92vw;border:1px solid var(--border2)">'
@@ -7391,9 +7411,9 @@ function csqEditTx(date){
 function csqEditTxClose(){ var m=document.getElementById('csqEditTxModal'); if(m) m.style.display='none'; }
 function csqEditTxSave(origDate){
   var nd=document.getElementById('csqet_date').value||origDate;
-  var vals={}; ['employer','participant','state','transfer'].forEach(function(k){ vals[k]=Math.round((parseFloat(document.getElementById('csqet_'+k).value)||0)*100)/100; });
+  var vals={}; ['employer','participant','state','transfer','insurance'].forEach(function(k){ vals[k]=Math.round((parseFloat(document.getElementById('csqet_'+k).value)||0)*100)/100; });
   CONSEQ_DATA.tx=(CONSEQ_DATA.tx||[]).filter(function(t){return t.date!==origDate;});
-  ['employer','participant','state','transfer'].forEach(function(k){ if(vals[k]!==0) CONSEQ_DATA.tx.push({date:nd,cat:k,label:CSQ_LABELS[k],amount:vals[k]}); });
+  ['employer','participant','state','transfer','insurance'].forEach(function(k){ if(vals[k]!==0) CONSEQ_DATA.tx.push({date:nd,cat:k,label:CSQ_LABELS[k],amount:vals[k]}); });
   csqRecomputeYears(); csqSave(); csqEditTxClose(); renderConseqSection();
 }
 
@@ -7494,6 +7514,7 @@ function csqSubmit(){
   amt=Math.round(amt*100)/100;
   CONSEQ_DATA.tx.push({date:date,cat:cat,label:CSQ_LABELS[cat],amount:amt});
   var y=parseInt(date.slice(0,4),10);
+  if(typeof csqRecomputeYears==='function'){ csqRecomputeYears(); csqSave(); renderConseqSection(); csqCloseModal(); return; }
   var yr=(CONSEQ_DATA.years||[]).find(function(o){return o.year===y;});
   if(yr) yr.invested=(yr.invested||0)+amt; else { if(!CONSEQ_DATA.years)CONSEQ_DATA.years=[]; CONSEQ_DATA.years.push({year:y,invested:amt,valueEnd:null}); }
   csqSave(); renderConseqSection(); csqCloseModal();
@@ -7950,7 +7971,8 @@ function csqFundDetail(){
 function renderConseqSection(){
   if(!CONSEQ_DATA) return;
   var years=(CONSEQ_DATA.years||[]).slice().sort(function(a,b){return a.year-b.year;});
-  var totInv=(CONSEQ_DATA.tx||[]).reduce(function(s,t){return s+(t.amount||0);},0);
+  var totInv=(CONSEQ_DATA.tx||[]).reduce(function(s,t){return s+(csqIsInv(t)?(t.amount||0):0);},0);
+  var totIns=(CONSEQ_DATA.tx||[]).reduce(function(s,t){return s+(t.cat==='insurance'?(t.amount||0):0);},0);
   var valNow=(CONSEQ_DATA.valueNow!=null)?CONSEQ_DATA.valueNow:(years.length?years[years.length-1].valueEnd:0);
   var gain=valNow-totInv;
   var perf=totInv?gain/totInv*100:0;
@@ -7971,7 +7993,7 @@ function renderConseqSection(){
     if(!_comp.length) return;
     var _lastY=_comp[_comp.length-1];
     var _endISO=_lastY.year+'-12-31';
-    var _bd={}; (CONSEQ_DATA.tx||[]).forEach(function(t){ if(t&&t.date&&t.amount&&t.date<=_endISO) _bd[t.date]=(_bd[t.date]||0)+t.amount; });
+    var _bd={}; (CONSEQ_DATA.tx||[]).forEach(function(t){ if(csqIsInv(t)&&t.date&&t.amount&&t.date<=_endISO) _bd[t.date]=(_bd[t.date]||0)+t.amount; });
     var _cfs=Object.keys(_bd).sort().map(function(d){return {t:new Date(d+'T00:00:00'),a:-_bd[d]};});
     if(!_cfs.length) return;
     _cfs.push({t:new Date(_endISO+'T00:00:00'),a:_lastY.valueEnd});
@@ -7982,7 +8004,7 @@ function renderConseqSection(){
   var kel=document.getElementById('csq_kpis');
   if(kel){
     var cards=[
-      {l:'Total investi',v:fmt(totInv)+' CZK',s:eurTxt(totInv),c:'var(--text)'},
+      {l:'Total investi',v:fmt(totInv)+' CZK',s:eurTxt(totInv)+(totIns?'<br>+ coût assurance capital : <strong>'+fmt(totIns)+' CZK</strong> ('+eurTxt(totIns)+')':''),c:'var(--text)'},
       {l:'Valeur actuelle',v:fmt(valNow)+' CZK',s:eurTxt(valNow),c:'var(--text)'},
       {l:'Plus-value',v:(gain>=0?'+':'')+fmt(gain)+' CZK',s:eurTxt(gain),c:gain>=0?'#4caf82':'#e06c6c'},
       {l:'Performance totale',v:(perf>=0?'+':'')+perf.toFixed(1).replace('.',',')+'%',s:"depuis l'origine",c:perf>=0?'#4caf82':'#e06c6c'},
@@ -7994,7 +8016,7 @@ function renderConseqSection(){
   var pb=document.getElementById('csq_perf_body');
   if(pb){
     var cum=0,prevVal=0,_rowsHtml=[];
-    var _csqFlows=(function(){var bd={};(CONSEQ_DATA.tx||[]).forEach(function(t){if(t&&t.date&&t.amount)bd[t.date]=(bd[t.date]||0)+t.amount;});return Object.keys(bd).map(function(d){return {date:d,amt:bd[d]};}).sort(function(a,b){return a.date.localeCompare(b.date);});})();
+    var _csqFlows=(function(){var bd={};(CONSEQ_DATA.tx||[]).forEach(function(t){if(csqIsInv(t)&&t.date&&t.amount)bd[t.date]=(bd[t.date]||0)+t.amount;});return Object.keys(bd).map(function(d){return {date:d,amt:bd[d]};}).sort(function(a,b){return a.date.localeCompare(b.date);});})();
     var col=function(n){return n==null?'var(--text2)':(n>=0?'#4caf82':'#e06c6c');};
     years.forEach(function(y,i){
       cum+=(y.invested||0);
@@ -8041,7 +8063,7 @@ function renderConseqSection(){
   }
   var tb=document.getElementById('csq_tx_body');
   if(tb){
-    var cols=['employer','participant','state','transfer'];
+    var cols=['employer','participant','state','transfer','insurance'];
     var byd={};
     (CONSEQ_DATA.tx||[]).forEach(function(t){
       if(_csqFilter!=='all' && (t.date||'').slice(0,4)!==_csqFilter) return;
