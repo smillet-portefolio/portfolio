@@ -7573,11 +7573,24 @@ function csqEvoChart(){
   //    (le mois en cours est considéré versé) puis mêmes versements futurs et mêmes rendements.
   var V0=(typeof CONSEQ_DATA!=='undefined'&&CONSEQ_DATA.valueNow)?CONSEQ_DATA.valueNow:(vals[iCur]||0);
   var projInv=new Array(nL).fill(null), proj={}; SCEN.forEach(function(s){ proj[s.k]=new Array(nL).fill(null); });
+  // Versements futurs (simulation actuelle) = montants RÉELLEMENT versés le même mois sur les 12 derniers mois
+  //   (mois déjà passés de l'année en cours → année en cours ; mois restants → année précédente).
+  //   Ex. le 18/10/2026 : nov./déc. = nov./déc. 2025, janv. → oct. = janv. → oct. 2026. Hors assurance capital.
+  //   Contribution PERSONNELLE (participant) : montant du DERNIER mois versé, appliqué à tous les mois futurs
+  //   (50 000 CZK au 18/10/2026) — se met à jour automatiquement si le versement personnel change.
+  var ROLL=[0,0,0,0,0,0,0,0,0,0,0,0], _pByM={};
+  (CONSEQ_DATA.tx||[]).forEach(function(t){ if(typeof csqIsInv==='function'&&!csqIsInv(t)) return;
+    if(t.cat==='participant'){ var k=String(t.date).slice(0,7); _pByM[k]=(_pByM[k]||0)+(t.amount||0); return; }
+    var ty=+String(t.date).slice(0,4), tm=+String(t.date).slice(5,7)-1;
+    if(ty===(tm<=m0?y0:y0-1)) ROLL[tm]+=(t.amount||0); });
+  var _pLastM=Object.keys(_pByM).sort().pop(), CSQ_PART_FUT=_pLastM?_pByM[_pLastM]:0;
+  for(var _rm=0;_rm<12;_rm++) ROLL[_rm]+=CSQ_PART_FUT;
+  window._csqRoll=ROLL; window._csqPartFut=CSQ_PART_FUT;
   if(iCur>=0){
     var inv=cumInv[iCur]||0;
     var V={}; SCEN.forEach(function(s){ V[s.k]=V0; });
     for(var y=y0; y<=PROJ_END; y++){
-      var _pl=(y===2026)?CSQ_PROJ_PLAN_2026:PLAN;
+      var _pl=ROLL;
       for(var m=(y===y0?m0+1:0); m<12; m++){
         SCEN.forEach(function(s){ V[s.k]=V[s.k]*Math.pow(1+s.rate(y),1/12)+_pl[m]; });
         inv+=_pl[m];
@@ -7599,7 +7612,8 @@ function csqEvoChart(){
     var i32=labels.indexOf(String(PROJ_END));
     var i26=labels.indexOf(String(y0));
     var _sum=function(a){return a.reduce(function(s,b){return s+b;},0);};
-    nt.innerHTML='<strong>Versements annuels</strong> : 2026 : '+csqFmt(_sum(CSQ_PROJ_PLAN_2026))+' CZK · 2027 → '+PROJ_END+' : '+csqFmt(_sum(PLAN))+' CZK/an. '
+    var _mN=['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+    nt.innerHTML='<strong>Versements annuels</strong> — simulation actuelle : '+csqFmt(_sum(ROLL))+' CZK/an (employeur + État : montants réels des 12 derniers mois, '+_mN[(m0+1)%12]+' '+(y0-1)+' → '+_mN[m0]+' '+y0+' ; contribution personnelle : '+csqFmt(CSQ_PART_FUT)+' CZK/mois = dernier versement) · simulation figée : 2026 : '+csqFmt(_sum(CSQ_PROJ_PLAN_2026))+' CZK, 2027 → '+PROJ_END+' : '+csqFmt(_sum(PLAN))+' CZK/an. '
       +'<strong>Fin '+PROJ_END+'</strong> : simulation actuelle <strong>'+csqFmt(proj.cen[i32])+' CZK</strong> · simulation figée '+csqFmt(CSQ_SIM_FROZEN.val[PROJ_END])+' CZK · investi '+csqFmt(projInv[i32])+' CZK. '
       +'Rendements réels / simulés indiqués sous chaque année. Simulation indicative, non garantie.'; }
   // Rendement sous chaque année : réel (années passées et en cours, même calcul que « Perf. annuelle ») + simulé
