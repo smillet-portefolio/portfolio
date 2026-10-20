@@ -1,0 +1,81 @@
+name: Infos portefeuille (lun-ven 7h00 et 18h30, Prague)
+
+# À placer dans le repo sous : .github/workflows/update-news.yml
+# Fichiers nécessaires à la racine du repo : news_prompt.md, update_news_gsheet.py
+# Secrets du repo (Settings → Secrets and variables → Actions) :
+#   CLAUDE_CODE_OAUTH_TOKEN  jeton de l'abonnement Claude (claude setup-token) — pas de frais API
+#   GOOGLE_SERVICE_ACCOUNT   déjà présent (utilisé par update-prices.yml)
+#
+# Déclencheurs :
+#   1) schedule : crons UTC doublés (heure d'été / d'hiver). La garde ne laisse passer que
+#      7h00-7h59 et 18h30-19h29 heure de Prague → une seule exécution par créneau.
+#   2) repository_dispatch (optionnel, à l'heure pile) : cron-job.org avec event_type
+#      "news_morning" / "news_evening", comme pour update-prices.yml.
+#   3) workflow_dispatch : lancement manuel (bouton « Run workflow »).
+
+on:
+  schedule:
+    - cron: '0 5 * * 1-5'    # 7h00 Prague en été  (6h00 en hiver → ignoré)
+    - cron: '0 6 * * 1-5'    # 7h00 Prague en hiver (8h00 en été  → ignoré)
+    - cron: '30 16 * * 1-5'  # 18h30 Prague en été  (17h30 en hiver → ignoré)
+    - cron: '30 17 * * 1-5'  # 18h30 Prague en hiver (19h30 en été  → ignoré)
+  repository_dispatch:
+    types: [news_morning, news_evening]
+  workflow_dispatch:
+
+concurrency:
+  group: update-news
+  cancel-in-progress: false
+
+jobs:
+  news:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Garde horaire (Prague)
+        id: guard
+        run: |
+          if [ "${{ github.event_name }}" != "schedule" ]; then echo "proceed=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          HM=$(TZ=Europe/Prague date +%H%M); echo "Prague $HM"
+          if { [ "$HM" -ge 0700 ] && [ "$HM" -lt 0800 ]; } || { [ "$HM" -ge 1830 ] && [ "$HM" -lt 1930 ]; }; then
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "proceed=false" >> "$GITHUB_OUTPUT"; echo "Hors créneau → ignoré"
+          fi
+
+      - name: Checkout
+        if: steps.guard.outputs.proceed == 'true'
+        uses: actions/checkout@v4
+
+      - name: Python
+        if: steps.guard.outputs.proceed == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Node
+        if: steps.guard.outputs.proceed == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        if: steps.guard.outputs.proceed == 'true'
+        run: |
+          pip install google-auth google-api-python-client
+          npm install -g @anthropic-ai/claude-code
+
+      - name: Résumé des actualités (Claude Code, abonnement) → onglet News
+        if: steps.guard.outputs.proceed == 'true'
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+          TZ: Europe/Prague
+        run: |
+          claude -p "$(cat news_prompt.md)" \
+            --allowedTools "WebSearch" "WebFetch" "Read" "Write" "Bash(python update_news_gsheet.py:*)" "Bash(date:*)" \
+            --max-turns 120
+
+      - name: Vérification
+        if: steps.guard.outputs.proceed == 'true'
+        run: test -s news_portefeuille.json && python -c "import json;d=json.load(open('news_portefeuille.json',encoding='utf-8'));print(len(d['stocks']),'titres')"
