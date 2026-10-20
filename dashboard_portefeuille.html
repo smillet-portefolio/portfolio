@@ -402,7 +402,11 @@
     <button class="tab" onclick="sw('jito',this)">🏦 Retraite Jito Conseq</button>
     <button class="tab" onclick="sw('immo',this)">🏠 Immobilier</button>
     <button class="tab" onclick="sw('enfants',this)">👶 Investissements enfants</button>
+    <button class="tab" onclick="sw('infos',this)">📰 Infos</button>
   </div>
+
+  <!-- ======== INFOS (actualités quotidiennes des actions détenues) ======== -->
+  <div id="infos" class="section"></div>
 
   <!-- ======== PATRIMOINE TOTAL ======== -->
   <div id="patrimoine" class="section"></div>
@@ -1359,6 +1363,7 @@ function sw(id, btn) {
   if (id === 'patrimoine')   setTimeout(renderPatrimoine, 50);
   if (id === 'immo')         setTimeout(renderImmo, 50);
   if (id === 'enfants')      setTimeout(renderEnfants, 50);
+  if (id === 'infos')        setTimeout(renderInfos, 50);
   if (id === 'dashboard') setTimeout(renderDashboard, 50);
   if (id === 'cash')         setTimeout(renderCashSection, 50);
   if (id === 'dividend')     setTimeout(renderDividendSection, 50);
@@ -5878,9 +5883,64 @@ function renderFxStrip() {
 }
 window.addEventListener('load', () => setTimeout(renderFxStrip, 600));
 
+// ══════════════════════════════════════════════════════════════════════════════
+// 📰 INFOS — résumé quotidien des actualités (48 h) des actions détenues (Seb + enfants)
+// Écrit chaque jour par la tâche planifiée (update_news_gsheet.py) dans l'onglet "News"
+// du Sheet ; lu ici et mis en cache local 'news_daily' (hors GS_KEYS : jamais réécrit).
+// ══════════════════════════════════════════════════════════════════════════════
+async function gsLoadNews() {
+  if (!_gsToken) return;
+  try {
+    const res = await gsRequest('GET', '/values/News!A:ZZ');
+    const rows = res.values || [];
+    const r = rows.find(x => x && x[0] === 'json');
+    if (r) { _gsRawSetItem('news_daily', r.slice(1).join('')); renderInfos(); }
+  } catch(e) { console.warn('gsLoadNews:', e); }
+}
+function _infEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function renderInfos() {
+  const el = document.getElementById('infos'); if (!el) return;
+  let N = null; try { N = JSON.parse(localStorage.getItem('news_daily') || 'null'); } catch(e) {}
+  const head = '<h2 style="font-size:18px;font-weight:700;margin:0 0 4px">📰 Infos — actions et cryptos détenues</h2>';
+  if (!N || !Array.isArray(N.stocks)) {
+    el.innerHTML = head + '<p class="section-desc">Aucun résumé disponible. Il est généré chaque jour par la tâche planifiée et lu depuis l\'onglet « News » du Google Sheet (connectez-vous à Google Sheets).</p>';
+    return;
+  }
+  const gen = N.generated_at ? new Date(N.generated_at).toLocaleString('fr', {weekday:'long', day:'2-digit', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '—';
+  const ICON = {pos:'🟢', neg:'🔴', neu:'⚪'};
+  const COL  = {pos:'#4caf82', neg:'#e06c6c', neu:'var(--text2)'};
+  const tone = s => { const p = (s.items||[]).filter(i => i.sentiment==='pos').length, n = (s.items||[]).filter(i => i.sentiment==='neg').length; return !(s.items||[]).length ? 'none' : (p>n?'pos':(n>p?'neg':'neu')); };
+  const order = {pos:0, neg:1, neu:2, none:3};
+  const stocks = N.stocks.slice().sort((a,b) => order[tone(a)]-order[tone(b)] || String(a.name).localeCompare(String(b.name)));
+  const card = s => {
+    const t = tone(s), items = s.items || [];
+    const owner = (s.owner||[]).map(o => '<span style="font-size:10px;border:1px solid var(--border2);border-radius:10px;padding:1px 7px;margin-left:4px;color:var(--text2)">'+_infEsc(o)+'</span>').join('');
+    const body = items.length ? '<ul style="margin:8px 0 0;padding-left:0;list-style:none">' + items.map(i =>
+        '<li style="margin:0 0 7px;font-size:12.5px;line-height:1.45"><span>'+(ICON[i.sentiment]||'⚪')+'</span> '+_infEsc(i.text)
+        + (i.url ? ' <a href="'+_infEsc(i.url)+'" target="_blank" rel="noopener" style="font-size:11px;color:var(--blue)">'+_infEsc(i.source||'source')+'</a>' : (i.source ? ' <span style="font-size:11px;color:var(--text2)">('+_infEsc(i.source)+')</span>' : ''))
+        + (i.date ? ' <span style="font-size:10px;color:var(--text2)">'+_infEsc(i.date)+'</span>' : '') + '</li>').join('') + '</ul>'
+      : '<div style="margin-top:8px;font-size:12px;color:var(--text2)"></div>';
+    return '<div class="card" style="padding:14px 16px;border-left:4px solid '+(t==='none'?'var(--border2)':COL[t])+'">'
+      + '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px"><strong style="font-size:14px">'+_infEsc(s.name)+'</strong>'
+      + '<span style="font-size:11px;color:var(--text2);margin-left:6px">'+_infEsc(s.ticker||'')+'</span>'+owner+'</div>'+body+'</div>';
+  };
+  const GRID = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px">';
+  const H3 = t => '<h3 style="font-size:14px;font-weight:700;margin:18px 0 10px">'+t+'</h3>';
+  const _act = stocks.filter(s => s.kind !== 'crypto'), _cry = stocks.filter(s => s.kind === 'crypto');
+  const cards = H3('📈 Actions') + GRID + _act.map(card).join('') + '</div>'
+    + (_cry.length ? H3('₿ Crypto') + GRID + _cry.map(card).join('') + '</div>' : '');
+  const agenda = (N.agenda||[]).length ? '<div class="card" style="padding:14px 16px;margin-top:16px"><p style="font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin:0 0 8px">📅 Prochaines publications</p>'
+      + N.agenda.map(a => '<div style="font-size:12.5px;margin:3px 0"><strong>'+_infEsc(a.date)+'</strong> — '+_infEsc(a.text)+'</div>').join('') + '</div>' : '';
+  el.innerHTML = head
+    + '<p class="section-desc" style="margin-bottom:16px">Actualités des <strong>dernières 48 h</strong> (presse économique française et internationale) — mise à jour du lundi au vendredi à 7h00 et 18h30 — résumé du <strong>'+_infEsc(gen)+'</strong>. Une action sans info reste vide. 🟢 positif · 🔴 négatif · ⚪ neutre. Synthèse indicative, pas un conseil en investissement.</p>'
+    + (N.summary ? '<div class="card" style="padding:14px 16px;margin-bottom:16px;font-size:13px;line-height:1.5">'+_infEsc(N.summary)+'</div>' : '')
+    + cards + agenda;
+}
+
 async function gsLoadPrices() {
   const status = document.getElementById('fetchStatus');
   if (!_gsToken) return;
+  gsLoadNews();
   if (status) status.innerHTML = `<span style="color:#60a5fa">⏳ Chargement des prix depuis Google Sheets...</span>`;
   try {
     const res  = await gsRequest('GET', '/values/Prices!A:L');
