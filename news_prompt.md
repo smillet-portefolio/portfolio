@@ -6,6 +6,12 @@ Prépare le résumé des actualités des actions et cryptos détenues par Sébas
 
 2. Pour CHAQUE titre, cherche avec WebSearch les actualités publiées dans les DERNIÈRES 48 HEURES uniquement (vérifie la date de chaque article ; ignore tout ce qui est plus ancien). Sources : presse économique française (Les Échos, Boursorama, Zonebourse, BFM Bourse, ABC Bourse, Investir, Le Revenu, AOF…) ET internationale (Reuters, Bloomberg, Financial Times, WSJ, CNBC, MarketWatch, Handelsblatt ; CoinDesk / The Block pour les cryptos). Privilégie les articles de presse aux notes boursières générées automatiquement. Fais des recherches en français et en anglais.
    Retiens pour chaque titre 0 à 4 faits marquants : résultats, prévisions, contrats, acquisitions, recommandations / objectifs d'analystes, mouvements de cours notables (avec leur raison), réglementation, litiges, dirigeants. Pour Bitcoin et Ethereum : prix et variation, flux ETF, régulation, événements de marché.
+   Méthode OBLIGATOIRE pour ne rien manquer — pour CHAQUE titre, fais AU MINIMUM ces 3 recherches séparées :
+     a) en anglais avec le nom ET le ticker : "<nom> <ticker> stock news <date du jour>" (ex. "Vistra VST stock news October 21 2026") ;
+     b) en anglais : "<nom> price target analyst" (relèvements / abaissements d'objectifs, changements de recommandation) ;
+     c) en français : "<nom> action bourse actualité" (ou en allemand pour les valeurs allemandes / autrichiennes : "<nom> Aktie").
+   Si un titre a varié de plus de ±3 % sur la séance, cherche spécifiquement la raison ("why <nom> stock up/down today") et indique-la.
+   Ne conclus à "aucune info" qu'après ces 3 recherches.
    Si aucune info dans les 48 h : "items": [] — n'invente rien, ne reprends pas d'anciennes infos.
 
 3. Écris avec l'outil Write le fichier news_portefeuille.json (UTF-8, dans le dossier courant) :
