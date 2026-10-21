@@ -7,20 +7,23 @@ name: Infos portefeuille (lun-ven 7h00 et 18h30, Prague)
 #   GOOGLE_SERVICE_ACCOUNT   déjà présent (utilisé par update-prices.yml)
 #
 # Déclencheurs :
-#   1) schedule : crons UTC doublés (heure d'été / d'hiver). La garde ne laisse passer que
-#      7h00-7h59 et 18h30-19h29 heure de Prague → une seule exécution par créneau.
-#   2) repository_dispatch (optionnel, à l'heure pile) : cron-job.org avec event_type
-#      "news_morning" / "news_evening", comme pour update-prices.yml.
-#   3) workflow_dispatch : lancement manuel (bouton « Run workflow »).
+#   1) repository_dispatch (PRINCIPAL, à l'heure pile) : cron-job.org à 7h00 et 18h30 heure de Prague,
+#      event_type "news_morning" / "news_evening" (même principe que update-prices.yml).
+#   2) schedule (SECOURS) : GitHub retarde souvent ses crons de plusieurs heures. Plusieurs crons UTC ;
+#      `update_news_gsheet.py --should-run` ne lance l'édition que si celle du créneau en cours
+#      (matin dès 7h00, soir dès 18h30, Prague) n'a pas encore été faite → jamais de doublon.
+#   3) workflow_dispatch : lancement manuel (bouton « Run workflow »), toujours exécuté.
 
 on:
-  schedule:
-    - cron: '0 5 * * 1-5'    # 7h00 Prague en été  (6h00 en hiver → ignoré)
-    - cron: '0 6 * * 1-5'    # 7h00 Prague en hiver (8h00 en été  → ignoré)
-    - cron: '30 16 * * 1-5'  # 18h30 Prague en été  (17h30 en hiver → ignoré)
-    - cron: '30 17 * * 1-5'  # 18h30 Prague en hiver (19h30 en été  → ignoré)
   repository_dispatch:
     types: [news_morning, news_evening]
+  schedule:
+    - cron: '5 5 * * 1-5'     # ≈ 7h05 Prague (été) / 6h05 (hiver → rien à faire)
+    - cron: '5 6 * * 1-5'     # ≈ 7h05 Prague (hiver) / 8h05 (été, rattrapage)
+    - cron: '5 8 * * 1-5'     # rattrapage matin
+    - cron: '35 16 * * 1-5'   # ≈ 18h35 Prague (été) / 17h35 (hiver → rien à faire)
+    - cron: '35 17 * * 1-5'   # ≈ 18h35 Prague (hiver) / 19h35 (été, rattrapage)
+    - cron: '35 19 * * 1-5'   # rattrapage soir
   workflow_dispatch:
 
 concurrency:
@@ -32,26 +35,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
-      - name: Garde horaire (Prague)
-        id: guard
-        run: |
-          if [ "${{ github.event_name }}" != "schedule" ]; then echo "proceed=true" >> "$GITHUB_OUTPUT"; exit 0; fi
-          HM=$(TZ=Europe/Prague date +%H%M); echo "Prague $HM"
-          if { [ "$HM" -ge 0700 ] && [ "$HM" -lt 0800 ]; } || { [ "$HM" -ge 1830 ] && [ "$HM" -lt 1930 ]; }; then
-            echo "proceed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "proceed=false" >> "$GITHUB_OUTPUT"; echo "Hors créneau → ignoré"
-          fi
-
       - name: Checkout
-        if: steps.guard.outputs.proceed == 'true'
         uses: actions/checkout@v4
 
       - name: Python
-        if: steps.guard.outputs.proceed == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: pip install google-auth google-api-python-client
+
+      - name: Édition à faire ?
+        id: guard
+        env:
+          GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+        run: |
+          echo "Prague : $(TZ=Europe/Prague date '+%a %d/%m %H:%M') — déclencheur ${{ github.event_name }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then P=true; else P=$(python update_news_gsheet.py --should-run); fi
+          echo "proceed=$P" >> "$GITHUB_OUTPUT"; echo "proceed=$P"
 
       - name: Node
         if: steps.guard.outputs.proceed == 'true'
@@ -59,11 +61,9 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install dependencies
+      - name: Install Claude Code
         if: steps.guard.outputs.proceed == 'true'
-        run: |
-          pip install google-auth google-api-python-client
-          npm install -g @anthropic-ai/claude-code
+        run: npm install -g @anthropic-ai/claude-code
 
       - name: Résumé des actualités (Claude Code, abonnement) → onglet News
         if: steps.guard.outputs.proceed == 'true'
