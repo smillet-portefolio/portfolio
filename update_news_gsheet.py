@@ -58,7 +58,28 @@ def write(path=None, data=None):
     print(f"✅ Onglet {TAB} mis à jour ({len(data.get('stocks', []))} actions, {len(s)} caractères)")
 
 
+def should_run():
+    """Affiche true/false : l'édition du créneau en cours (matin dès 7h00, soir dès 18h30, Prague) reste-t-elle à faire ?
+    Permet de rattraper un déclenchement GitHub en retard sans jamais faire deux éditions par créneau."""
+    from zoneinfo import ZoneInfo
+    tz = ZoneInfo("Europe/Prague")
+    now = datetime.datetime.now(tz)
+    if now.weekday() >= 5: print("false"); return                       # week-end
+    m_start = now.replace(hour=7, minute=0, second=0, microsecond=0)
+    e_start = now.replace(hour=18, minute=30, second=0, microsecond=0)
+    slot = e_start if now >= e_start else (m_start if now >= m_start else None)
+    if slot is None: print("false"); return                              # avant 7h00
+    last = None
+    try:
+        v = svc().values().get(spreadsheetId=SHEET_ID, range=f"{TAB}!A1:B1").execute().get("values", [])
+        if v and len(v[0]) > 1: last = datetime.datetime.fromisoformat(v[0][1]).astimezone(tz)
+    except Exception:
+        pass
+    print("true" if (last is None or last < slot) else "false")
+
+
 if __name__ == "__main__":
-    if "--holdings" in sys.argv: holdings()
+    if "--should-run" in sys.argv: should_run()
+    elif "--holdings" in sys.argv: holdings()
     elif "--write" in sys.argv: write(sys.argv[sys.argv.index("--write") + 1])
     else: print(__doc__ or "usage: --holdings | --write file.json")
