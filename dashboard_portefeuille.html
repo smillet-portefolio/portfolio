@@ -5912,6 +5912,19 @@ function renderInfos() {
   const tone = s => { const p = (s.items||[]).filter(i => i.sentiment==='pos').length, n = (s.items||[]).filter(i => i.sentiment==='neg').length; return !(s.items||[]).length ? 'none' : (p>n?'pos':(n>p?'neg':'neu')); };
   const order = {pos:0, neg:1, neu:2, none:3};
   const stocks = N.stocks.slice().sort((a,b) => order[tone(a)]-order[tone(b)] || String(a.name).localeCompare(String(b.name)));
+  // Cours actuel + variation du jour (onglet Prices du Sheet : CURRENT_PRICES / CURRENT_VARIATIONS)
+  const _sym = c => ({EUR:'€', USD:'$', GBP:'£', GBp:'p', CZK:'Kč', CHF:'CHF', HKD:'HK$'}[c] || c || '');
+  const quote = s => {
+    const tk = s.ticker || '';
+    const p = (typeof CURRENT_PRICES !== 'undefined') ? (CURRENT_PRICES[tk] || CURRENT_PRICES[s.isin]) : null;
+    if (!p || !(p.price > 0)) return '';
+    const v = (typeof CURRENT_VARIATIONS !== 'undefined') ? (CURRENT_VARIATIONS[tk] || CURRENT_VARIATIONS[s.isin] || {}) : {};
+    const d = v['1D'], ytd = v['YTD'];
+    const px = p.price.toLocaleString('fr', p.price >= 1000 ? {maximumFractionDigits: 0} : {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ' + _sym(p.currency);
+    const pct = (x, lab) => x == null ? '' : '<span style="color:'+(x>=0?'#4caf82':'#e06c6c')+';font-weight:600" title="'+lab+'">'+(x>=0?'+':'')+x.toFixed(2).replace('.',',')+' %</span><span style="font-size:10px;color:var(--text2)"> '+lab+'</span>';
+    return '<span style="margin-left:auto;font-size:12px;white-space:nowrap;display:inline-flex;gap:8px;align-items:baseline">'
+      + '<span class="mono" style="font-weight:600">'+px+'</span>' + pct(d, '1 j') + (ytd != null ? pct(ytd, 'YTD') : '') + '</span>';
+  };
   const card = s => {
     const t = tone(s), items = s.items || [];
     const owner = (s.owner||[]).map(o => '<span style="font-size:10px;border:1px solid var(--border2);border-radius:10px;padding:1px 7px;margin-left:4px;color:var(--text2)">'+_infEsc(o)+'</span>').join('');
@@ -5922,7 +5935,7 @@ function renderInfos() {
       : '<div style="margin-top:8px;font-size:12px;color:var(--text2)"></div>';
     return '<div class="card" style="padding:14px 16px;border-left:4px solid '+(t==='none'?'var(--border2)':COL[t])+'">'
       + '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px"><strong style="font-size:14px">'+_infEsc(s.name)+'</strong>'
-      + '<span style="font-size:11px;color:var(--text2);margin-left:6px">'+_infEsc(s.ticker||'')+'</span>'+owner+'</div>'+body+'</div>';
+      + '<span style="font-size:11px;color:var(--text2);margin-left:6px">'+_infEsc(s.ticker||'')+'</span>'+owner+quote(s)+'</div>'+body+'</div>';
   };
   const GRID = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px">';
   const H3 = t => '<h3 style="font-size:14px;font-weight:700;margin:18px 0 10px">'+t+'</h3>';
@@ -6030,6 +6043,7 @@ async function gsLoadPrices() {
     if (CURRENT_PRICES['SCOJ.DE'] && !CURRENT_PRICES['SC0J.DE']) CURRENT_PRICES['SC0J.DE'] = { ...CURRENT_PRICES['SCOJ.DE'], source:'alias' };
     if (typeof CURRENT_VARIATIONS!=='undefined' && CURRENT_VARIATIONS['SCOJ.DE'] && !CURRENT_VARIATIONS['SC0J.DE']) CURRENT_VARIATIONS['SC0J.DE'] = CURRENT_VARIATIONS['SCOJ.DE'];
     if (typeof gsApplyConseqNav === 'function') gsApplyConseqNav();
+    try { if (typeof renderInfos === 'function') renderInfos(); } catch(e) {}   // cours + perf dans l'onglet Infos
 
     const portfolioTickers = [...new Set(BOOK2_ROWS.map(r => r.ticker))];
     let matched = 0, unmatched = [];
