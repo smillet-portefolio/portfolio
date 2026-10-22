@@ -2,7 +2,7 @@ Prépare le résumé des actualités des actions, cryptos et marchés des ETF d�
 
 1. Liste des titres suivis : exécute
    python update_news_gsheet.py --holdings
-   Il renvoie un JSON [{name, ticker, isin, kind ("action" ou "crypto"), owner}] lu en lecture seule depuis le Google Sheet. Suis exactement ces titres (pas d'ETF). Exécute aussi `date` (fuseau Europe/Prague) pour connaître la date et l'heure.
+   Il renvoie un JSON [{name, ticker, isin, kind ("action" ou "crypto"), owner, var_1d_pct, var_ytd_pct}] lu en lecture seule depuis le Google Sheet (var_1d_pct = variation de la dernière séance en %). Suis exactement ces titres (pas d'ETF). Exécute aussi `date` (fuseau Europe/Prague) pour connaître la date et l'heure.
 
 2. Pour CHAQUE titre, cherche avec WebSearch les actualités publiées dans les DERNIÈRES 48 HEURES uniquement (vérifie la date de chaque article ; ignore tout ce qui est plus ancien). Sources : presse économique française (Les Échos, Boursorama, Zonebourse, BFM Bourse, ABC Bourse, Investir, Le Revenu, AOF…) ET internationale (Reuters, Bloomberg, Financial Times, WSJ, CNBC, MarketWatch, Handelsblatt ; CoinDesk / The Block pour les cryptos). Privilégie les articles de presse aux notes boursières générées automatiquement. Fais des recherches en français et en anglais.
    Retiens pour chaque titre 0 à 4 faits marquants : résultats, prévisions, contrats, acquisitions, recommandations / objectifs d'analystes, mouvements de cours notables (avec leur raison), réglementation, litiges, dirigeants. Pour Bitcoin et Ethereum : prix et variation, flux ETF, régulation, événements de marché.
@@ -10,9 +10,18 @@ Prépare le résumé des actualités des actions, cryptos et marchés des ETF d�
      a) en anglais avec le nom ET le ticker : "<nom> <ticker> stock news <date du jour>" (ex. "Vistra VST stock news October 21 2026") ;
      b) en anglais : "<nom> price target analyst" (relèvements / abaissements d'objectifs, changements de recommandation) ;
      c) en français : "<nom> action bourse actualité" (ou en allemand pour les valeurs allemandes / autrichiennes : "<nom> Aktie").
-   Si un titre a varié de plus de ±3 % sur la séance, cherche spécifiquement la raison ("why <nom> stock up/down today") et indique-la.
+   RÈGLE STRICTE : tout titre dont |var_1d_pct| ≥ 3 ne peut PAS rester avec "items": [] — cherche spécifiquement la raison
+   ("why <nom> stock up/down today", "<nom> action chute / bondit", "<nom> Aktie fällt / steigt") et indique au moins un fait
+   expliquant le mouvement (même s'il s'agit d'un mouvement de secteur ou de marché, dis-le).
+   N'oublie pas non plus les suites d'un événement récent encore dans la fenêtre de 48 h (réaction du cours, révisions
+   d'objectifs des analystes dans les jours qui suivent une annonce, une augmentation de capital ou des résultats).
    Ne conclus à "aucune info" qu'après ces 3 recherches.
    Si aucune info dans les 48 h : "items": [] — n'invente rien, ne reprends pas d'anciennes infos.
+
+   Exécute aussi `python update_news_gsheet.py --previous` : il liste les infos DÉJÀ publiées pour chaque titre / thème.
+   Ne les répète pas (même fait, même s'il est reformulé ou vient d'une autre source) ; n'ajoute que des faits NOUVEAUX.
+   Le script de publication fusionne automatiquement : il conserve les anciennes infos et ne garde que les 4 plus récentes
+   par carte (les plus anciennes sont retirées en premier). Une carte sans nouveauté garde donc ses infos précédentes.
 
 2 bis. Marchés & ETF : exécute
    python update_news_gsheet.py --etf-themes
@@ -38,7 +47,8 @@ Prépare le résumé des actualités des actions, cryptos et marchés des ETF d�
               "fund_events": [ {"etf": "<nom de l'ETF>", "text": "<événement propre au fonds>", "source": "...", "url": "...", "date": "JJ/MM"} ] } ],
  "agenda": [ {"date": "JJ/MM", "text": "<titre ou événement de marché (BCE, Fed…)> — <à venir dans les 15 prochains jours>"} ]
 }
-   Un objet par titre de l'étape 1, dans le même ordre, y compris ceux sans info (items vide).
+   Un objet par titre de l'étape 1, dans le même ordre, y compris ceux sans info nouvelle (items vide : les anciennes infos sont conservées automatiquement).
+   Dans "items", ne mets QUE les faits nouveaux de cette édition (pas ceux listés par --previous).
    Un objet par thème de l'étape 2 bis, dans le même ordre, y compris ceux sans info (items et fund_events vides).
    Le "summary" peut citer un fait de marché important (Fed, BCE…) s'il concerne fortement les ETF.
 

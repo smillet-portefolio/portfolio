@@ -84,14 +84,98 @@ def holdings(as_list=False):
         k = (r.get("isin") or r.get("ticker") or "").upper()
         o = out.setdefault(k, {"name": r.get("nom"), "ticker": r.get("ticker"), "isin": r.get("isin"), "kind": "action", "owner": []})
         if r.get("e") and r.get("e") not in o["owner"]: o["owner"].append(r.get("e"))
+    # Variation du jour / YTD (onglet Prices) : permet de repérer les mouvements de ±3 % à expliquer
+    try:
+        pr = svc().values().get(spreadsheetId=SHEET_ID, range="Prices!A:L").execute().get("values", [])
+        hdr = pr[0]; i1, iy = hdr.index("1D"), hdr.index("YTD")
+        var = {r[0]: r for r in pr[1:] if r}
+        for o in out.values():
+            r = var.get(o["ticker"])
+            if r:
+                o["var_1d_pct"] = float(r[i1]) if len(r) > i1 and r[i1] not in ("", None) else None
+                o["var_ytd_pct"] = float(r[iy]) if len(r) > iy and r[iy] not in ("", None) else None
+    except Exception:
+        pass
     lst = sorted(out.values(), key=lambda x: (x["kind"], (x["name"] or "").lower()))
     if as_list: return lst
     print(json.dumps(lst, ensure_ascii=False, indent=1))
 
 
-def write(path=None, data=None):
+MAX_ITEMS = 4          # infos conservées par carte (action / crypto / thème ETF)
+MAX_EVENTS = 3         # événements « fonds » conservés par thème
+
+
+def read_current():
+    """Édition actuellement publiée dans l'onglet News (dict) ou None."""
+    try:
+        v = svc().values().get(spreadsheetId=SHEET_ID, range=f"{TAB}!A:ZZ").execute().get("values", [])
+        r = next((x for x in v if x and x[0] == "json"), None)
+        return json.loads("".join(r[1:])) if r else None
+    except Exception:
+        return None
+
+
+def _item_date(i, ref):
+    """Date d'une info : champ "date" JJ/MM (année déduite de la date de l'édition) ; à défaut, date d'ajout."""
+    try:
+        dd, mm = [int(x) for x in str(i.get("date", "")).split("/")[:2]]
+        d = datetime.date(ref.year, mm, dd)
+        if d > ref + datetime.timedelta(days=2): d = d.replace(year=ref.year - 1)
+        return d
+    except Exception:
+        try: return datetime.datetime.fromisoformat(i.get("added")).date()
+        except Exception: return datetime.date.min
+
+
+def _norm(t):
+    return " ".join(str(t or "").lower().split())[:120]
+
+
+def _merge(new, old, ref, cap, gen):
+    """Nouvelles infos + anciennes, sans doublon (même lien ou même texte), triées de la plus récente à la plus
+    ancienne, limitées à `cap` : les plus anciennes sont retirées en premier. Jamais de remise à zéro."""
+    out, seen = [], set()
+    for i in (new or []):
+        i.setdefault("added", gen)
+    for i in sorted((new or []) + (old or []), key=lambda i: (_item_date(i, ref), i.get("added", "")), reverse=True):
+        k = (i.get("url") or "").strip() or _norm(i.get("text"))
+        k2 = _norm(i.get("text"))
+        if k in seen or k2 in seen: continue
+        seen.update({k, k2}); out.append(i)
+    return out[:cap]
+
+
+def merge_with_previous(data):
+    prev = read_current()
+    if not prev: return data
+    gen = data["generated_at"]
+    ref = datetime.datetime.fromisoformat(gen).date()
+    p_st = {s.get("ticker") or s.get("name"): s for s in prev.get("stocks", [])}
+    for s in data.get("stocks", []):
+        o = p_st.get(s.get("ticker") or s.get("name"), {})
+        s["items"] = _merge(s.get("items"), o.get("items"), ref, MAX_ITEMS, gen)
+    p_th = {t.get("key"): t for t in prev.get("themes", [])}
+    for t in data.get("themes", []):
+        o = p_th.get(t.get("key"), {})
+        t["items"] = _merge(t.get("items"), o.get("items"), ref, MAX_ITEMS, gen)
+        # événements « fonds » : conservés 30 jours maximum
+        ev = _merge(t.get("fund_events"), o.get("fund_events"), ref, MAX_EVENTS, gen)
+        t["fund_events"] = [e for e in ev if _item_date(e, ref) >= ref - datetime.timedelta(days=30)]
+    return data
+
+
+def previous():
+    """Affiche les infos déjà publiées (par ticker / thème), pour éviter de les répéter."""
+    prev = read_current() or {}
+    out = {"stocks": {s.get("ticker"): [i.get("text") for i in s.get("items", [])] for s in prev.get("stocks", [])},
+           "themes": {t.get("key"): [i.get("text") for i in t.get("items", [])] for t in prev.get("themes", [])}}
+    print(json.dumps(out, ensure_ascii=False, indent=1))
+
+
+def write(path=None, data=None, merge=True):
     if data is None: data = json.load(open(path, encoding="utf-8"))
     data.setdefault("generated_at", datetime.datetime.now().astimezone().isoformat(timespec="minutes"))
+    if merge: data = merge_with_previous(data)
     s = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
     api = svc(write=True)
     try:
@@ -129,5 +213,6 @@ if __name__ == "__main__":
     if "--should-run" in sys.argv: should_run()
     elif "--holdings" in sys.argv: holdings()
     elif "--etf-themes" in sys.argv: etf_themes()
+    elif "--previous" in sys.argv: previous()
     elif "--write" in sys.argv: write(sys.argv[sys.argv.index("--write") + 1])
     else: print(__doc__ or "usage: --holdings | --write file.json")
