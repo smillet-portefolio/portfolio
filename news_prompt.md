@@ -1,4 +1,4 @@
-Prépare le résumé des actualités des actions et cryptos détenues par Sébastien (et ses enfants) et publie-le dans l'onglet « News » de son Google Sheet, lu par l'onglet 📰 Infos de son dashboard financier. Tout le texte produit doit être en FRANÇAIS. Travaille de façon autonome, sans poser de question.
+Prépare le résumé des actualités des actions, cryptos et marchés des ETF détenus par Sébastien (et ses enfants) et publie-le dans l'onglet « News » de son Google Sheet, lu par l'onglet 📰 Infos de son dashboard financier. Tout le texte produit doit être en FRANÇAIS. Travaille de façon autonome, sans poser de question.
 
 1. Liste des titres suivis : exécute
    python update_news_gsheet.py --holdings
@@ -14,17 +14,35 @@ Prépare le résumé des actualités des actions et cryptos détenues par Sébas
    Ne conclus à "aucune info" qu'après ces 3 recherches.
    Si aucune info dans les 48 h : "items": [] — n'invente rien, ne reprends pas d'anciennes infos.
 
+2 bis. Marchés & ETF : exécute
+   python update_news_gsheet.py --etf-themes
+   Il renvoie les ETF / fonds détenus regroupés par THÈME de marché : [{key, label, scope, etfs:[{name, ticker, isin, owner}]}].
+   Pour CHAQUE thème (pas pour chaque ETF), cherche les actualités des DERNIÈRES 48 HEURES sur le marché ou le thème décrit
+   par "scope" (au minimum 2 recherches : une en anglais, une en français ; ex. "Athens stock exchange Greek banks news",
+   "uranium price news", "Bovespa Brazil stocks today", "marchés émergents actualité"). Retiens 0 à 3 faits marquants qui expliquent
+   l'évolution de ces ETF : décisions de banques centrales, chiffres macro, mouvements de l'indice et leur raison, événements
+   politiques, prix des matières premières, flux.
+   Fais aussi UNE recherche par ETF sur les événements propres au fonds (fusion, fermeture, changement d'indice ou de nom,
+   baisse de frais, dividende) : ex. "<nom de l'ETF> ISIN <isin>". Ne les signale QUE s'ils datent de moins de 30 jours ;
+   sinon n'en parle pas.
+
 3. Écris avec l'outil Write le fichier news_portefeuille.json (UTF-8, dans le dossier courant) :
 {
  "generated_at": "<date-heure ISO de Prague, ex. 2026-10-21T07:05+02:00>",
- "summary": "<2-3 phrases : les faits les plus importants pour le portefeuille>",
+ "summary": "<2-3 phrases : les faits les plus importants pour les titres et ETF dont owner contient \"Seb\">",
+ "summary_kids": "<2-3 phrases : les faits les plus importants pour les titres et ETF détenus par les enfants (owner = Estelle, Léandre ou Corentin)>",
  "stocks": [ {"name": "...", "ticker": "...", "kind": "action|crypto", "owner": [...repris de l'étape 1...],
               "items": [ {"sentiment": "pos|neg|neu", "text": "<1-2 phrases, chiffres précis>", "source": "<média>", "url": "<lien de l'article>", "date": "JJ/MM"} ] } ],
- "agenda": [ {"date": "JJ/MM", "text": "<titre> — <publication à venir dans les 15 prochains jours>"} ]
+ "themes": [ {"key": "...", "label": "...", "etfs": [...repris tels quels de l'étape 2 bis...],
+              "items": [ {"sentiment": "pos|neg|neu", "text": "...", "source": "...", "url": "...", "date": "JJ/MM"} ],
+              "fund_events": [ {"etf": "<nom de l'ETF>", "text": "<événement propre au fonds>", "source": "...", "url": "...", "date": "JJ/MM"} ] } ],
+ "agenda": [ {"date": "JJ/MM", "text": "<titre ou événement de marché (BCE, Fed…)> — <à venir dans les 15 prochains jours>"} ]
 }
    Un objet par titre de l'étape 1, dans le même ordre, y compris ceux sans info (items vide).
+   Un objet par thème de l'étape 2 bis, dans le même ordre, y compris ceux sans info (items et fund_events vides).
+   Le "summary" peut citer un fait de marché important (Fed, BCE…) s'il concerne fortement les ETF.
 
 4. Publie : python update_news_gsheet.py --write news_portefeuille.json
    Le script n'écrit QUE dans l'onglet « News ». Ne modifie aucun autre fichier.
 
-5. Termine par un court compte rendu : nombre de titres avec actualité, les 3 faits principaux. Synthèse indicative, pas un conseil en investissement.
+5. Termine par un court compte rendu : nombre de titres et de thèmes avec actualité, les 3 faits principaux. Synthèse indicative, pas un conseil en investissement.
