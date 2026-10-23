@@ -5982,8 +5982,38 @@ function renderInfosInto(el, scope) {
   const cards = (_act.length ? H3('📈 Actions') + GRID + _act.map(card).join('') + '</div>' : '')
     + (_cry.length ? H3('₿ Crypto') + GRID + _cry.map(card).join('') + '</div>' : '')
     + (_th.length ? H3('🌍 Marchés & ETF') + GRID + _th.map(themeCard).join('') + '</div>' : '');
-  const agenda = (N.agenda||[]).length ? '<div class="card" style="padding:14px 16px;margin-top:16px"><p style="font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin:0 0 8px">📅 Prochaines publications</p>'
-      + N.agenda.map(a => '<div style="font-size:12.5px;margin:3px 0"><strong>'+_infEsc(a.date)+'</strong> — '+_infEsc(a.text)+'</div>').join('') + '</div>' : '';
+  // 📅 Prochaines publications de résultats des actions détenues : agenda de la veille (pub.last / pub.next, confirmé ou estimé)
+  // complété par Yahoo Finance (onglet Dividends_Cal). Publication passée sans nouvelle date -> date estimée (dernière + intervalle).
+  const DC = (typeof _divCal === 'function') ? _divCal() : null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const td = today.toISOString().slice(0,10);
+  const fD = s => s ? new Date(s + 'T00:00:00').toLocaleDateString('fr', {weekday:'short', day:'2-digit', month:'short', year:'numeric'}) : '—';
+  const pubRows = N.stocks.filter(s => s.kind !== 'crypto').map(s => {
+    const y = DC && DC.items ? (DC.items[s.ticker] || {}) : {}, p = s.pub || {};
+    let last = null;
+    [[p.last && p.last.date, p.last && p.last.label], [y.last_earn, 'Résultats']].forEach(([d, l]) => { if (d && d <= td && (!last || d > last.d)) last = {d, l: l || 'Publication'}; });
+    let next = null;
+    if (p.next && p.next.date && p.next.date >= td) next = {d: p.next.date, l: p.next.label || 'Publication', st: /confirm/i.test(p.next.status||'') ? 'confirmée' : 'estimée'};
+    if (y.next_earn && y.next_earn >= td && (!next || y.next_earn < next.d && next.st !== 'confirmée'))
+      next = {d: y.next_earn, l: 'Résultats', st: y.next_earn_src === 'yahoo' ? 'prévue (Yahoo)' : 'estimée'};
+    if (!next && last) {   // publication passée, pas de nouvelle date connue -> estimation à +3 mois
+      const e = new Date(last.d + 'T00:00:00'); do { e.setMonth(e.getMonth() + 3); } while (e < today);
+      next = {d: e.toISOString().slice(0,10), l: 'Prochaine publication', st: 'estimée'};
+    }
+    return {s, last, next};
+  }).sort((a, b) => (a.next ? a.next.d : '9999').localeCompare(b.next ? b.next.d : '9999'));
+  const stCol = st => st === 'confirmée' ? '#4caf82' : (st === 'estimée' ? '#e8a838' : '#5a8dee');
+  const pubTable = pubRows.length ? '<div class="card" style="padding:14px 16px;margin-top:16px"><p style="font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin:0 0 8px">📅 Prochaines publications des actions détenues</p>'
+    + '<div style="overflow-x:auto"><table><thead><tr><th>Titre</th><th>Prochaine publication</th><th>Dans</th><th>Statut</th><th>Dernière publication</th></tr></thead><tbody>'
+    + pubRows.map(r => { const n = r.next, days = n ? Math.round((new Date(n.d + 'T00:00:00') - today) / 864e5) : null;
+        return '<tr><td><strong>' + _infEsc(r.s.name) + '</strong> <span style="font-size:11px;color:var(--text2)">' + _infEsc(r.s.ticker||'') + '</span></td>'
+          + '<td>' + (n ? fD(n.d) + ' <span style="font-size:11px;color:var(--text2)">— ' + _infEsc(n.l) + '</span>' : '—') + '</td>'
+          + '<td class="mono">' + (days == null ? '—' : days === 0 ? "aujourd'hui" : days + ' j') + '</td>'
+          + '<td>' + (n ? '<span style="font-size:10.5px;border:1px solid ' + stCol(n.st) + ';color:' + stCol(n.st) + ';border-radius:10px;padding:1px 8px">' + n.st + '</span>' : '') + '</td>'
+          + '<td style="font-size:12px;color:var(--text2)">' + (r.last ? fD(r.last.d) + ' — ' + _infEsc(r.last.l) : '—') + '</td></tr>'; }).join('')
+    + '</tbody></table></div><p style="font-size:10.5px;color:var(--text2);margin:6px 0 0">confirmée = date publiée par la société · prévue (Yahoo) = date annoncée par Yahoo Finance · estimée = déduite de la dernière publication (à confirmer).</p></div>' : '';
+  const agenda = pubTable + ((N.agenda||[]).length ? '<div class="card" style="padding:14px 16px;margin-top:16px"><p style="font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin:0 0 8px">📅 Autres événements à venir</p>'
+      + N.agenda.map(a => '<div style="font-size:12.5px;margin:3px 0"><strong>'+_infEsc(a.date)+'</strong> — '+_infEsc(a.text)+'</div>').join('') + '</div>' : '');
   el.innerHTML = head
     + '<p class="section-desc" style="margin-bottom:16px">Actualités des <strong>dernières 48 h</strong> (presse économique française et internationale) — mise à jour du lundi au vendredi à 7h00 et 18h30 — résumé du <strong>'+_infEsc(gen)+'</strong>. Une action sans info reste vide. 🟢 positif · 🔴 négatif · ⚪ neutre. Synthèse indicative, pas un conseil en investissement.</p>'
     + (N.summary ? '<div class="card" style="padding:14px 16px;margin-bottom:16px;font-size:13px;line-height:1.5">'+_infEsc(N.summary)+'</div>' : '')
@@ -5994,6 +6024,7 @@ async function gsLoadPrices() {
   const status = document.getElementById('fetchStatus');
   if (!_gsToken) return;
   gsLoadNews();
+  if (typeof gsLoadDivCal === 'function') gsLoadDivCal();
   if (status) status.innerHTML = `<span style="color:#60a5fa">⏳ Chargement des prix depuis Google Sheets...</span>`;
   try {
     const res  = await gsRequest('GET', '/values/Prices!A:L');
@@ -7030,13 +7061,17 @@ function divSave(){ try{ localStorage.setItem('dividend_data', JSON.stringify(DI
   sec.innerHTML =
     '<h2 style="font-size:18px;font-weight:700;margin:0 0 4px">💸 Dividendes</h2>'+
     '<p class="section-desc" style="margin-bottom:16px">Dividendes encaissés — bruts, taxes et nets, convertis en euros.</p>'+
+    '<div class="sub-tabs" style="margin-bottom:16px"><button class="sub-tab active" data-dv="hist" onclick="divSwitchView(\'hist\')">📋 Historique</button><button class="sub-tab" data-dv="proj" onclick="divSwitchView(\'proj\')">📅 Projections 12 mois</button></div>'+
+    '<div id="div_view_proj" style="display:none"></div>'+
+    '<div id="div_view_hist">'+
     '<div id="div_kpis" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px"></div>'+
     '<div style="margin-bottom:12px"><button onclick="divOpenAdd()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer">+ Ajouter un dividende</button></div>'+
     '<h3 style="font-size:14px;font-weight:700;margin:4px 0 10px">Dividende net par année</h3>'+
     '<div class="chart-wrap" style="height:300px;margin-bottom:24px"><canvas id="divYearChart"></canvas></div>'+
     '<div style="max-height:70vh;overflow:auto"><table id="divTable"><thead><tr>'+
       _divTh('date','Date')+_divTh('broker','Broker')+_divTh('name','Description')+_divTh('ticker','Ticker')+_divTh('isin','ISIN')+_divTh('brutEur','Brut €')+_divTh('taxeEur','Taxe €')+_divTh('netEur','Net €')+'<th></th>'+
-    '</tr></thead><tbody id="divTableBody"></tbody></table></div>';
+    '</tr></thead><tbody id="divTableBody"></tbody></table></div>'+
+    '</div>';
   wrapper.appendChild(sec);
 
   const modal=document.createElement('div'); modal.id='divModal';
@@ -7065,6 +7100,122 @@ function divSave(){ try{ localStorage.setItem('dividend_data', JSON.stringify(DI
   document.body.appendChild(modal);
   renderDividendSection();
 })();
+
+// ── 📅 Projections : dividendes estimés des 12 prochains mois roulants ─────────────────────────────
+// Source : onglet "Dividends_Cal" du Sheet (update_dividends_gsheet.py, Yahoo Finance) mis en cache 'div_cal'.
+// Méthode, par titre détenu (positions actuelles × dividende par action) :
+//   • chaque dividende détaché sur les 12 derniers mois est reconduit à la même date un an plus tard ;
+//   • montant par action = le DERNIER montant versé pour les payeurs trimestriels / mensuels (≥ 4 / an),
+//     sinon le montant de l'échéance correspondante de l'an passé (acompte / solde) ;
+//   • si Yahoo annonce une prochaine date de détachement, elle remplace la date estimée la plus proche.
+//   Net estimé = brut × (net / brut constaté sur l'historique de ce titre, sinon moyenne de l'historique).
+var _divView = 'hist';
+function divSwitchView(v){
+  _divView = v === 'proj' ? 'proj' : 'hist';
+  document.querySelectorAll('#dividend .sub-tabs .sub-tab').forEach(b => b.classList.toggle('active', b.dataset.dv === _divView));
+  const h = document.getElementById('div_view_hist'), p = document.getElementById('div_view_proj');
+  if (h) h.style.display = _divView === 'hist' ? '' : 'none';
+  if (p) p.style.display = _divView === 'proj' ? '' : 'none';
+  if (_divView === 'proj') renderDivProjections();
+}
+async function gsLoadDivCal(){
+  if (!_gsToken) return;
+  try {
+    const res = await gsRequest('GET', '/values/Dividends_Cal!A:ZZ');
+    const r = (res.values || []).find(x => x && x[0] === 'json');
+    if (r) { _gsRawSetItem('div_cal', r.slice(1).join('')); if (_divView === 'proj') renderDivProjections(); if (typeof renderInfos === 'function') renderInfos(); }
+  } catch(e) { console.warn('gsLoadDivCal:', e); }
+}
+function _divCal(){ try { return JSON.parse(localStorage.getItem('div_cal') || 'null'); } catch(e) { return null; } }
+function divProjCompute(){
+  const DC = _divCal(); if (!DC || !DC.items) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const end = new Date(today); end.setFullYear(end.getFullYear() + 1);
+  const iso = d => d.toISOString().slice(0,10);
+  // Quantités détenues (positions actuelles)
+  const qty = {};
+  (typeof BOOK2_ROWS !== 'undefined' ? BOOK2_ROWS : []).forEach(r => { if (r && r.ticker) qty[r.ticker] = (qty[r.ticker]||0) + (+r.qty||0); });
+  // Ratio net / brut constaté (historique des dividendes encaissés)
+  const rk = {}, rAll = {b:0, n:0};
+  (typeof DIVIDEND_DATA !== 'undefined' ? DIVIDEND_DATA : []).forEach(d => {
+    const k = d.isin || d.ticker; if (!k || !(d.brutEur > 0)) return;
+    rk[k] = rk[k] || {b:0, n:0}; rk[k].b += d.brutEur; rk[k].n += (d.netEur||0); rAll.b += d.brutEur; rAll.n += (d.netEur||0);
+  });
+  const ratioAll = rAll.b ? rAll.n / rAll.b : 0.75;
+  const ev = [];
+  Object.entries(DC.items).forEach(([tk, it]) => {
+    const q = qty[tk]; if (!(q > 0)) return;
+    const divs = (it.divs || []).map(([d, a]) => ({d: new Date(d + 'T00:00:00'), a: +a})).sort((x, y) => x.d - y.d);
+    if (!divs.length) return;
+    const yAgo = new Date(today); yAgo.setFullYear(yAgo.getFullYear() - 1);
+    const last12 = divs.filter(x => x.d > yAgo);
+    if (!last12.length) return;
+    const lastAmt = divs[divs.length - 1].a, freq = last12.length;
+    let proj = last12.map(x => { const d = new Date(x.d); d.setFullYear(d.getFullYear() + 1); return {d, a: freq >= 4 ? lastAmt : x.a, src: 'estimé'}; })
+                    .filter(x => x.d >= today && x.d < end);
+    if (it.next_ex) {
+      const nx = new Date(it.next_ex + 'T00:00:00');
+      if (nx >= today && nx < end) {
+        let best = null; proj.forEach(p => { const g = Math.abs(p.d - nx); if (g < 60*864e5 && (!best || g < Math.abs(best.d - nx))) best = p; });
+        if (best) { best.d = nx; best.src = 'annoncé'; } else proj.push({d: nx, a: lastAmt, src: 'annoncé'});
+      }
+    }
+    const fx = (DC.fx || {})[it.currency] || (typeof _divEurPerUnit === 'function' ? _divEurPerUnit(it.currency) : 1);
+    const rt = (rk[it.isin] || rk[tk]) ? ((rk[it.isin] || rk[tk]).n / (rk[it.isin] || rk[tk]).b) : ratioAll;
+    proj.forEach(p => ev.push({ date: iso(p.d), month: iso(p.d).slice(0,7), name: it.name || tk, ticker: tk, qty: q, dps: p.a, cur: it.currency,
+      brutEur: q * p.a * fx, netEur: q * p.a * fx * rt, src: p.src, freq }));
+  });
+  ev.sort((a, b) => a.date.localeCompare(b.date));
+  const months = []; const m0 = new Date(today.getFullYear(), today.getMonth(), 1);
+  for (let i = 0; i < 12; i++) { const d = new Date(m0.getFullYear(), m0.getMonth() + i, 1); months.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')); }
+  return { ev, months, generated: DC.generated_at };
+}
+function renderDivProjections(){
+  const el = document.getElementById('div_view_proj'); if (!el) return;
+  const P = divProjCompute();
+  if (!P) { el.innerHTML = '<p class="section-desc">Données de dividendes indisponibles : connectez-vous à Google Sheets (onglet « Dividends_Cal », mis à jour chaque jour par GitHub Actions).</p>'; return; }
+  const f0 = n => Math.round(n).toLocaleString('fr'), f2 = n => (+n).toLocaleString('fr', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  const mLab = m => new Date(m + '-01T00:00:00').toLocaleDateString('fr', {month: 'short', year: '2-digit'});
+  const byM = {}; P.months.forEach(m => byM[m] = {b: 0, n: 0, rows: []});
+  P.ev.forEach(e => { if (byM[e.month]) { byM[e.month].b += e.brutEur; byM[e.month].n += e.netEur; byM[e.month].rows.push(e); } });
+  const totB = P.ev.reduce((s, e) => s + e.brutEur, 0), totN = P.ev.reduce((s, e) => s + e.netEur, 0);
+  const nSoc = new Set(P.ev.map(e => e.ticker)).size;
+  const best = P.months.reduce((a, m) => byM[m].b > (byM[a] ? byM[a].b : -1) ? m : a, P.months[0]);
+  const kp = [
+    {l: 'Brut estimé 12 mois', v: f0(totB) + ' €', s: P.ev.length + ' versements · ' + nSoc + ' titres', c: 'var(--text)'},
+    {l: 'Net estimé 12 mois', v: f0(totN) + ' €', s: 'taux net/brut de votre historique', c: '#4caf82'},
+    {l: 'Moyenne mensuelle nette', v: f0(totN / 12) + ' €', s: 'sur 12 mois roulants', c: 'var(--text)'},
+    {l: 'Mois le plus fort', v: mLab(best), s: f0(byM[best].n) + ' € net', c: 'var(--text)'},
+  ];
+  const table = P.months.map(m => {
+    const g = byM[m];
+    const head = '<tr style="background:var(--bg3);font-weight:700"><td colspan="5">' + new Date(m + '-01T00:00:00').toLocaleDateString('fr', {month: 'long', year: 'numeric'}) + '</td><td class="mono">' + f2(g.b) + '</td><td class="mono" style="color:#4caf82">' + f2(g.n) + '</td><td></td></tr>';
+    const rows = g.rows.map(e => '<tr><td class="mono" style="white-space:nowrap">' + e.date + '</td><td><strong>' + _infEsc(e.name) + '</strong> <span style="font-size:11px;color:var(--text2)">' + _infEsc(e.ticker) + '</span></td>'
+      + '<td class="mono">' + (e.qty % 1 ? f2(e.qty) : f0(e.qty)) + '</td><td class="mono">' + e.dps.toLocaleString('fr', {maximumFractionDigits: 4}) + ' ' + _infEsc(e.cur) + '</td>'
+      + '<td style="font-size:11px;color:var(--text2)">' + (e.freq >= 12 ? 'mensuel' : e.freq >= 4 ? 'trimestriel' : e.freq >= 2 ? 'semestriel' : 'annuel') + '</td>'
+      + '<td class="mono">' + f2(e.brutEur) + '</td><td class="mono" style="color:#4caf82">' + f2(e.netEur) + '</td>'
+      + '<td><span style="font-size:10px;border:1px solid var(--border2);border-radius:10px;padding:1px 7px;color:' + (e.src === 'annoncé' ? '#4caf82' : 'var(--text2)') + '">' + e.src + '</span></td></tr>').join('');
+    return head + (rows || '<tr><td colspan="8" style="font-size:12px;color:var(--text2)">—</td></tr>');
+  }).join('');
+  el.innerHTML =
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px">' + kp.map(c => '<div style="background:var(--bg2);border-radius:8px;padding:14px 16px;border:1px solid var(--border2)"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:6px">' + c.l + '</div><div style="font-size:20px;font-weight:700;color:' + c.c + '">' + c.v + '</div><div style="font-size:11px;color:var(--text2);margin-top:3px">' + c.s + '</div></div>').join('') + '</div>'
+    + '<h3 style="font-size:14px;font-weight:700;margin:4px 0 10px">Dividendes estimés par mois — 12 mois roulants</h3>'
+    + '<div class="chart-wrap" style="height:300px;margin-bottom:20px"><canvas id="divProjChart"></canvas></div>'
+    + '<div style="max-height:70vh;overflow:auto"><table><thead><tr><th>Date (détachement)</th><th>Titre</th><th>Nb titres</th><th>Dividende / action</th><th>Fréquence</th><th>Brut €</th><th>Net estimé €</th><th>Statut</th></tr></thead><tbody>'
+    + table + '<tr style="border-top:2px solid var(--border2);font-weight:700"><td colspan="5">Total 12 mois</td><td class="mono">' + f2(totB) + '</td><td class="mono" style="color:#4caf82">' + f2(totN) + '</td><td></td></tr></tbody></table></div>'
+    + '<p style="font-size:11px;color:var(--text2);margin-top:10px">Estimation basée sur les positions actuelles et l\'historique des dividendes par action (Yahoo Finance, mis à jour le ' + (P.generated ? new Date(P.generated).toLocaleDateString('fr') : '—') + ') : chaque dividende des 12 derniers mois est reconduit un an plus tard ; le montant retenu est le dernier versé (payeurs trimestriels) ou celui de l\'échéance correspondante (acompte / solde). « annoncé » = date de détachement publiée. Le versement intervient en général quelques jours à quelques semaines après la date de détachement. Les ETF capitalisants ne versent pas de dividende.</p>';
+  const cv = document.getElementById('divProjChart');
+  if (cv && typeof Chart !== 'undefined') {
+    if (window._divProjChart) { try { window._divProjChart.destroy(); } catch(e) {} }
+    window._divProjChart = new Chart(cv.getContext('2d'), {type: 'bar',
+      data: {labels: P.months.map(mLab), datasets: [
+        {label: 'Brut estimé', data: P.months.map(m => Math.round(byM[m].b)), backgroundColor: 'rgba(90,141,238,0.35)', borderRadius: 5},
+        {label: 'Net estimé', data: P.months.map(m => Math.round(byM[m].n)), backgroundColor: '#4caf82', borderRadius: 5}]},
+      options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {position: 'top', labels: {color: '#8b95a8'}},
+        tooltip: {callbacks: {label: c => c.dataset.label + ' : ' + c.parsed.y.toLocaleString('fr') + ' €', afterBody: items => { const m = P.months[items[0].dataIndex]; return byM[m].rows.map(e => '• ' + e.name + ' : ' + Math.round(e.brutEur).toLocaleString('fr') + ' € brut'); }}}},
+        scales: {y: {ticks: {callback: v => v.toLocaleString('fr') + ' €', color: '#8b95a8'}, grid: {color: 'rgba(0,0,0,0.05)'}}, x: {grid: {display: false}, ticks: {color: '#8b95a8'}}}}});
+  }
+}
 
 function divSort(col){ if(_divSort.col===col)_divSort.dir*=-1; else{_divSort.col=col;_divSort.dir=['brutEur','taxeEur','netEur','date'].includes(col)?-1:1;} renderDividendSection(); }
 

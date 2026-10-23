@@ -154,6 +154,8 @@ def merge_with_previous(data):
     for s in data.get("stocks", []):
         o = p_st.get(s.get("ticker") or s.get("name"), {})
         s["items"] = _merge(s.get("items"), o.get("items"), ref, MAX_ITEMS, gen)
+        # Agenda des publications : garder l'ancien si la nouvelle édition n'en donne pas
+        if not s.get("pub") and o.get("pub"): s["pub"] = o["pub"]
     p_th = {t.get("key"): t for t in prev.get("themes", [])}
     for t in data.get("themes", []):
         o = p_th.get(t.get("key"), {})
@@ -168,6 +170,7 @@ def previous():
     """Affiche les infos déjà publiées (par ticker / thème), pour éviter de les répéter."""
     prev = read_current() or {}
     out = {"stocks": {s.get("ticker"): [i.get("text") for i in s.get("items", [])] for s in prev.get("stocks", [])},
+           "pub": {s.get("ticker"): s.get("pub") for s in prev.get("stocks", []) if s.get("pub")},
            "themes": {t.get("key"): [i.get("text") for i in t.get("items", [])] for t in prev.get("themes", [])}}
     print(json.dumps(out, ensure_ascii=False, indent=1))
 

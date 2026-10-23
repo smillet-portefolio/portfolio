@@ -23,6 +23,15 @@ Prépare le résumé des actualités des actions, cryptos et marchés des ETF d�
    Le script de publication fusionne automatiquement : il conserve les anciennes infos et ne garde que les 4 plus récentes
    par carte (les plus anciennes sont retirées en premier). Une carte sans nouveauté garde donc ses infos précédentes.
 
+   AGENDA DES PUBLICATIONS : pour chaque ACTION (pas les cryptos), détermine via l'agenda financier de la société (page
+   investisseurs, Zonebourse « agenda », Boursorama, communiqués) :
+     - la dernière publication passée (résultats, chiffre d'affaires trimestriel, trading update) : date + libellé ;
+     - la prochaine publication : date + libellé + statut "confirmée" (date publiée par la société) ou "estimée"
+       (déduite du calendrier habituel, ex. même période que l'an dernier).
+   Si la publication annoncée a eu lieu, remplace-la par la suivante (confirmée si connue, sinon estimée).
+   Mets-le dans "pub" (voir format). Commence par `python update_news_gsheet.py --previous` qui affiche aussi les "pub" déjà
+   connues : ne refais la recherche que si la prochaine date est passée, manquante ou encore "estimée".
+
 2 bis. Marchés & ETF : exécute
    python update_news_gsheet.py --etf-themes
    Il renvoie les ETF / fonds détenus regroupés par THÈME de marché : [{key, label, scope, etfs:[{name, ticker, isin, owner}]}].
@@ -41,7 +50,9 @@ Prépare le résumé des actualités des actions, cryptos et marchés des ETF d�
  "summary": "<2-3 phrases : les faits les plus importants pour les titres et ETF dont owner contient \"Seb\">",
  "summary_kids": "<2-3 phrases : les faits les plus importants pour les titres et ETF détenus par les enfants (owner = Estelle, Léandre ou Corentin)>",
  "stocks": [ {"name": "...", "ticker": "...", "kind": "action|crypto", "owner": [...repris de l'étape 1...],
-              "items": [ {"sentiment": "pos|neg|neu", "text": "<1-2 phrases, chiffres précis>", "source": "<média>", "url": "<lien de l'article>", "date": "JJ/MM"} ] } ],
+              "items": [ {"sentiment": "pos|neg|neu", "text": "<1-2 phrases, chiffres précis>", "source": "<média>", "url": "<lien de l'article>", "date": "JJ/MM"} ],
+              "pub": {"last": {"date": "AAAA-MM-JJ", "label": "<ex. CA T3 2026>"},
+                      "next": {"date": "AAAA-MM-JJ", "label": "<ex. Résultats annuels 2026>", "status": "confirmée|estimée"}} } ],
  "themes": [ {"key": "...", "label": "...", "etfs": [...repris tels quels de l'étape 2 bis...],
               "items": [ {"sentiment": "pos|neg|neu", "text": "...", "source": "...", "url": "...", "date": "JJ/MM"} ],
               "fund_events": [ {"etf": "<nom de l'ETF>", "text": "<événement propre au fonds>", "source": "...", "url": "...", "date": "JJ/MM"} ] } ],
