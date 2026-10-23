@@ -454,6 +454,62 @@ def resolve_yahoo(tick):
     return tick, None, None
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# OBLIGATIONS COTÉES (onglet Obligations du dashboard, cote = Oui + ISIN)
+#   cours en % du nominal, écrit dans l'onglet Prices avec ticker = ISIN, devise "PCT"
+#   (le dashboard le reprend automatiquement : valeur actuelle = nominal restant × cours / 100)
+#   • ISIN tchèques (CZ…) : Bourse de Prague (pse.cz) — « Aktuální cena » + date du dernier cours
+#   • autres ISIN          : onvista (api.onvista.de) — dernier cours, place de référence
+# ══════════════════════════════════════════════════════════════════════════════
+_BOND_H = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36",
+           "Accept": "application/json, text/html"}
+
+
+def lire_obligations_cotees():
+    """[(isin, nom)] des obligations cotées de l'onglet Obligations (clé oblig_data)."""
+    if not GOOGLE_OK:
+        return []
+    try:
+        svc = build("sheets", "v4", credentials=_get_creds()).spreadsheets()
+        res = svc.values().get(spreadsheetId=SHEET_ID, range="Data!A:ZZ").execute()
+        raw = next(("".join(r[1:]) for r in (res.get("values", []) or []) if r and r[0] == "oblig_data"), None)
+        out, seen = [], set()
+        for p in (json.loads(raw) if raw else []):
+            isin = str(p.get("isin") or "").strip().upper()
+            if p.get("cote") and isin and isin not in seen:
+                seen.add(isin); out.append((isin, p.get("nom") or isin))
+        return out
+    except Exception as e:
+        print(f"  [Data] lecture obligations impossible : {e}")
+        return []
+
+
+def cours_obligation(isin):
+    """(cours % du nominal, date AAAA-MM-JJ, source) ou (None, None, source)."""
+    if isin.startswith("CZ"):
+        try:
+            r = requests.get(f"https://www.pse.cz/detail/{isin}", headers=_BOND_H, timeout=25)
+            r.encoding = "utf-8"
+            txt = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "|", r.text))
+            m = re.search(r"Aktuální cena[|\s]+([\d  .,]+?)\s*%", txt)
+            d = re.search(r"Datum a čas[|\s]+(\d{1,2})\.(\d{1,2})\.(\d{4})", txt)
+            if m:
+                pct = float(m.group(1).replace(" ", "").replace(" ", "").replace(",", "."))
+                dd = f"{d.group(3)}-{int(d.group(2)):02d}-{int(d.group(1)):02d}" if d else None
+                return pct, dd, "PSE Praha"
+        except Exception as e:
+            print(f"    [PSE {isin}] {e}")
+        return None, None, "PSE Praha"
+    try:
+        j = requests.get(f"https://api.onvista.de/api/v1/bonds/ISIN:{isin}/snapshot", headers=_BOND_H, timeout=25).json()
+        q = j.get("quote") or {}
+        if q.get("last") and q.get("unitType", "PCT") == "PCT":
+            return float(q["last"]), str(q.get("datetimeLast") or "")[:10] or None, "onvista/" + str((q.get("market") or {}).get("name") or "")
+    except Exception as e:
+        print(f"    [onvista {isin}] {e}")
+    return None, None, "onvista"
+
+
 def collecter_prix():
     print("\n--- Taux CNB ---")
     cnb = taux_cnb()
@@ -550,6 +606,14 @@ def collecter_prix():
              (maintenant if nav else "")]
             + ["" for _ in VAR_KEYS]
         )
+
+    print("\n--- Obligations cotées (cours en % du nominal) ---")
+    for isin, nom in lire_obligations_cotees():
+        pct, ddate, src = cours_obligation(isin)
+        print(f"  {'OK' if pct else 'KO'} {str(nom)[:40]:<40s} ({isin}) -> {pct} %  [{src} {ddate or ''}]")
+        if pct and pct > 0:
+            rows.append([isin, f"{nom} (% du nominal, {src}{', ' + ddate if ddate else ''})", fmt_prix(pct), "PCT", maintenant]
+                        + ["" for _ in VAR_KEYS])
 
     return rows
 

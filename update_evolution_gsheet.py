@@ -380,6 +380,8 @@ def norm_broker(b):
     """Réplique normBroker : replie 'KB*' -> 'KB' + map ledger/binance/finst/trading 212."""
     if b and str(b).upper().startswith("KB"):
         return "KB"
+    if b == "SAXO obligations":          # obligations achetées chez SAXO -> SAXO (comme le dashboard)
+        return "SAXO"
     mapping = {
         "ledger": "Ledger", "LEDGER": "Ledger",
         "binance": "Binance", "BINANCE": "Binance",
@@ -447,6 +449,10 @@ def get_today_evo_row(book2_rows, cash_data, oblig_data, current_prices):
             if e.get("date") and e["date"] <= today
         )
         cap = (p.get("montant") or 0) - recu_cap
+        # Obligation cotée : VALEUR FINALE (nominal restant, détention jusqu'à l'échéance) — réplique obValFinaleEur
+        if p.get("cote") and p.get("valeurFinale") is not None:
+            reimb = sum((e.get("capital") or 0) for e in (p.get("echeancier") or []) if e.get("date") and e["date"] <= today)
+            cap = max(0, p["valeurFinale"] - reimb) * ob_fx(p)
         b = norm_broker(p.get("plateforme") or "—")
         pf_by_broker[b] = pf_by_broker.get(b, 0) + cap
 

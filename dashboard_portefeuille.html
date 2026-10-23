@@ -2107,16 +2107,26 @@ function modifiedDietz(evo, cut, valNow, invNow, suffixes, today) {
   //   kbonly = kb − kbobl
   const kbOblAt = d => (typeof OBLIG_DATA !== 'undefined' ? OBLIG_DATA : [])
     .filter(p => /^KB/i.test(p.plateforme || '') && (!p.date || p.date <= d))
-    .reduce((s, p) => s + ((typeof obCapRestEur === 'function') ? (obCapRestEur(p, d) || 0) : 0), 0);
+    .reduce((s, p) => s + ((typeof obValFinaleEur === 'function') ? (obValFinaleEur(p, d) || 0) : 0), 0);
+  // Idem SAXO (actions/cash) et SAXO obligations, regroupés dans la colonne « saxo » : pseudo-colonnes saxonly / saxobl
+  const saxoOblAt = d => (typeof OBLIG_DATA !== 'undefined' ? OBLIG_DATA : [])
+    .filter(p => p.plateforme === 'SAXO obligations' && (!p.date || p.date <= d))
+    .reduce((s, p) => s + ((typeof obValFinaleEur === 'function') ? (obValFinaleEur(p, d) || 0) : 0), 0);
   const actOf = k => k === 'kbobl' ? kbOblAt(base.date)
                    : k === 'kbonly' ? (typeof base.act_kb === 'number' ? base.act_kb : 0) - kbOblAt(base.date)
+                   : k === 'saxobl' ? saxoOblAt(base.date)
+                   : k === 'saxonly' ? (typeof base.act_saxo === 'number' ? base.act_saxo : 0) - saxoOblAt(base.date)
                    : (typeof base['act_' + k] === 'number' ? base['act_' + k] : 0);
   // Valeur de départ = historique Évolution (dernière ligne avant la période)
   const V0 = suffixes ? suffixes.reduce((s, k) => s + actOf(k), 0) : (base.act_total || 0);
   // Flux = dépôts / retraits À LEUR DATE (onglet Dépôts & Cash) — même source que « Performance par année civile »
   const day = d => Date.parse(d + 'T00:00:00Z') / 86400000;
-  const tagsOf = b => { const s = _brokerEvoSuffix(b); if (s !== 'kb') return [s]; return /oblig/i.test(b) ? ['kb', 'kbobl'] : ['kb', 'kbonly']; };
-  const deps = [...(typeof CASH_BASE_DEPOSITS !== 'undefined' ? CASH_BASE_DEPOSITS : []), ...((typeof CASH_DATA !== 'undefined' && CASH_DATA.deposits) || [])]
+  const tagsOf = b => { const s = _brokerEvoSuffix(b);
+    if (s === 'kb')   return /oblig/i.test(b) ? ['kb', 'kbobl'] : ['kb', 'kbonly'];
+    if (s === 'saxo') return /oblig/i.test(b) ? ['saxo', 'saxobl'] : ['saxo', 'saxonly'];
+    return [s]; };
+  const deps = [...(typeof CASH_BASE_DEPOSITS !== 'undefined' ? CASH_BASE_DEPOSITS : []), ...((typeof CASH_DATA !== 'undefined' && CASH_DATA.deposits) || []),
+                ...((typeof obSaxoTransferDeps === 'function') ? obSaxoTransferDeps() : [])]
     .filter(d => d && d.date && d.date > base.date && d.date <= today && (!suffixes || tagsOf(d.broker).some(t => suffixes.indexOf(t) >= 0)))
     .map(d => ({ date: d.date, f: (d.type === 'dépôt' ? 1 : -1) * (d.amountEur != null ? +d.amountEur : (d.currency === 'EUR' ? +d.amount : (toEur(+d.amount, d.currency) || +d.amount || 0))) }))
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -2159,7 +2169,8 @@ function renderDashboard() {
 
   // ── 1. Montant investi par catégorie = net déposé par broker ────────────────
   const allDeps = [...(typeof CASH_BASE_DEPOSITS !== 'undefined' ? CASH_BASE_DEPOSITS : []),
-                   ...(CASH_DATA?.deposits || [])];
+                   ...(CASH_DATA?.deposits || []),
+                   ...((typeof obSaxoTransferDeps === 'function') ? obSaxoTransferDeps() : [])];   // SAXO -> SAXO obligations
 
   const investedByCat = {};
   const investedByBroker = {};
@@ -2219,11 +2230,11 @@ function renderDashboard() {
     if (cat) cashByCat[cat] += cashEur;
   });
 
-  // Obligations : capital restant
+  // Obligations : VALEUR FINALE (détention jusqu'à l'échéance) — cotée = nominal restant, non cotée = capital restant
   let obligCapRest = 0;
   const obligByPlat = {};
   (typeof OBLIG_DATA !== 'undefined' ? OBLIG_DATA : []).forEach(p => {
-    const cap = obCapRestEur(p, today);
+    const cap = obValFinaleEur(p, today);
     obligCapRest += cap;
     const b = p.plateforme || '—';
     if (!obligByPlat[b]) obligByPlat[b] = 0;
@@ -2276,9 +2287,9 @@ function renderDashboard() {
       if (!cashEur || cashEur <= 0) return;
       items.push({ name:'Cash — '+normBroker(bb0), ticker:'', cat:'Cash', broker:normBroker(bb0), valEur:Math.round(cashEur) });
     });
-    // 3) Obligations (onglet dédié) — capital restant
+    // 3) Obligations (onglet dédié) — valeur finale (jusqu'à l'échéance)
     (typeof OBLIG_DATA !== 'undefined' ? OBLIG_DATA : []).forEach(p => {
-      const val = (typeof obCapRestEur==='function') ? obCapRestEur(p, today) : (p.montant||0);
+      const val = (typeof obValFinaleEur==='function') ? obValFinaleEur(p, today) : (p.montant||0);
       if (!val || val <= 0) return;
       items.push({ name:(p.nom||p.projet||p.plateforme||'Obligation'), ticker:'', cat:'Obligations', broker:normBroker(p.plateforme||'—'), valEur:Math.round(val) });
     });
@@ -2716,8 +2727,8 @@ function renderDashboard() {
   };
   // Catégories : KB (épargne) et KB obligations partagent la colonne « kb » de l'historique -> pseudo-colonnes kbonly / kbobl
   const catSuffixes = (cat) => {
-    const s = Object.keys(BROKER_EVO).filter(k => BROKER_TO_CAT[k] === cat).map(k => BROKER_EVO[k] === 'kb' ? 'kbonly' : BROKER_EVO[k]);
-    if (cat === 'Obligations') s.push('kbobl');
+    const s = Object.keys(BROKER_EVO).filter(k => BROKER_TO_CAT[k] === cat).map(k => BROKER_EVO[k] === 'kb' ? 'kbonly' : BROKER_EVO[k] === 'saxo' ? 'saxonly' : BROKER_EVO[k]);
+    if (cat === 'Obligations') s.push('kbobl', 'saxobl');
     return s;
   };
   const catCell = (cat, val, inv, cut) => periodCell(val, inv, catSuffixes(cat), cut);
@@ -2781,7 +2792,7 @@ function renderDashboard() {
     body.innerHTML = sorted.map((r, i) => {
       const bg = i % 2 === 0 ? 'var(--bg)' : 'var(--bg2)';
       return `<tr style="background:${bg};border-bottom:1px solid var(--border)">
-        <td style="padding:7px 12px;font-weight:600">${r.label}</td>
+        <td style="padding:7px 12px;font-weight:600">${r.label === 'Obligations' ? 'Obligations<span title="Obligations valorisées jusqu\'à l\'échéance (valeur finale)" style="color:var(--text2)">*</span>' : r.label}</td>
         ${c(fmtE(r.inv), 'var(--text)')}${c(fmtE(r.val), 'var(--text)')}${c(fmtE(r.pnl), colPnl(r.pnl))}${c(fmtP(r.perf), colPnl(r.perf))}${pc(fmtP(r.ytd), colPnl(r.ytd))}${pc(fmtP(r.mtd), colPnl(r.mtd))}
       </tr>`;
     }).join('') + `<tr class="tfoot">
@@ -2801,6 +2812,15 @@ function renderDashboard() {
   };
   window._dbRender.type();
   window._dbRender.broker();
+  // Note « * » sous le tableau Par type d'actif
+  try {
+    const _tb = document.getElementById('db_type_body'), _tbl = _tb && _tb.closest('table');
+    if (_tbl && !document.getElementById('db_type_note')) {
+      const n = document.createElement('p'); n.id = 'db_type_note'; n.style.cssText = 'font-size:11px;color:var(--text2);margin:6px 2px 0';
+      n.textContent = '* Obligations jusqu\'à échéance : valorisées à la valeur finale (nominal restant pour les obligations cotées, capital restant pour les non cotées).';
+      _tbl.parentNode.insertBefore(n, _tbl.nextSibling);
+    }
+  } catch(e) {}
 
   // ── Tableau par broker ──────────────────────────────────────────────────────
 // (tableaux rendus via window._dbRender ci-dessus)
@@ -6421,8 +6441,8 @@ function getTodayEvoRow() {
     pfByBroker[bn] = (pfByBroker[bn] || 0) + cashEur;
   });
   (typeof OBLIG_DATA !== 'undefined' ? OBLIG_DATA : []).forEach(p => {
-    const cap = obCapRestEur(p, today);
-    const b = normBroker(p.plateforme || '—');   // KB obligations -> KB (capital restant)
+    const cap = obValFinaleEur(p, today);        // valeur finale (jusqu'à l'échéance), comme le Dashboard
+    const b = normBroker(p.plateforme || '—');   // KB obligations -> KB · SAXO obligations -> SAXO
     pfByBroker[b] = (pfByBroker[b] || 0) + cap;
   });
 
@@ -9072,6 +9092,20 @@ function obValActEur(p, today) {
   const nominal = p.valeurFinale != null ? p.valeurFinale : (p.montantOrig != null ? p.montantOrig : (p.montant || 0));
   const reimb = (p.echeancier || []).filter(e => e.date <= today).reduce((s, e) => s + (e.capital || 0), 0);
   return Math.max(0, nominal - reimb) * c.pct / 100 * obFx(p);
+}
+// Transfert interne : une obligation achetée avec le cash SAXO (plateforme « SAXO obligations ») sort de SAXO
+// (Actions & ETFs) et entre dans Obligations, à sa date, pour valeur d'achat + frais (EUR). Flux synthétiques utilisés
+// uniquement par les calculs du Dashboard (investi par catégorie, Modified Dietz) — jamais affichés dans Dépôts & Cash.
+function obSaxoTransferDeps() {
+  const out = [];
+  (typeof OBLIG_DATA !== 'undefined' ? OBLIG_DATA : []).forEach(p => {
+    if (p.plateforme !== 'SAXO obligations' || !p.date) return;
+    const x = Math.round(((p.montant || 0) + (p.fraisEur || 0)) * 100) / 100;
+    if (!(x > 0)) return;
+    out.push({ date: p.date, broker: 'SAXO', type: 'retrait', amountEur: x, currency: 'EUR', amount: x, _synth: true });
+    out.push({ date: p.date, broker: 'SAXO obligations', type: 'dépôt', amountEur: x, currency: 'EUR', amount: x, _synth: true });
+  });
+  return out;
 }
 function obligLockPastFx() {
   const today = new Date().toISOString().slice(0,10);
