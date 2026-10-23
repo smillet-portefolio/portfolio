@@ -7019,6 +7019,8 @@ let _obligEditId = null;
     // Valeur finale (remboursement à l'échéance = nominal) + obligation cotée (cours du jour en % du nominal)
     + '<div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Valeur finale (remboursement)</label>'
     + '<input id="ob_final" type="number" step="0.01" placeholder="= valeur d\'achat si vide" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none"></div>'
+    + '<div><label id="ob_frais_lbl" style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Frais / commission</label>'
+    + '<input id="ob_frais" type="number" step="0.01" placeholder="ex: 5.90" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none"></div>'
     + '<div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Obligation cotée ?</label>'
     + '<select id="ob_cote" onchange="obligCoteChange()" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none"><option value="0">Non — non cotée (capital restant)</option><option value="1">Oui — cotée (cours du jour)</option></select></div>'
     + '<div class="ob-cote-f"><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">ISIN / Ticker</label>'
@@ -7031,8 +7033,23 @@ let _obligEditId = null;
     + '<div style="margin-bottom:18px">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
     + '<label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px">Ech&#233;ancier</label>'
-    + '<button onclick="obligAddEcheance()" style="padding:4px 12px;font-size:11px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;color:var(--text);cursor:pointer">+ Ajouter &#233;ch&#233;ance</button>'
+    + '<div style="display:flex;gap:6px"><button onclick="obligGenToggle()" style="padding:4px 12px;font-size:11px;background:#2563eb22;border:1px solid #2563eb66;border-radius:4px;color:var(--text);cursor:pointer">&#9881;&#65039; G&#233;n&#233;rer l\'&#233;ch&#233;ancier</button>'
+    + '<button onclick="obligAddEcheance()" style="padding:4px 12px;font-size:11px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;color:var(--text);cursor:pointer">+ Ajouter &#233;ch&#233;ance</button></div>'
     + '</div>'
+    // Générateur d'échéancier (obligation in fine : coupons périodiques + remboursement du nominal à l'échéance)
+    + '<div id="ob_gen" style="display:none;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:12px;margin-bottom:10px">'
+    + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">'
+    + '<div><label style="font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:3px">Nominal</label><input id="obg_nom" type="number" step="0.001" style="width:100%;box-sizing:border-box;padding:6px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:12px"></div>'
+    + '<div><label style="font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:3px">Taux annuel (%)</label><input id="obg_taux" type="number" step="0.001" style="width:100%;box-sizing:border-box;padding:6px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:12px"></div>'
+    + '<div><label style="font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:3px">Fréquence</label><select id="obg_freq" style="width:100%;box-sizing:border-box;padding:6px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:12px"><option value="1">Annuelle</option><option value="2">Semestrielle</option><option value="4">Trimestrielle</option><option value="12">Mensuelle</option></select></div>'
+    + '<div><label style="font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:3px">1er coupon</label><input id="obg_first" type="date" style="width:100%;box-sizing:border-box;padding:6px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:12px"></div>'
+    + '<div><label style="font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:3px">Échéance (remboursement)</label><input id="obg_mat" type="date" style="width:100%;box-sizing:border-box;padding:6px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:12px"></div>'
+    + '<div style="display:flex;align-items:flex-end"><label style="font-size:11px;color:var(--text2);display:flex;gap:6px;align-items:center;cursor:pointer"><input id="obg_prorata" type="checkbox"> 1er coupon au prorata depuis la date d\'investissement</label></div>'
+    + '</div>'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:8px">'
+    + '<span id="obg_msg" style="font-size:11px;color:var(--text2)">Coupons = nominal × taux / fréquence ; nominal remboursé à l\'échéance (obligation in fine). Remplace l\'échéancier actuel.</span>'
+    + '<button onclick="obligGenRun()" style="padding:6px 14px;font-size:12px;background:#2563eb;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:600;white-space:nowrap">Générer</button>'
+    + '</div></div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:6px;padding:0 0 6px;font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">'
     + '<span>Date</span><span id="ob_ec_int_hdr">Int&#233;r&#234;ts (&#8364;)</span><span id="ob_ec_cap_hdr">Remb. capital (&#8364;)</span><span></span></div>'
     + '<div id="ob_echeancier" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto"></div>'
@@ -9095,6 +9112,10 @@ function obligOpenModal(id) {
   document.getElementById('obligModalTitle').textContent = id != null ? 'Modifier le projet' : 'Nouveau projet';
   document.getElementById('ob_echeancier').innerHTML = '';
   document.getElementById('ob_msg').textContent = '';
+  // Générateur : replié et vidé à chaque ouverture
+  const _g = document.getElementById('ob_gen'); if (_g) _g.style.display = 'none';
+  ['obg_nom','obg_taux','obg_first','obg_mat'].forEach(k => { const e = document.getElementById(k); if (e) e.value = ''; });
+  const _gm = document.getElementById('obg_msg'); if (_gm) { _gm.style.color = 'var(--text2)'; _gm.textContent = 'Coupons = nominal × taux / fréquence ; nominal remboursé à l\'échéance (obligation in fine). Remplace l\'échéancier actuel.'; }
   if (id != null) {
     const p = OBLIG_DATA.find(x => x.id === id);
     if (!p) return;
@@ -9108,13 +9129,14 @@ function obligOpenModal(id) {
     document.getElementById('ob_duree').value      = p.duree      || '';
     document.getElementById('ob_interet').value    = p.interet    || '';
     document.getElementById('ob_final').value      = p.valeurFinale != null ? p.valeurFinale : '';
+    document.getElementById('ob_frais').value      = p.frais != null ? p.frais : '';
     document.getElementById('ob_cote').value       = p.cote ? '1' : '0';
     document.getElementById('ob_isin').value       = p.isin || '';
     document.getElementById('ob_cours').value      = p.cours != null ? p.cours : '';
     document.getElementById('ob_cours_date').value = p.coursDate || '';
     (p.echeancier||[]).forEach(e => obligAddEcheanceRow(e.date, e.interet||'', e.capital||''));
   } else {
-    ['ob_nom','ob_montant','ob_duree','ob_interet','ob_final','ob_isin','ob_cours','ob_cours_date'].forEach(id2 => { document.getElementById(id2).value = ''; });
+    ['ob_nom','ob_montant','ob_duree','ob_interet','ob_final','ob_frais','ob_isin','ob_cours','ob_cours_date'].forEach(id2 => { document.getElementById(id2).value = ''; });
     document.getElementById('ob_cote').value = '0';
     document.getElementById('ob_date').value = new Date().toISOString().slice(0,10);
     document.getElementById('ob_plateforme').value = 'LENDOSPHERE';
@@ -9149,6 +9171,8 @@ function obligCurrencyChange() {
   if (_fl) _fl.textContent = 'Valeur finale \u2014 remboursement (' + _cl + ')';
   const _al = document.getElementById('ob_montant') && document.getElementById('ob_montant').previousElementSibling;
   if (_al) _al.textContent = 'Valeur d\u2019achat (' + _cl + ')';
+  const _frl = document.getElementById('ob_frais_lbl');
+  if (_frl) _frl.textContent = 'Frais / commission (' + _cl + ')';
   const fxEl    = document.getElementById('ob_fx');
   const lbl     = document.getElementById('ob_fx_label');
   const hint    = document.getElementById('ob_eur_hint');
@@ -9170,6 +9194,70 @@ function obligCurrencyChange() {
 }
 
 function obligAddEcheance() { obligAddEcheanceRow('', '', ''); }
+
+// ── Générateur d'échéancier (obligation in fine) ─────────────────────────────
+function obligGenToggle() {
+  const g = document.getElementById('ob_gen'); if (!g) return;
+  const show = g.style.display === 'none';
+  g.style.display = show ? '' : 'none';
+  if (!show) return;
+  const v = id => (document.getElementById(id) || {}).value || '';
+  // Pré-remplissage depuis le formulaire : nominal = valeur finale (sinon valeur d'achat), taux = intérêt annuel
+  if (!v('obg_nom'))  document.getElementById('obg_nom').value  = v('ob_final') || v('ob_montant');
+  if (!v('obg_taux')) document.getElementById('obg_taux').value = v('ob_interet');
+  const m = String(v('ob_nom')).match(/(\d{1,2})\s*(jan|f[ée]v|feb|mar|avr|apr|mai|may|juin|jun|juil|jul|ao[uû]|aug|sep|oct|nov|d[ée]c|dec)\w*\.?\s*(\d{4})/i);
+  if (m && !v('obg_mat')) {   // ex. « 25 Nov 2036 » dans le nom du projet
+    const MO = {jan:1,fev:2,'fév':2,feb:2,mar:3,avr:4,apr:4,mai:5,may:5,juin:6,jun:6,juil:7,jul:7,aou:8,'aoû':8,aug:8,sep:9,oct:10,nov:11,dec:12,'déc':12};
+    const k = m[2].toLowerCase().replace('é','e').replace('û','u');
+    const mo = MO[k] || MO[m[2].toLowerCase()];
+    if (mo) document.getElementById('obg_mat').value = m[3] + '-' + String(mo).padStart(2,'0') + '-' + String(m[1]).padStart(2,'0');
+  }
+  obligGenFirstGuess();
+}
+function obligGenFirstGuess() {
+  // 1er coupon par défaut : première date anniversaire de l'échéance (selon la fréquence) postérieure à la date d'investissement
+  const fEl = document.getElementById('obg_first'); if (!fEl || fEl.value) return;
+  const mat = document.getElementById('obg_mat').value, inv = document.getElementById('ob_date').value;
+  if (!mat || !inv) return;
+  const step = 12 / (+document.getElementById('obg_freq').value || 1);
+  let d = _obgDate(mat); const lim = _obgDate(inv);
+  while (true) { const p = _obgAddMonths(d, -step); if (p <= lim) break; d = p; }
+  fEl.value = d.toISOString().slice(0,10);
+}
+// Dates en UTC (évite le décalage d'un jour lié au fuseau horaire) ; ajout de mois en gardant le jour (fin de mois bornée)
+function _obgDate(s) { const [y, m, d] = s.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); }
+function _obgAddMonths(dt, n) {
+  const day = dt.getUTCDate(), r = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + n, 1));
+  const last = new Date(Date.UTC(r.getUTCFullYear(), r.getUTCMonth() + 1, 0)).getUTCDate();
+  r.setUTCDate(Math.min(day, last)); return r;
+}
+function obligGenRun() {
+  const msg = document.getElementById('obg_msg');
+  const nom = parseFloat(document.getElementById('obg_nom').value), taux = parseFloat(document.getElementById('obg_taux').value);
+  const freq = +document.getElementById('obg_freq').value || 1;
+  obligGenFirstGuess();
+  const first = document.getElementById('obg_first').value, mat = document.getElementById('obg_mat').value;
+  if (!(nom > 0) || isNaN(taux) || !first || !mat || first > mat) { msg.style.color = '#e06c6c'; msg.textContent = 'Renseigner nominal, taux, 1er coupon et échéance (1er coupon ≤ échéance).'; return; }
+  const existing = document.querySelectorAll('#ob_echeancier > div').length;
+  if (existing && !confirm('Remplacer les ' + existing + ' échéance(s) existante(s) ?')) return;
+  const step = 12 / freq, cpn = Math.round(nom * taux / 100 / freq * 100) / 100;
+  const dates = []; const d0 = _obgDate(first);
+  for (let k = 0; dates.length < 600; k++) { const s = _obgAddMonths(d0, k * step).toISOString().slice(0,10); if (s > mat) break; dates.push(s); }
+  if (dates[dates.length - 1] !== mat) dates.push(mat);   // échéance hors calendrier régulier : dernière ligne à l'échéance
+  document.getElementById('ob_echeancier').innerHTML = '';
+  dates.forEach((dt, i) => {
+    let it = cpn;
+    if (i === 0 && document.getElementById('obg_prorata').checked) {
+      const inv = document.getElementById('ob_date').value;
+      if (inv && inv < dt) it = Math.round(nom * taux / 100 * ((_obgDate(dt) - _obgDate(inv)) / 864e5) / 365 * 100) / 100;
+    }
+    obligAddEcheanceRow(dt, it, i === dates.length - 1 ? nom : '');
+  });
+  if (!document.getElementById('ob_final').value) document.getElementById('ob_final').value = nom;
+  if (!document.getElementById('ob_interet').value) document.getElementById('ob_interet').value = taux;
+  msg.style.color = '#4caf82';
+  msg.textContent = '✅ ' + dates.length + ' échéances générées : ' + cpn.toLocaleString('fr', {minimumFractionDigits:2}) + ' par coupon, total intérêts ' + (cpn * dates.length).toLocaleString('fr', {maximumFractionDigits:2}) + ', nominal ' + nom.toLocaleString('fr') + ' remboursé le ' + mat + '. Vérifier puis Enregistrer.';
+}
 
 function obligAddEcheanceRow(date, interet, capital) {
   const ec  = document.getElementById('ob_echeancier');
@@ -9197,6 +9285,7 @@ function obligSaveModal() {
   if (!date)                      { msg.textContent = 'Date requise.'; return; }
   if (isNaN(montant)||montant<=0) { msg.textContent = 'Valeur d\'achat invalide.'; return; }
   const valeurFinaleIn = parseFloat(document.getElementById('ob_final').value);
+  const fraisIn   = parseFloat(document.getElementById('ob_frais').value);
   const cote      = document.getElementById('ob_cote').value === '1';
   const isin      = document.getElementById('ob_isin').value.trim().toUpperCase();
   const coursIn   = parseFloat(document.getElementById('ob_cours').value);
@@ -9216,6 +9305,8 @@ function obligSaveModal() {
   const montantEur = currency === 'EUR' ? montant : Math.round(montant * fxRate * 100) / 100;
   const fields = { nom, plateforme, typeProjet, date, montant: montantEur, montantOrig: montant, currency, fxRate, duree, interet: isNaN(interet)?null:interet, echeancier,
                    valeurFinale: isNaN(valeurFinaleIn) ? null : valeurFinaleIn, cote, isin: isin || null,
+                   frais: isNaN(fraisIn) || fraisIn <= 0 ? null : fraisIn,
+                   fraisEur: isNaN(fraisIn) || fraisIn <= 0 ? null : (currency === 'EUR' ? fraisIn : Math.round(fraisIn * fxRate * 100) / 100),
                    cours: cote && !isNaN(coursIn) ? coursIn : null, coursDate: cote ? coursDate : null };
   if (_obligEditId != null) {
     const idx = OBLIG_DATA.findIndex(x => x.id === _obligEditId);
@@ -9345,7 +9436,7 @@ function renderObligSection() {
     });
   }
 
-  var totMontant=0, totCapRest=0, totRecuInt=0, totMontantInvesti=0, totValFinale=0, totValAct=0;
+  var totMontant=0, totCapRest=0, totRecuInt=0, totMontantInvesti=0, totValFinale=0, totValAct=0, totFrais=0;
   tbody.innerHTML = data.map(function(p, i) {
     var col = PLAT_COLORS[p.plateforme] || '#6b7280';
     var bg  = i%2===0 ? 'var(--bg)' : 'var(--bg2)';
@@ -9353,6 +9444,7 @@ function renderObligSection() {
     totCapRest         += p.capRest;
     totValFinale       += p.valFinale;
     totValAct          += p.valAct;
+    totFrais           += p.fraisEur || 0;
     totRecuInt         += p.recuInt;
     totMontantInvesti  += p.montantInvesti;
     var yearCells = futureYears.map(function(yr) {
@@ -9367,7 +9459,8 @@ function renderObligSection() {
       + '<td style="padding:8px 14px"><span style="padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;background:' + col + '22;color:' + col + '">' + p.plateforme + '</span></td>'
       + '<td style="padding:8px 14px;font-size:11px;color:var(--text2)">' + (p.typeProjet||'-') + '</td>'
       + '<td style="padding:8px 14px;color:var(--text2)">' + (p.date||'-') + '</td>'
-      + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:600">' + Math.round(p.montant||0).toLocaleString('fr') + ' &#8364;</td>'
+      + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:600">' + Math.round(p.montant||0).toLocaleString('fr') + ' &#8364;'
+      + (p.fraisEur ? '<div style="font-size:10px;font-weight:400;color:#e06c6c" title="Frais / commission d\'achat">+ frais ' + p.fraisEur.toLocaleString('fr', {maximumFractionDigits: 2}) + ' &#8364;</div>' : '') + '</td>'
       + '<td style="padding:8px 14px;text-align:center;color:var(--text2)">' + (p.duree||'-') + '</td>'
       + '<td style="padding:8px 14px;text-align:right;color:#4caf82;font-weight:600">' + interetStr + '</td>'
       + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;color:#4caf82">' + Math.round(p.recuInt).toLocaleString('fr') + ' &#8364;</td>'
@@ -9392,7 +9485,8 @@ function renderObligSection() {
 
   tfoot.innerHTML = '<tr class="tfoot">'
     + '<td colspan="4" style="padding:8px 14px;font-weight:700">Total (' + data.length + ' projet' + (data.length>1?'s':'') + ')</td>'
-    + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:700">' + Math.round(totMontant).toLocaleString('fr') + ' &#8364;</td>'
+    + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:700">' + Math.round(totMontant).toLocaleString('fr') + ' &#8364;'
+    + (totFrais ? '<div style="font-size:10px;font-weight:400;color:#e06c6c">+ frais ' + totFrais.toLocaleString('fr', {maximumFractionDigits: 2}) + ' &#8364;</div>' : '') + '</td>'
     + '<td></td><td></td>'
     + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:700;color:#4caf82">' + Math.round(totRecuInt).toLocaleString('fr') + ' &#8364;</td>'
     + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:700;color:#60a5fa">' + Math.round(totMontantInvesti).toLocaleString('fr') + ' &#8364;</td>'
