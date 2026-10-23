@@ -55,6 +55,15 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then P=true; else P=$(python update_news_gsheet.py --should-run); fi
           echo "proceed=$P" >> "$GITHUB_OUTPUT"; echo "proceed=$P"
 
+      - name: Dividendes + calendrier des publications (Yahoo) → onglet Dividends_Cal
+        if: steps.guard.outputs.proceed == 'true'
+        continue-on-error: true
+        env:
+          GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+        run: |
+          pip install yfinance pandas requests lxml beautifulsoup4
+          python update_dividends_gsheet.py
+
       - name: Node
         if: steps.guard.outputs.proceed == 'true'
         uses: actions/setup-node@v4
