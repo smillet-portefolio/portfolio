@@ -56,7 +56,8 @@ Prépare le résumé des actualités des actions, cryptos et marchés des ETF d�
  "themes": [ {"key": "...", "label": "...", "etfs": [...repris tels quels de l'étape 2 bis...],
               "items": [ {"sentiment": "pos|neg|neu", "text": "...", "source": "...", "url": "...", "date": "JJ/MM"} ],
               "fund_events": [ {"etf": "<nom de l'ETF>", "text": "<événement propre au fonds>", "source": "...", "url": "...", "date": "JJ/MM"} ] } ],
- "agenda": [ {"date": "JJ/MM", "text": "<titre ou événement de marché (BCE, Fed…)> — <à venir dans les 15 prochains jours>"} ]
+ "agenda": [ {"date": "JJ/MM", "text": "<événement de MARCHÉ à venir dans les 15 prochains jours : banques centrales (Fed, BCE…), élections, notations souveraines, chiffres macro, OPEP…>"} ]
+   NE METS PAS les publications de résultats / chiffre d'affaires des sociétés dans "agenda" : elles vont uniquement dans "pub".
 }
    Un objet par titre de l'étape 1, dans le même ordre, y compris ceux sans info nouvelle (items vide : les anciennes infos sont conservées automatiquement).
    Dans "items", ne mets QUE les faits nouveaux de cette édition (pas ceux listés par --previous).

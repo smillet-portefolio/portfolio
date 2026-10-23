@@ -5916,6 +5916,12 @@ function renderInfosInto(el, scope) {
     el.innerHTML = head + '<p class="section-desc">Aucun résumé disponible. Il est généré chaque jour (GitHub Actions) et lu depuis l\'onglet « News » du Google Sheet (connectez-vous à Google Sheets).</p>';
     return;
   }
+  // « Autres événements » : sans les publications de sociétés (déjà dans le tableau des publications), triés par date
+  const _co = N.stocks.filter(s => s.kind !== 'crypto').map(s => String(s.name||'').toLowerCase().split(/[\s(]/)[0]).filter(w => w.length > 2);
+  const _pubRe = /r[ée]sultats|chiffre d'affaires|\bca\b|trading (update|statement)|publication|earnings/i;
+  const _ddmm = s => { const m = String(s||'').match(/(\d{1,2})\/(\d{1,2})/); return m ? (m[2].padStart(2,'0') + m[1].padStart(2,'0')) : '9999'; };
+  N = Object.assign({}, N, { agenda: (N.agenda||[]).filter(a => { const t = String(a.text||'').toLowerCase(); return !(_pubRe.test(t) && _co.some(w => t.includes(w))); })
+                                                    .sort((a, b) => _ddmm(a.date).localeCompare(_ddmm(b.date))) });
   // Filtre par détenteur : actions / cryptos détenues, ETF détenus dans chaque thème (thèmes vides retirés)
   N = Object.assign({}, N, {
     stocks: N.stocks.filter(s => (s.owner||[]).some(want)).map(s => Object.assign({}, s, {owner: scope === 'kids' ? (s.owner||[]).filter(want) : []})),
