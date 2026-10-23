@@ -6938,13 +6938,13 @@ let _obligEditId = null;
   sec.className = 'section';
 
   sec.innerHTML = '<h2 style="font-size:18px;font-weight:700;margin:0 0 4px">📋 Obligations</h2>'
-    + '<p class="section-desc" style="margin-bottom:20px">Projets financement participatif — Lendosphere, Enerfip, Lumo…</p>'
+    + '<p class="section-desc" style="margin-bottom:20px">Projets de financement participatif (Lendosphere, Enerfip, Lumo…) et obligations cotées (KB obligations…). Valeur actuelle : capital restant (non cotées) ou nominal × cours du jour (cotées).</p>'
     + '<button onclick="obligOpenModal()" style="margin-bottom:20px;padding:9px 18px;background:#2563eb;color:#fff;border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer">＋ Nouveau projet</button>'
     + '<div style="overflow-x:auto;margin-bottom:28px">'
     + '<table id="obligTable" style="font-size:12px;width:100%;border-collapse:collapse">'
     + '<thead>'
     + '<tr id="obligHeadGroup" style="background:var(--bg3);font-size:10px;color:var(--text2)">'
-    + '<th colspan="10" style="padding:4px 14px;border-bottom:1px solid var(--border2)"></th>'
+    + '<th colspan="12" style="padding:4px 14px;border-bottom:1px solid var(--border2)"></th>'
     + '<th class="yr-group-end" style="padding:4px 14px;border-bottom:1px solid var(--border2)"></th>'
     + '</tr>'
     + '<tr id="obligHeadCols" style="background:var(--bg3);text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2)">'
@@ -6952,19 +6952,21 @@ let _obligEditId = null;
     + '<th onclick="obligSort(\'plat\',this)" style="padding:8px 14px;cursor:pointer;text-align:left">Plateforme <span class="ob-arr" style="opacity:.35">&#8645;</span></th>'
     + '<th onclick="obligSort(\'type\',this)" style="padding:8px 14px;cursor:pointer;text-align:left">Type <span class="ob-arr" style="opacity:.35">&#8645;</span></th>'
     + '<th onclick="obligSort(\'date\',this)" style="padding:8px 14px;cursor:pointer;text-align:left">Date inv. <span class="ob-arr" style="opacity:.35">&#8645;</span></th>'
-    + '<th onclick="obligSort(\'montant\',this)" style="padding:8px 14px;cursor:pointer;text-align:right">Montant initial investi (&#8364;) <span class="ob-arr" style="opacity:.35">&#8645;</span></th>'
+    + '<th onclick="obligSort(\'montant\',this)" style="padding:8px 14px;cursor:pointer;text-align:right">Valeur d\'achat (&#8364;) <span class="ob-arr" style="opacity:.35">&#8645;</span></th>'
+    + '<th onclick="obligSort(\'valFinale\',this)" style="padding:8px 14px;cursor:pointer;text-align:right">Valeur finale (&#8364;) <span class="ob-arr" style="opacity:.35">&#8645;</span></th>'
     + '<th onclick="obligSort(\'duree\',this)" style="padding:8px 14px;cursor:pointer;text-align:center">Dur&#233;e <span class="ob-arr" style="opacity:.35">&#8645;</span></th>'
     + '<th onclick="obligSort(\'interet\',this)" style="padding:8px 14px;cursor:pointer;text-align:right">Int&#233;r&#234;t % <span class="ob-arr" style="opacity:.35">&#8645;</span></th>'
     + '<th onclick="obligSort(\'recuInt\',this)" style="padding:8px 14px;cursor:pointer;text-align:right">Re&#231;u int. (&#8364;) <span class="ob-arr" style="opacity:.35">&#8645;</span></th>'
     + '<th onclick="obligSort(\'montantInvesti\',this)" style="padding:8px 14px;cursor:pointer;text-align:right">Montant investi (&#8364;) <span class="ob-arr" style="opacity:.35">&#8645;</span></th>'
     + '<th onclick="obligSort(\'capRest\',this)" style="padding:8px 14px;cursor:pointer;text-align:right">Capital restant (&#8364;) <span class="ob-arr" style="opacity:.35">&#8645;</span></th>'
+    + '<th onclick="obligSort(\'valAct\',this)" style="padding:8px 14px;cursor:pointer;text-align:right" title="Non cotée : capital restant · Cotée : nominal restant × cours du jour">Valeur actuelle capital (&#8364;) <span class="ob-arr" style="opacity:.35">&#8645;</span></th>'
     + '<th class="yr-col-end" style="padding:8px 14px"></th>'
     + '</tr>'
     + '<tr style="background:var(--bg3)">'
     + '<td style="padding:3px 8px"><input type="text" placeholder="Filtrer..." oninput="obligFilter(\'nom\',this.value)" style="width:100%;box-sizing:border-box;padding:4px 7px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>'
     + '<td style="padding:3px 8px"><input type="text" placeholder="Plateforme..." oninput="obligFilter(\'plat\',this.value)" style="width:100%;box-sizing:border-box;padding:4px 7px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>'
     + '<td style="padding:3px 8px"><input type="text" placeholder="Type..." oninput="obligFilter(\'type\',this.value)" style="width:100%;box-sizing:border-box;padding:4px 7px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>'
-    + '<td colspan="6"></td>'
+    + '<td colspan="8"></td>'
     + '<td class="yr-filter-end"></td>'
     + '</tr>'
     + '</thead>'
@@ -7001,7 +7003,7 @@ let _obligEditId = null;
     + '<option value="Autre">Autre</option></select></div>'
     + '<div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Date investissement</label>'
     + '<input id="ob_date" type="date" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none"></div>'
-    + '<div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Montant investi</label>'
+    + '<div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Valeur d\'achat</label>'
     + '<input id="ob_montant" type="number" step="0.01" placeholder="ex: 1000" oninput="obligCurrencyChange()" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none"></div>'
     + '<div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Devise</label>'
     + '<select id="ob_currency" onchange="obligCurrencyChange()" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none"><option value="EUR">EUR</option><option value="CZK">CZK</option><option value="USD">USD</option><option value="GBP">GBP</option></select></div>'
@@ -7012,6 +7014,17 @@ let _obligEditId = null;
     + '<input id="ob_duree" type="text" placeholder="ex: 36 mois" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none"></div>'
     + '<div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Int&#233;r&#234;t annuel (%)</label>'
     + '<input id="ob_interet" type="number" step="0.01" placeholder="ex: 7.5" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none"></div>'
+    // Valeur finale (remboursement à l'échéance = nominal) + obligation cotée (cours du jour en % du nominal)
+    + '<div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Valeur finale (remboursement)</label>'
+    + '<input id="ob_final" type="number" step="0.01" placeholder="= valeur d\'achat si vide" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none"></div>'
+    + '<div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Obligation cotée ?</label>'
+    + '<select id="ob_cote" onchange="obligCoteChange()" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none"><option value="0">Non — non cotée (capital restant)</option><option value="1">Oui — cotée (cours du jour)</option></select></div>'
+    + '<div class="ob-cote-f"><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">ISIN / Ticker</label>'
+    + '<input id="ob_isin" type="text" placeholder="ex: CZ0003551251" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none"></div>'
+    + '<div class="ob-cote-f"><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Cours (% du nominal)</label>'
+    + '<div style="display:flex;gap:6px"><input id="ob_cours" type="number" step="0.001" placeholder="ex: 101.25" style="flex:1;min-width:0;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">'
+    + '<input id="ob_cours_date" type="date" title="Date du cours" style="width:150px;box-sizing:border-box;padding:9px 8px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:12px;outline:none"></div></div>'
+    + '<div class="ob-cote-f" style="grid-column:1/-1;font-size:11px;color:var(--text2);margin-top:-6px">Valeur actuelle = valeur finale (nominal) restant à rembourser × cours / 100. Le cours du jour est repris automatiquement s\'il existe dans l\'onglet Prices (ticker = ISIN) ; sinon le dernier cours saisi ici est utilisé.</div>'
     + '</div>'
     + '<div style="margin-bottom:18px">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
@@ -9013,6 +9026,29 @@ function obCapRestEur(p, today) {
   var fxNow = (typeof FX_RATES !== 'undefined' && FX_RATES[p.currency]) ? FX_RATES[p.currency] : (p.fxRate || 1);
   return (mOrig - reimbCap) * fxNow;
 }
+// Valeur finale (EUR au FX du jour) : remboursement prévu à l'échéance (nominal) ; à défaut = valeur d'achat.
+function obValFinaleEur(p) {
+  if (!p) return 0;
+  if (p.valeurFinale == null) return (p.currency && p.currency !== 'EUR') ? ((p.montantOrig != null ? p.montantOrig : (p.montant||0)) * obFx(p)) : (p.montant || 0);
+  return p.valeurFinale * obFx(p);
+}
+// Cours (% du nominal) d'une obligation cotée : cours du jour de l'onglet Prices (ticker = ISIN) sinon dernier cours saisi.
+function obCours(p) {
+  if (!p || !p.cote) return null;
+  const live = (p.isin && typeof CURRENT_PRICES !== 'undefined' && CURRENT_PRICES[p.isin] && CURRENT_PRICES[p.isin].price > 0) ? CURRENT_PRICES[p.isin].price : null;
+  if (live != null) return { pct: live, date: new Date().toISOString().slice(0,10), src: 'Prices' };
+  return p.cours > 0 ? { pct: p.cours, date: p.coursDate || null, src: 'saisi' } : null;
+}
+// Valeur actuelle du capital (EUR) : non cotée = capital restant ; cotée = nominal restant × cours / 100 (FX du jour).
+function obValActEur(p, today) {
+  if (!p) return 0;
+  today = today || new Date().toISOString().slice(0,10);
+  const c = obCours(p);
+  if (!c) return obCapRestEur(p, today);
+  const nominal = p.valeurFinale != null ? p.valeurFinale : (p.montantOrig != null ? p.montantOrig : (p.montant || 0));
+  const reimb = (p.echeancier || []).filter(e => e.date <= today).reduce((s, e) => s + (e.capital || 0), 0);
+  return Math.max(0, nominal - reimb) * c.pct / 100 * obFx(p);
+}
 function obligLockPastFx() {
   const today = new Date().toISOString().slice(0,10);
   let changed = false;
@@ -9065,9 +9101,15 @@ function obligOpenModal(id) {
     document.getElementById('ob_fx').value         = p.fxRate     || 1;
     document.getElementById('ob_duree').value      = p.duree      || '';
     document.getElementById('ob_interet').value    = p.interet    || '';
+    document.getElementById('ob_final').value      = p.valeurFinale != null ? p.valeurFinale : '';
+    document.getElementById('ob_cote').value       = p.cote ? '1' : '0';
+    document.getElementById('ob_isin').value       = p.isin || '';
+    document.getElementById('ob_cours').value      = p.cours != null ? p.cours : '';
+    document.getElementById('ob_cours_date').value = p.coursDate || '';
     (p.echeancier||[]).forEach(e => obligAddEcheanceRow(e.date, e.interet||'', e.capital||''));
   } else {
-    ['ob_nom','ob_montant','ob_duree','ob_interet'].forEach(id2 => { document.getElementById(id2).value = ''; });
+    ['ob_nom','ob_montant','ob_duree','ob_interet','ob_final','ob_isin','ob_cours','ob_cours_date'].forEach(id2 => { document.getElementById(id2).value = ''; });
+    document.getElementById('ob_cote').value = '0';
     document.getElementById('ob_date').value = new Date().toISOString().slice(0,10);
     document.getElementById('ob_plateforme').value = 'LENDOSPHERE';
     document.getElementById('ob_type').value = '';
@@ -9075,6 +9117,13 @@ function obligOpenModal(id) {
     document.getElementById('ob_fx').value = 1;
   }
   try { obligCurrencyChange(); } catch(e) {}
+  try { obligCoteChange(); } catch(e) {}
+}
+function obligCoteChange() {
+  const on = document.getElementById('ob_cote') && document.getElementById('ob_cote').value === '1';
+  document.querySelectorAll('#obligModal .ob-cote-f').forEach(el => { el.style.display = on ? '' : 'none'; });
+  const cd = document.getElementById('ob_cours_date');
+  if (on && cd && !cd.value) cd.value = new Date().toISOString().slice(0,10);
 }
 
 function obligCloseModal() {
@@ -9090,6 +9139,10 @@ function obligCurrencyChange() {
   const _ch = document.getElementById('ob_ec_cap_hdr');
   if (_ih) _ih.textContent = 'Int\u00e9r\u00eats (' + _cl + ')';
   if (_ch) _ch.textContent = 'Remb. capital (' + _cl + ')';
+  const _fl = document.getElementById('ob_final') && document.getElementById('ob_final').previousElementSibling;
+  if (_fl) _fl.textContent = 'Valeur finale \u2014 remboursement (' + _cl + ')';
+  const _al = document.getElementById('ob_montant') && document.getElementById('ob_montant').previousElementSibling;
+  if (_al) _al.textContent = 'Valeur d\u2019achat (' + _cl + ')';
   const fxEl    = document.getElementById('ob_fx');
   const lbl     = document.getElementById('ob_fx_label');
   const hint    = document.getElementById('ob_eur_hint');
@@ -9136,7 +9189,14 @@ function obligSaveModal() {
   const msg        = document.getElementById('ob_msg');
   if (!nom)                       { msg.textContent = 'Nom requis.'; return; }
   if (!date)                      { msg.textContent = 'Date requise.'; return; }
-  if (isNaN(montant)||montant<=0) { msg.textContent = 'Montant invalide.'; return; }
+  if (isNaN(montant)||montant<=0) { msg.textContent = 'Valeur d\'achat invalide.'; return; }
+  const valeurFinaleIn = parseFloat(document.getElementById('ob_final').value);
+  const cote      = document.getElementById('ob_cote').value === '1';
+  const isin      = document.getElementById('ob_isin').value.trim().toUpperCase();
+  const coursIn   = parseFloat(document.getElementById('ob_cours').value);
+  const coursDate = document.getElementById('ob_cours_date').value || '';
+  if (cote && (isNaN(coursIn) || coursIn <= 0) && !(isin && typeof CURRENT_PRICES !== 'undefined' && CURRENT_PRICES[isin]))
+    { msg.textContent = 'Obligation cotée : saisir le cours (% du nominal) ou un ISIN présent dans l\'onglet Prices.'; return; }
 
   const echeancier = [];
   document.querySelectorAll('#ob_echeancier > div').forEach(row => {
@@ -9148,7 +9208,9 @@ function obligSaveModal() {
   echeancier.sort((a, b) => a.date.localeCompare(b.date));
 
   const montantEur = currency === 'EUR' ? montant : Math.round(montant * fxRate * 100) / 100;
-  const fields = { nom, plateforme, typeProjet, date, montant: montantEur, montantOrig: montant, currency, fxRate, duree, interet: isNaN(interet)?null:interet, echeancier };
+  const fields = { nom, plateforme, typeProjet, date, montant: montantEur, montantOrig: montant, currency, fxRate, duree, interet: isNaN(interet)?null:interet, echeancier,
+                   valeurFinale: isNaN(valeurFinaleIn) ? null : valeurFinaleIn, cote, isin: isin || null,
+                   cours: cote && !isNaN(coursIn) ? coursIn : null, coursDate: cote ? coursDate : null };
   if (_obligEditId != null) {
     const idx = OBLIG_DATA.findIndex(x => x.id === _obligEditId);
     if (idx !== -1) OBLIG_DATA[idx] = { ...OBLIG_DATA[idx], ...fields };
@@ -9246,7 +9308,8 @@ function renderObligSection() {
       if (!dateByYear[yr]) dateByYear[yr] = [];
       dateByYear[yr].push(e.date + ' : ' + Math.round(ie).toLocaleString('fr') + ' EUR' + (e.intEur!=null ? ' (figé)' : ''));
     });
-    return Object.assign({}, p, { recuInt: recuInt, capRest: capRest, montantInvesti: montantInvesti, intByYear: intByYear, dateByYear: dateByYear });
+    return Object.assign({}, p, { recuInt: recuInt, capRest: capRest, montantInvesti: montantInvesti, intByYear: intByYear, dateByYear: dateByYear,
+                                  valFinale: obValFinaleEur(p), valAct: obValActEur(p, today), coursInfo: obCours(p) });
   });
 
   var f = _obligFilter || {};
@@ -9268,18 +9331,22 @@ function renderObligSection() {
       else if (col==='recuInt'){ va=a.recuInt;         vb=b.recuInt; }
       else if (col==='montantInvesti'){ va=a.montantInvesti; vb=b.montantInvesti; }
       else if (col==='capRest'){ va=a.capRest;         vb=b.capRest; }
+      else if (col==='valFinale'){ va=a.valFinale;     vb=b.valFinale; }
+      else if (col==='valAct') { va=a.valAct;          vb=b.valAct; }
       else { va=0; vb=0; }
       if (typeof va==='string') return va.localeCompare(vb)*dir;
       return (va-vb)*dir;
     });
   }
 
-  var totMontant=0, totCapRest=0, totRecuInt=0, totMontantInvesti=0;
+  var totMontant=0, totCapRest=0, totRecuInt=0, totMontantInvesti=0, totValFinale=0, totValAct=0;
   tbody.innerHTML = data.map(function(p, i) {
     var col = PLAT_COLORS[p.plateforme] || '#6b7280';
     var bg  = i%2===0 ? 'var(--bg)' : 'var(--bg2)';
     totMontant         += p.montant  || 0;
     totCapRest         += p.capRest;
+    totValFinale       += p.valFinale;
+    totValAct          += p.valAct;
     totRecuInt         += p.recuInt;
     totMontantInvesti  += p.montantInvesti;
     var yearCells = futureYears.map(function(yr) {
@@ -9290,16 +9357,20 @@ function renderObligSection() {
     }).join('');
     var interetStr = p.interet!=null ? p.interet.toFixed(2).replace('.',',')+'%' : '-';
     return '<tr style="background:' + bg + ';border-bottom:1px solid var(--border)">'
-      + '<td style="padding:8px 14px;font-weight:600">' + p.nom + '</td>'
+      + '<td style="padding:8px 14px;font-weight:600">' + p.nom + (p.cote ? ' <span title="Obligation cotée" style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;background:#5a8dee22;color:#5a8dee;vertical-align:middle">COTÉE</span>' : '') + '</td>'
       + '<td style="padding:8px 14px"><span style="padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;background:' + col + '22;color:' + col + '">' + p.plateforme + '</span></td>'
       + '<td style="padding:8px 14px;font-size:11px;color:var(--text2)">' + (p.typeProjet||'-') + '</td>'
       + '<td style="padding:8px 14px;color:var(--text2)">' + (p.date||'-') + '</td>'
       + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:600">' + Math.round(p.montant||0).toLocaleString('fr') + ' &#8364;</td>'
+      + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;color:var(--text2)"' + (p.valeurFinale==null ? ' title="Non renseignée : = valeur d\'achat"' : '') + '>' + Math.round(p.valFinale||0).toLocaleString('fr') + ' &#8364;</td>'
       + '<td style="padding:8px 14px;text-align:center;color:var(--text2)">' + (p.duree||'-') + '</td>'
       + '<td style="padding:8px 14px;text-align:right;color:#4caf82;font-weight:600">' + interetStr + '</td>'
       + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;color:#4caf82">' + Math.round(p.recuInt).toLocaleString('fr') + ' &#8364;</td>'
       + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:600;color:#60a5fa">' + Math.round(p.montantInvesti).toLocaleString('fr') + ' &#8364;</td>'
       + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;color:' + (p.capRest>0?'var(--text)':'#4caf82') + '">' + Math.round(p.capRest).toLocaleString('fr') + ' &#8364;</td>'
+      + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:600">' + Math.round(p.valAct).toLocaleString('fr') + ' &#8364;'
+      + (p.coursInfo ? '<div style="font-size:10px;font-weight:400;color:var(--text2)">cours ' + p.coursInfo.pct.toLocaleString('fr', {maximumFractionDigits: 3}) + ' %' + (p.coursInfo.date ? ' · ' + p.coursInfo.date : '') + (p.coursInfo.src === 'Prices' ? ' (auto)' : '') + '</div>'
+         : (p.cote ? '<div style="font-size:10px;color:#e06c6c">cours manquant</div>' : '')) + '</td>'
       + yearCells
       + '<td style="padding:8px 10px;white-space:nowrap">'
       + '<button onclick="obligOpenModal(' + p.id + ')" style="padding:3px 8px;font-size:11px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;color:var(--text);cursor:pointer;margin-right:4px">&#9999;</button>'
@@ -9316,10 +9387,12 @@ function renderObligSection() {
   tfoot.innerHTML = '<tr class="tfoot">'
     + '<td colspan="4" style="padding:8px 14px;font-weight:700">Total (' + data.length + ' projet' + (data.length>1?'s':'') + ')</td>'
     + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:700">' + Math.round(totMontant).toLocaleString('fr') + ' &#8364;</td>'
+    + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:700;color:var(--text2)">' + Math.round(totValFinale).toLocaleString('fr') + ' &#8364;</td>'
     + '<td></td><td></td>'
     + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:700;color:#4caf82">' + Math.round(totRecuInt).toLocaleString('fr') + ' &#8364;</td>'
     + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:700;color:#60a5fa">' + Math.round(totMontantInvesti).toLocaleString('fr') + ' &#8364;</td>'
     + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:700">' + Math.round(totCapRest).toLocaleString('fr') + ' &#8364;</td>'
+    + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:700">' + Math.round(totValAct).toLocaleString('fr') + ' &#8364;</td>'
     + yrTots + '<td></td></tr>';
 
   // ── Graphiques — uniquement si l'onglet est visible ─────────────────────────
