@@ -2093,7 +2093,7 @@ function renderPatrimoine(){
 function _brokerEvoSuffix(b) {
   b = String(b || '');
   if (b.toUpperCase().startsWith('KB')) return 'kb';
-  return ({ 'LUMO':'lumo', 'LENDOSPHERE':'lendo', 'ENERFIP':'enerfip', 'LINXEA':'linxea', 'SAXO':'saxo', 'IBKR':'ibkr',
+  return ({ 'LUMO':'lumo', 'LENDOSPHERE':'lendo', 'ENERFIP':'enerfip', 'LINXEA':'linxea', 'SAXO':'saxo', 'SAXO obligations':'saxo', 'IBKR':'ibkr',
             'TRADING 212':'t212', 'trading 212':'t212', 'TRADING 212 JITO':'jito', 'XTB':'xtb', 'Ledger':'ledger', 'LEDGER':'ledger', 'ledger':'ledger',
             'Binance':'binance', 'BINANCE':'binance', 'binance':'binance', 'Finst':'finst', 'FINST':'finst', 'finst':'finst' })[b] || null;
 }
@@ -2152,9 +2152,10 @@ function renderDashboard() {
     'XTB':'Actions & ETFs', 'TRADING 212':'Actions & ETFs', 'TRADING 212 JITO':'Actions & ETFs',
     'Ledger':'Crypto', 'Binance':'Crypto', 'Finst':'Crypto',
     'KB':'Produits structurés & Épargne',
-    'LENDOSPHERE':'Obligations non cotées', 'ENERFIP':'Obligations non cotées', 'LUMO':'Obligations non cotées', 'KB obligations':'Obligations non cotées'
+    'LENDOSPHERE':'Obligations', 'ENERFIP':'Obligations', 'LUMO':'Obligations', 'KB obligations':'Obligations',
+    'SAXO obligations':'Obligations'
   };
-  const CATS = ['Actions & ETFs', 'Crypto', 'Produits structurés & Épargne', 'Obligations non cotées'];
+  const CATS = ['Actions & ETFs', 'Crypto', 'Produits structurés & Épargne', 'Obligations'];
 
   // ── 1. Montant investi par catégorie = net déposé par broker ────────────────
   const allDeps = [...(typeof CASH_BASE_DEPOSITS !== 'undefined' ? CASH_BASE_DEPOSITS : []),
@@ -2197,7 +2198,7 @@ function renderDashboard() {
     let cat = 'Actions & ETFs';
     if (r.typeInv === 'Crypto') cat = 'Crypto';
     else if (r.typeInv === 'Produit structuré' || r.typeInv === 'Produit structure' || r.typeInv === 'Épargne' || r.typeInv === 'Epargne') cat = 'Produits structurés & Épargne';
-    else if (r.typeInv && r.typeInv.toLowerCase().includes('obligation')) cat = 'Obligations non cotées';
+    else if (r.typeInv && r.typeInv.toLowerCase().includes('obligation')) cat = 'Obligations';
     pfByCat[cat] = (pfByCat[cat] || 0) + val;
 
     // Par broker
@@ -2218,7 +2219,7 @@ function renderDashboard() {
     if (cat) cashByCat[cat] += cashEur;
   });
 
-  // Obligations non cotées : capital restant
+  // Obligations : capital restant
   let obligCapRest = 0;
   const obligByPlat = {};
   (typeof OBLIG_DATA !== 'undefined' ? OBLIG_DATA : []).forEach(p => {
@@ -2230,13 +2231,13 @@ function renderDashboard() {
     if (!pfByBroker[b]) pfByBroker[b] = 0;
     pfByBroker[b] += cap;
   });
-  pfByCat['Obligations non cotées'] = (pfByCat['Obligations non cotées'] || 0) + obligCapRest;
+  pfByCat['Obligations'] = (pfByCat['Obligations'] || 0) + obligCapRest;
 
   // ── Détail par item pour le donut « Par type d'actif » (et le clic) ──────────
   // Construit ICI, à partir des MÊMES sources que les onglets :
   //   • instruments valorisés  -> onglet Portefeuille (valeur actuelle)
   //   • cash converti en €      -> onglet Dépôts & Cash (une tuile 'Cash', détail/broker)
-  //   • capital restant         -> onglet Obligations non cotées
+  //   • capital restant         -> onglet Obligations
   // BROKER_TO_CAT / normBroker sont locaux à renderDashboard. NB : on n'utilise PAS
   // isActiveInv (qui ne garde que Action/ETF et exclurait Crypto/Épargne).
   window._dbHoldingsData = (function(){
@@ -2248,11 +2249,11 @@ function renderDashboard() {
       if (ti.includes('crypto')) return 'Crypto';
       if (ti.includes('structur')) return 'Produits structurés';
       if (ti.includes('pargne')) return 'Épargne';
-      if (ti.includes('obligation')) return 'Obligations non cotées';
+      if (ti.includes('obligation')) return 'Obligations';
       const bc = BROKER_TO_CAT[normBroker(r.broker || '—')] || 'Actions & ETFs';
       if (bc === 'Crypto') return 'Crypto';
       if (bc === 'Produits structurés & Épargne') return 'Épargne';   // KB sans Type = épargne
-      if (bc === 'Obligations non cotées') return 'Obligations non cotées';
+      if (bc === 'Obligations') return 'Obligations';
       if (ti === 'etf' || (typeof ETF_TICKERS!=='undefined' && ETF_TICKERS.has(r.ticker))) return 'ETFs';
       return 'Actions';
     };
@@ -2275,11 +2276,11 @@ function renderDashboard() {
       if (!cashEur || cashEur <= 0) return;
       items.push({ name:'Cash — '+normBroker(bb0), ticker:'', cat:'Cash', broker:normBroker(bb0), valEur:Math.round(cashEur) });
     });
-    // 3) Obligations non cotées (onglet dédié) — capital restant
+    // 3) Obligations (onglet dédié) — capital restant
     (typeof OBLIG_DATA !== 'undefined' ? OBLIG_DATA : []).forEach(p => {
       const val = (typeof obCapRestEur==='function') ? obCapRestEur(p, today) : (p.montant||0);
       if (!val || val <= 0) return;
-      items.push({ name:(p.nom||p.projet||p.plateforme||'Obligation'), ticker:'', cat:'Obligations non cotées', broker:normBroker(p.plateforme||'—'), valEur:Math.round(val) });
+      items.push({ name:(p.nom||p.projet||p.plateforme||'Obligation'), ticker:'', cat:'Obligations', broker:normBroker(p.plateforme||'—'), valEur:Math.round(val) });
     });
     return items;
   })();
@@ -2440,7 +2441,7 @@ function renderDashboard() {
     'Actions & ETFs': '#5a8dee',
     'Crypto': '#f59e0b',
     'Produits structurés & Épargne': '#a78bfa',
-    'Obligations non cotées': '#4caf82'
+    'Obligations': '#4caf82'
   };
   var BROKER_PALETTE = ['#5a8dee','#4caf82','#f97316','#a78bfa','#f59e0b','#ec4899','#14b8a6','#84cc16','#e06c6c','#60a5fa','#34d399','#fb923c'];
 
@@ -2483,22 +2484,22 @@ function renderDashboard() {
 
   // Donut par type — construit à partir de window._dbHoldingsData (mêmes items que le
   // détail affiché au clic). Catégories : Actions / ETFs / Produits structurés / Épargne
-  // / Crypto (onglet Portefeuille), Obligations non cotées (onglet dédié) et une tuile
+  // / Crypto (onglet Portefeuille), Obligations (onglet dédié) et une tuile
   // Cash (détail par broker au clic). Une catégorie sans ligne (valeur 0) n'apparaît pas.
   var _typeAgg = {};
   (window._dbHoldingsData || []).forEach(function(h){ _typeAgg[h.cat] = (_typeAgg[h.cat] || 0) + h.valEur; });
-  var _typeOrder = ['Actions', 'ETFs', 'Produits structurés', 'Épargne', 'Crypto', 'Obligations non cotées', 'Cash'];
+  var _typeOrder = ['Actions', 'ETFs', 'Produits structurés', 'Épargne', 'Crypto', 'Obligations', 'Cash'];
   var typeEntries = _typeOrder
     .filter(function(c) { return (_typeAgg[c] || 0) > 0; })
     .map(function(c) { return [c, _typeAgg[c]]; });
   // Couleurs stables par libellé ; tri par valeur pour aligner la palette
-  var _typeCol = { 'Actions':'#5a8dee', 'ETFs':'#38bdf8', 'Crypto':'#f59e0b', 'Produits structurés':'#a78bfa', 'Épargne':'#c4b5fd', 'Obligations non cotées':'#4caf82', 'Cash':'#94a3b8' };
+  var _typeCol = { 'Actions':'#5a8dee', 'ETFs':'#38bdf8', 'Crypto':'#f59e0b', 'Produits structurés':'#a78bfa', 'Épargne':'#c4b5fd', 'Obligations':'#4caf82', 'Cash':'#94a3b8' };
   typeEntries.sort(function(a,b) { return b[1]-a[1]; });
   makeDonut('db_donut_type', 'db_donut_type_leg', typeEntries, typeEntries.map(function(e) { return _typeCol[e[0]] || '#6b7280'; }), function(l){ window._dbShow('type', l); });
 
   // Donut par broker
   var _pfBrokerMerged = {};
-  Object.keys(pfByBroker).forEach(function(b){ var k = (b === 'KB obligations') ? 'KB' : b; _pfBrokerMerged[k] = (_pfBrokerMerged[k]||0) + pfByBroker[b]; });
+  Object.keys(pfByBroker).forEach(function(b){ var k = (b === 'KB obligations') ? 'KB' : (b === 'SAXO obligations') ? 'SAXO' : b; _pfBrokerMerged[k] = (_pfBrokerMerged[k]||0) + pfByBroker[b]; });
   var brokerEntries = Object.entries(_pfBrokerMerged)
     .filter(function(e) { return e[1] > 0; })
     .sort(function(a, b) { return b[1] - a[1]; });
@@ -2716,7 +2717,7 @@ function renderDashboard() {
   // Catégories : KB (épargne) et KB obligations partagent la colonne « kb » de l'historique -> pseudo-colonnes kbonly / kbobl
   const catSuffixes = (cat) => {
     const s = Object.keys(BROKER_EVO).filter(k => BROKER_TO_CAT[k] === cat).map(k => BROKER_EVO[k] === 'kb' ? 'kbonly' : BROKER_EVO[k]);
-    if (cat === 'Obligations non cotées') s.push('kbobl');
+    if (cat === 'Obligations') s.push('kbobl');
     return s;
   };
   const catCell = (cat, val, inv, cut) => periodCell(val, inv, catSuffixes(cat), cut);
@@ -2732,7 +2733,7 @@ function renderDashboard() {
   const typeData = CATS.map(cat => {
     const inv = investedByCat[cat] || 0, val = valueByCat[cat] || 0;
     let perf = inv > 0 ? (val - inv) / inv * 100 : null;
-    if (cat === 'Obligations non cotées' && typeof OBLIG_DATA !== 'undefined') {
+    if (cat === 'Obligations' && typeof OBLIG_DATA !== 'undefined') {
       // Obligations : performance = intérêts reçus à ce jour / montant initialement investi
       const _t = new Date().toISOString().slice(0,10); let _oi = 0, _on = 0;
       OBLIG_DATA.forEach(p => { _oi += (p.montant||0); (p.echeancier||[]).forEach(e => { if (e.date <= _t) _on += (typeof echIntEur === 'function') ? echIntEur(p,e) : (e.interet||0); }); });
@@ -2743,7 +2744,7 @@ function renderDashboard() {
   });
   try{ window._patFin = { types: typeData.map(t=>({label:t.label,val:t.val,pnl:t.pnl})), totalEur: totalValue }; }catch(e){}
   // Par broker : regrouper "KB obligations" sous "KB"
-  const _mergeBrk = b => (b === 'KB obligations') ? 'KB' : b;
+  const _mergeBrk = b => (b === 'KB obligations') ? 'KB' : (b === 'SAXO obligations') ? 'SAXO' : b;
   const _bInv = {}, _bVal = {};
   [...new Set([...Object.keys(investedByBroker), ...Object.keys(pfByBroker)])].forEach(b => {
     const k = _mergeBrk(b);
@@ -6389,6 +6390,7 @@ function getTodayEvoRow() {
 
   const normBroker = b => {
     if (b && String(b).toUpperCase().startsWith('KB')) return 'KB';  // KB + "KB obligations" -> KB (meme logique que le tableau par broker)
+    if (b === 'SAXO obligations') return 'SAXO';                          // obligations achetées chez SAXO -> SAXO
     const map = { 'ledger':'Ledger','LEDGER':'Ledger','binance':'Binance','BINANCE':'Binance','finst':'Finst','FINST':'Finst','trading 212':'TRADING 212','TRADING 212 JITO':'TRADING 212 JITO' };
     return map[b] || b;
   };
@@ -6944,7 +6946,7 @@ let _obligEditId = null;
     + '<table id="obligTable" style="font-size:12px;width:100%;border-collapse:collapse">'
     + '<thead>'
     + '<tr id="obligHeadGroup" style="background:var(--bg3);font-size:10px;color:var(--text2)">'
-    + '<th colspan="12" style="padding:4px 14px;border-bottom:1px solid var(--border2)"></th>'
+    + '<th colspan="11" style="padding:4px 14px;border-bottom:1px solid var(--border2)"></th>'
     + '<th class="yr-group-end" style="padding:4px 14px;border-bottom:1px solid var(--border2)"></th>'
     + '</tr>'
     + '<tr id="obligHeadCols" style="background:var(--bg3);text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2)">'
@@ -6953,12 +6955,11 @@ let _obligEditId = null;
     + '<th onclick="obligSort(\'type\',this)" style="padding:8px 14px;cursor:pointer;text-align:left">Type <span class="ob-arr" style="opacity:.35">&#8645;</span></th>'
     + '<th onclick="obligSort(\'date\',this)" style="padding:8px 14px;cursor:pointer;text-align:left">Date inv. <span class="ob-arr" style="opacity:.35">&#8645;</span></th>'
     + '<th onclick="obligSort(\'montant\',this)" style="padding:8px 14px;cursor:pointer;text-align:right">Valeur d\'achat (&#8364;) <span class="ob-arr" style="opacity:.35">&#8645;</span></th>'
-    + '<th onclick="obligSort(\'valFinale\',this)" style="padding:8px 14px;cursor:pointer;text-align:right">Valeur finale (&#8364;) <span class="ob-arr" style="opacity:.35">&#8645;</span></th>'
     + '<th onclick="obligSort(\'duree\',this)" style="padding:8px 14px;cursor:pointer;text-align:center">Dur&#233;e <span class="ob-arr" style="opacity:.35">&#8645;</span></th>'
     + '<th onclick="obligSort(\'interet\',this)" style="padding:8px 14px;cursor:pointer;text-align:right">Int&#233;r&#234;t % <span class="ob-arr" style="opacity:.35">&#8645;</span></th>'
     + '<th onclick="obligSort(\'recuInt\',this)" style="padding:8px 14px;cursor:pointer;text-align:right">Re&#231;u int. (&#8364;) <span class="ob-arr" style="opacity:.35">&#8645;</span></th>'
     + '<th onclick="obligSort(\'montantInvesti\',this)" style="padding:8px 14px;cursor:pointer;text-align:right">Montant investi (&#8364;) <span class="ob-arr" style="opacity:.35">&#8645;</span></th>'
-    + '<th onclick="obligSort(\'capRest\',this)" style="padding:8px 14px;cursor:pointer;text-align:right">Capital restant (&#8364;) <span class="ob-arr" style="opacity:.35">&#8645;</span></th>'
+    + '<th onclick="obligSort(\'valFinale\',this)" style="padding:8px 14px;cursor:pointer;text-align:right" title="Montant restant à récupérer : cotée = valeur nominale restante · non cotée = capital restant">Valeur finale (&#8364;) <span class="ob-arr" style="opacity:.35">&#8645;</span></th>'
     + '<th onclick="obligSort(\'valAct\',this)" style="padding:8px 14px;cursor:pointer;text-align:right" title="Non cotée : capital restant · Cotée : nominal restant × cours du jour">Valeur actuelle capital (&#8364;) <span class="ob-arr" style="opacity:.35">&#8645;</span></th>'
     + '<th class="yr-col-end" style="padding:8px 14px"></th>'
     + '</tr>'
@@ -6966,7 +6967,7 @@ let _obligEditId = null;
     + '<td style="padding:3px 8px"><input type="text" placeholder="Filtrer..." oninput="obligFilter(\'nom\',this.value)" style="width:100%;box-sizing:border-box;padding:4px 7px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>'
     + '<td style="padding:3px 8px"><input type="text" placeholder="Plateforme..." oninput="obligFilter(\'plat\',this.value)" style="width:100%;box-sizing:border-box;padding:4px 7px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>'
     + '<td style="padding:3px 8px"><input type="text" placeholder="Type..." oninput="obligFilter(\'type\',this.value)" style="width:100%;box-sizing:border-box;padding:4px 7px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:11px;outline:none"></td>'
-    + '<td colspan="8"></td>'
+    + '<td colspan="7"></td>'
     + '<td class="yr-filter-end"></td>'
     + '</tr>'
     + '</thead>'
@@ -6987,7 +6988,7 @@ let _obligEditId = null;
     + '<input id="ob_nom" type="text" placeholder="ex: Centrale solaire Provence" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none"></div>'
     + '<div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Plateforme</label>'
     + '<select id="ob_plateforme" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">'
-    + '<option value="LENDOSPHERE">LENDOSPHERE</option><option value="ENERFIP">ENERFIP</option><option value="LUMO">LUMO</option><option value="KB">KB</option><option value="KB obligations">KB obligations</option></select></div>'
+    + '<option value="LENDOSPHERE">LENDOSPHERE</option><option value="ENERFIP">ENERFIP</option><option value="LUMO">LUMO</option><option value="KB">KB</option><option value="KB obligations">KB obligations</option><option value="SAXO obligations">SAXO obligations</option></select></div>'
     + '<div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Type de projet</label>'
     + '<select id="ob_type" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">'
     + '<option value="">-- S&#233;lectionner --</option>'
@@ -6999,6 +7000,7 @@ let _obligEditId = null;
     + '<option value="Immobilier">Immobilier</option>'
     + '<option value="Agriculture">Agriculture</option>'
     + '<option value="Financement entreprise">Financement d\'entreprise</option>'
+    + '<option value="Financement Dette Etat">Financement Dette &#201;tat</option>'
     + '<option value="Monetaire">Mon&#233;taire</option>'
     + '<option value="Autre">Autre</option></select></div>'
     + '<div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Date investissement</label>'
@@ -9026,11 +9028,15 @@ function obCapRestEur(p, today) {
   var fxNow = (typeof FX_RATES !== 'undefined' && FX_RATES[p.currency]) ? FX_RATES[p.currency] : (p.fxRate || 1);
   return (mOrig - reimbCap) * fxNow;
 }
-// Valeur finale (EUR au FX du jour) : remboursement prévu à l'échéance (nominal) ; à défaut = valeur d'achat.
-function obValFinaleEur(p) {
+// Valeur finale (EUR au FX du jour) = montant restant à récupérer :
+//   obligation cotée     -> valeur nominale restante (valeur finale saisie − capital déjà remboursé) ;
+//   obligation non cotée -> capital restant (valeur d'achat − capital déjà remboursé).
+function obValFinaleEur(p, today) {
   if (!p) return 0;
-  if (p.valeurFinale == null) return (p.currency && p.currency !== 'EUR') ? ((p.montantOrig != null ? p.montantOrig : (p.montant||0)) * obFx(p)) : (p.montant || 0);
-  return p.valeurFinale * obFx(p);
+  today = today || new Date().toISOString().slice(0,10);
+  if (!p.cote || p.valeurFinale == null) return obCapRestEur(p, today);
+  const reimb = (p.echeancier || []).filter(e => e.date <= today).reduce((s, e) => s + (e.capital || 0), 0);
+  return Math.max(0, p.valeurFinale - reimb) * obFx(p);
 }
 // Cours (% du nominal) d'une obligation cotée : cours du jour de l'onglet Prices (ticker = ISIN) sinon dernier cours saisi.
 function obCours(p) {
@@ -9246,7 +9252,7 @@ function renderObligSection() {
   try { obligLockPastFx(); } catch(e) {}
   const today    = new Date().toISOString().slice(0,10);
   const thisYear = today.slice(0,4);
-  const PLAT_COLORS = { LENDOSPHERE: '#4caf82', ENERFIP: '#5a8dee', LUMO: '#f97316', KB: '#9b87d4', 'KB obligations': '#7c6bbf' };
+  const PLAT_COLORS = { LENDOSPHERE: '#4caf82', ENERFIP: '#5a8dee', LUMO: '#f97316', KB: '#9b87d4', 'KB obligations': '#7c6bbf', 'SAXO obligations': '#0ea5e9' };
 
   // Années futures uniquement
   const futureYears = [...new Set(
@@ -9309,7 +9315,7 @@ function renderObligSection() {
       dateByYear[yr].push(e.date + ' : ' + Math.round(ie).toLocaleString('fr') + ' EUR' + (e.intEur!=null ? ' (figé)' : ''));
     });
     return Object.assign({}, p, { recuInt: recuInt, capRest: capRest, montantInvesti: montantInvesti, intByYear: intByYear, dateByYear: dateByYear,
-                                  valFinale: obValFinaleEur(p), valAct: obValActEur(p, today), coursInfo: obCours(p) });
+                                  valFinale: obValFinaleEur(p, today), valAct: obValActEur(p, today), coursInfo: obCours(p) });
   });
 
   var f = _obligFilter || {};
@@ -9362,12 +9368,12 @@ function renderObligSection() {
       + '<td style="padding:8px 14px;font-size:11px;color:var(--text2)">' + (p.typeProjet||'-') + '</td>'
       + '<td style="padding:8px 14px;color:var(--text2)">' + (p.date||'-') + '</td>'
       + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:600">' + Math.round(p.montant||0).toLocaleString('fr') + ' &#8364;</td>'
-      + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;color:var(--text2)"' + (p.valeurFinale==null ? ' title="Non renseignée : = valeur d\'achat"' : '') + '>' + Math.round(p.valFinale||0).toLocaleString('fr') + ' &#8364;</td>'
       + '<td style="padding:8px 14px;text-align:center;color:var(--text2)">' + (p.duree||'-') + '</td>'
       + '<td style="padding:8px 14px;text-align:right;color:#4caf82;font-weight:600">' + interetStr + '</td>'
       + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;color:#4caf82">' + Math.round(p.recuInt).toLocaleString('fr') + ' &#8364;</td>'
       + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:600;color:#60a5fa">' + Math.round(p.montantInvesti).toLocaleString('fr') + ' &#8364;</td>'
-      + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;color:' + (p.capRest>0?'var(--text)':'#4caf82') + '">' + Math.round(p.capRest).toLocaleString('fr') + ' &#8364;</td>'
+      + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;color:' + (p.valFinale>0?'var(--text)':'#4caf82') + '" title="' + (p.cote && p.valeurFinale!=null ? 'Valeur nominale restante' : 'Capital restant') + '">' + Math.round(p.valFinale).toLocaleString('fr') + ' &#8364;'
+      + (p.cote && p.valeurFinale!=null ? '<div style="font-size:10px;color:var(--text2)">nominal</div>' : '') + '</td>'
       + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:600">' + Math.round(p.valAct).toLocaleString('fr') + ' &#8364;'
       + (p.coursInfo ? '<div style="font-size:10px;font-weight:400;color:var(--text2)">cours ' + p.coursInfo.pct.toLocaleString('fr', {maximumFractionDigits: 3}) + ' %' + (p.coursInfo.date ? ' · ' + p.coursInfo.date : '') + (p.coursInfo.src === 'Prices' ? ' (auto)' : '') + '</div>'
          : (p.cote ? '<div style="font-size:10px;color:#e06c6c">cours manquant</div>' : '')) + '</td>'
@@ -9387,11 +9393,10 @@ function renderObligSection() {
   tfoot.innerHTML = '<tr class="tfoot">'
     + '<td colspan="4" style="padding:8px 14px;font-weight:700">Total (' + data.length + ' projet' + (data.length>1?'s':'') + ')</td>'
     + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:700">' + Math.round(totMontant).toLocaleString('fr') + ' &#8364;</td>'
-    + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:700;color:var(--text2)">' + Math.round(totValFinale).toLocaleString('fr') + ' &#8364;</td>'
     + '<td></td><td></td>'
     + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:700;color:#4caf82">' + Math.round(totRecuInt).toLocaleString('fr') + ' &#8364;</td>'
     + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:700;color:#60a5fa">' + Math.round(totMontantInvesti).toLocaleString('fr') + ' &#8364;</td>'
-    + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:700">' + Math.round(totCapRest).toLocaleString('fr') + ' &#8364;</td>'
+    + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:700">' + Math.round(totValFinale).toLocaleString('fr') + ' &#8364;</td>'
     + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:700">' + Math.round(totValAct).toLocaleString('fr') + ' &#8364;</td>'
     + yrTots + '<td></td></tr>';
 
@@ -15046,7 +15051,7 @@ function renderObligHist(){
   // Donuts (global, non filtré)
   var byProj={}, byPlat={}, byYear={};
   all.forEach(function(r){ byProj[r.projet]=(byProj[r.projet]||0)+r.recu; byPlat[r.plateforme]=(byPlat[r.plateforme]||0)+r.recu; var y=String(r.date).slice(0,4); byYear[y]=(byYear[y]||0)+r.recu; });
-  var PLAT_COLORS={ LENDOSPHERE:'#4caf82', ENERFIP:'#5a8dee', LUMO:'#f97316', KB:'#9b87d4', 'KB obligations':'#7c6bbf' };
+  var PLAT_COLORS={ LENDOSPHERE:'#4caf82', ENERFIP:'#5a8dee', LUMO:'#f97316', KB:'#9b87d4', 'KB obligations':'#7c6bbf', 'SAXO obligations':'#0ea5e9' };
   var PALETTE=['#5a8dee','#4caf82','#f97316','#a78bfa','#f59e0b','#ec4899','#14b8a6','#84cc16','#e06c6c','#60a5fa','#34d399','#fb923c'];
   ['obligHistChartProjet','obligHistChartPlat','obligHistChartYear'].forEach(function(id){ if(_obligHistCharts[id]){try{_obligHistCharts[id].destroy();}catch(e){}delete _obligHistCharts[id];} });
   if(typeof Chart==='undefined') return;
