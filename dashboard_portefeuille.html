@@ -6985,12 +6985,13 @@ let _obligEditId = null;
     + '<h3 id="obligModalTitle" style="margin:0 0 20px;font-size:15px;font-weight:700">Nouveau projet</h3>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">'
     + '<div style="grid-column:1/-1"><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Nom du projet</label>'
-    + '<input id="ob_nom" type="text" placeholder="ex: Centrale solaire Provence" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none"></div>'
+    + '<input id="ob_nom" type="text" list="ob_nom_list" autocomplete="off" oninput="obligNomPicked()" placeholder="Choisir une obligation existante ou saisir un nouveau nom" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none"><datalist id="ob_nom_list"></datalist>'
+    + '<div id="ob_nom_hint" style="font-size:10.5px;color:var(--text2);margin-top:3px"></div></div>'
     + '<div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Plateforme</label>'
-    + '<select id="ob_plateforme" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">'
+    + '<select id="ob_plateforme" onchange="obligNomList()" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">'
     + '<option value="LENDOSPHERE">LENDOSPHERE</option><option value="ENERFIP">ENERFIP</option><option value="LUMO">LUMO</option><option value="KB">KB</option><option value="KB obligations">KB obligations</option><option value="SAXO obligations">SAXO obligations</option></select></div>'
     + '<div><label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Type de projet</label>'
-    + '<select id="ob_type" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">'
+    + '<select id="ob_type" onchange="obligNomList()" style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">'
     + '<option value="">-- S&#233;lectionner --</option>'
     + '<option value="Energie solaire">Energie solaire</option>'
     + '<option value="Energie eolienne">Energie &#233;olienne</option>'
@@ -9106,6 +9107,9 @@ function obligFilter(field, val) {
 
 function obligOpenModal(id) {
   _obligEditId = id != null ? id : null;
+  window._obPlatTouched = false;
+  const _ps = document.getElementById('ob_plateforme');
+  if (_ps && !_ps._obTouchBound) { _ps.addEventListener('change', () => { window._obPlatTouched = true; obligNomList(); }); _ps._obTouchBound = true; }
   const modal = document.getElementById('obligModal');
   if (!modal) return;
   modal.style.display = 'flex';
@@ -9146,6 +9150,39 @@ function obligOpenModal(id) {
   }
   try { obligCurrencyChange(); } catch(e) {}
   try { obligCoteChange(); } catch(e) {}
+  try { obligNomList(); } catch(e) {}
+}
+// Liste déroulante « Nom du projet » : obligations existantes, restreinte à la plateforme et au type sélectionnés
+function obligNomList() {
+  const dl = document.getElementById('ob_nom_list'); if (!dl) return;
+  const plat = (document.getElementById('ob_plateforme') || {}).value || '';
+  const typ  = (document.getElementById('ob_type') || {}).value || '';
+  // À la création, la plateforme a une valeur par défaut : on ne filtre dessus que si elle a été choisie (ou en modification)
+  const usePlat = _obligEditId != null || window._obPlatTouched;
+  const names = {};
+  (OBLIG_DATA || []).forEach(p => {
+    if (usePlat && plat && p.plateforme !== plat) return;
+    if (typ && p.typeProjet !== typ) return;
+    names[p.nom] = p;
+  });
+  const list = Object.keys(names).sort((a, b) => a.localeCompare(b, 'fr'));
+  dl.innerHTML = list.map(n => '<option value="' + String(n).replace(/"/g, '&quot;') + '">' + (names[n].plateforme || '') + (names[n].typeProjet ? ' · ' + names[n].typeProjet : '') + '</option>').join('');
+  const h = document.getElementById('ob_nom_hint');
+  if (h) h.textContent = list.length + ' obligation' + (list.length > 1 ? 's' : '') + ' existante' + (list.length > 1 ? 's' : '') + (usePlat && plat ? ' · ' + plat : '') + (typ ? ' · ' + typ : '') + ' — cliquez dans le champ pour voir la liste.';
+}
+// Choix d'une obligation existante à la création : reprend ses caractéristiques (pas les montants ni les dates)
+function obligNomPicked() {
+  if (_obligEditId != null) return;
+  const v = document.getElementById('ob_nom').value;
+  const p = (OBLIG_DATA || []).find(x => x.nom === v); if (!p) return;
+  const set = (id, val) => { const e = document.getElementById(id); if (e && val != null && val !== '') e.value = val; };
+  set('ob_plateforme', p.plateforme); set('ob_type', p.typeProjet); set('ob_currency', p.currency || 'EUR');
+  set('ob_duree', p.duree); set('ob_interet', p.interet);
+  document.getElementById('ob_cote').value = p.cote ? '1' : '0';
+  set('ob_isin', p.isin); set('ob_cours', p.cours);
+  try { obligCurrencyChange(); obligCoteChange(); } catch(e) {}
+  const h = document.getElementById('ob_nom_hint');
+  if (h) h.textContent = 'Caractéristiques reprises de « ' + p.nom + ' » (plateforme, type, devise, durée, taux, cotation). Saisir la valeur d\'achat, la date et l\'échéancier de ce nouvel achat.';
 }
 function obligCoteChange() {
   const on = document.getElementById('ob_cote') && document.getElementById('ob_cote').value === '1';
