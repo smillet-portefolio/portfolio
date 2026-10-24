@@ -9530,17 +9530,21 @@ function renderObligSection() {
       + '<td style="padding:8px 14px"><span style="padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;background:' + col + '22;color:' + col + '">' + p.plateforme + '</span></td>'
       + '<td style="padding:8px 14px;font-size:11px;color:var(--text2)">' + (p.typeProjet||'-') + '</td>'
       + '<td style="padding:8px 14px;color:var(--text2)">' + (p.date||'-') + '</td>'
-      + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:600">' + Math.round(p.montant||0).toLocaleString('fr') + ' &#8364;'
-      + (p.fraisEur ? '<div style="font-size:10px;font-weight:400;color:#e06c6c" title="Frais / commission d\'achat">+ frais ' + p.fraisEur.toLocaleString('fr', {maximumFractionDigits: 2}) + ' &#8364;</div>' : '') + '</td>'
+      + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:600' + (p.fraisEur ? ';cursor:help' : '') + '"'
+      + (p.fraisEur ? ' title="+ frais / commission : ' + p.fraisEur.toLocaleString('fr', {maximumFractionDigits: 2}) + ' €"' : '') + '>'
+      + (p.fraisEur ? '<span style="border-bottom:1px dotted var(--text3)">' : '') + Math.round(p.montant||0).toLocaleString('fr') + ' &#8364;' + (p.fraisEur ? '</span>' : '') + '</td>'
       + '<td style="padding:8px 14px;text-align:center;color:var(--text2)">' + (p.duree||'-') + '</td>'
       + '<td style="padding:8px 14px;text-align:right;color:#4caf82;font-weight:600">' + interetStr + '</td>'
       + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;color:#4caf82">' + Math.round(p.recuInt).toLocaleString('fr') + ' &#8364;</td>'
       + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:600;color:#60a5fa">' + Math.round(p.montantInvesti).toLocaleString('fr') + ' &#8364;</td>'
-      + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;color:' + (p.valFinale>0?'var(--text)':'#4caf82') + '" title="' + (p.cote && p.valeurFinale!=null ? 'Valeur nominale restante' : 'Capital restant') + '">' + Math.round(p.valFinale).toLocaleString('fr') + ' &#8364;'
-      + (p.cote && p.valeurFinale!=null ? '<div style="font-size:10px;color:var(--text2)">nominal</div>' : '') + '</td>'
-      + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:600">' + Math.round(p.valAct).toLocaleString('fr') + ' &#8364;'
-      + (p.coursInfo ? '<div style="font-size:10px;font-weight:400;color:var(--text2)">cours ' + p.coursInfo.pct.toLocaleString('fr', {maximumFractionDigits: 3}) + ' %' + (p.coursInfo.date ? ' · ' + p.coursInfo.date : '') + (p.coursInfo.src === 'Prices' ? ' (auto)' : '') + '</div>'
-         : (p.cote ? '<div style="font-size:10px;color:#e06c6c">cours manquant</div>' : '')) + '</td>'
+      + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;cursor:help;color:' + (p.valFinale>0?'var(--text)':'#4caf82') + '" title="' + (p.cote && p.valeurFinale!=null ? 'Valeur nominale restante (remboursée à l\'échéance)' : 'Capital restant') + '">' + Math.round(p.valFinale).toLocaleString('fr') + ' &#8364;</td>'
+      + (function(){
+          var tip = p.coursInfo ? ('Cours ' + p.coursInfo.pct.toLocaleString('fr', {maximumFractionDigits: 3}) + ' % du nominal' + (p.coursInfo.date ? ' · ' + p.coursInfo.date : '') + (p.coursInfo.src === 'Prices' ? ' (mise à jour automatique)' : ' (saisi)'))
+                  : (p.cote ? 'Cours manquant : saisir le cours ou un ISIN suivi' : 'Non cotée : capital restant');
+          var miss = p.cote && !p.coursInfo;
+          return '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:600;cursor:help' + (miss ? ';color:#e06c6c' : '') + '" title="' + tip.replace(/"/g,'&quot;') + '">'
+            + (p.cote ? '<span style="border-bottom:1px dotted var(--text3)">' : '') + Math.round(p.valAct).toLocaleString('fr') + ' &#8364;' + (p.cote ? '</span>' : '') + '</td>';
+        })()
       + yearCells
       + '<td style="padding:8px 10px;white-space:nowrap">'
       + '<button onclick="obligOpenModal(' + p.id + ')" style="padding:3px 8px;font-size:11px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;color:var(--text);cursor:pointer;margin-right:4px">&#9999;</button>'
@@ -9556,8 +9560,9 @@ function renderObligSection() {
 
   tfoot.innerHTML = '<tr class="tfoot">'
     + '<td colspan="4" style="padding:8px 14px;font-weight:700">Total (' + data.length + ' projet' + (data.length>1?'s':'') + ')</td>'
-    + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:700">' + Math.round(totMontant).toLocaleString('fr') + ' &#8364;'
-    + (totFrais ? '<div style="font-size:10px;font-weight:400;color:#e06c6c">+ frais ' + totFrais.toLocaleString('fr', {maximumFractionDigits: 2}) + ' &#8364;</div>' : '') + '</td>'
+    + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:700' + (totFrais ? ';cursor:help' : '') + '"'
+    + (totFrais ? ' title="+ frais / commissions : ' + totFrais.toLocaleString('fr', {maximumFractionDigits: 2}) + ' €"' : '') + '>'
+    + (totFrais ? '<span style="border-bottom:1px dotted var(--text3)">' : '') + Math.round(totMontant).toLocaleString('fr') + ' &#8364;' + (totFrais ? '</span>' : '') + '</td>'
     + '<td></td><td></td>'
     + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:700;color:#4caf82">' + Math.round(totRecuInt).toLocaleString('fr') + ' &#8364;</td>'
     + '<td style="padding:8px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:700;color:#60a5fa">' + Math.round(totMontantInvesti).toLocaleString('fr') + ' &#8364;</td>'
@@ -11061,7 +11066,9 @@ function _aeRenderRows() {
     { key:'gce',   label:'Global Clean Energy',    members:['IQQH','Q8Y0'],        color:'#22c55e' },
   ];
   const _shortOf = t => (typeof ETF_META!=='undefined' && ETF_META[t] && ETF_META[t].short) ? ETF_META[t].short : String(t).split('.')[0];
-  const _grpKeyOf = r => { const s=_shortOf(r.ticker); for(const g of GRP_DEFS){ if(g.members.indexOf(s)>=0) return g.key; } return null; };
+  // Un groupe n'est consolidé que s'il reste au moins 2 ETF détenus ; sinon l'ETF restant s'affiche seul (non groupé)
+  const _grpActive = new Set(GRP_DEFS.filter(g => rows.filter(r => g.members.indexOf(_shortOf(r.ticker)) >= 0).length >= 2).map(g => g.key));
+  const _grpKeyOf = r => { const s=_shortOf(r.ticker); for(const g of GRP_DEFS){ if(g.members.indexOf(s)>=0) return _grpActive.has(g.key) ? g.key : null; } return null; };
   if(window._aeGrpOpen==null) window._aeGrpOpen=new Set();
   const rowHTML = (r,ind) => `<tr>
       <td style="white-space:nowrap;padding:6px 8px${ind?';padding-left:30px':''}">${ind?'<span style="color:var(--text3)">↳ </span>':''}<strong>${r.name}</strong> ${typeBadge(r.typeInv)}</td>
@@ -11239,6 +11246,14 @@ function renderAePnlChart(){
   if(window._aePnlSel == null) window._aePnlSel = new Set(tickers);
   window._aePnlSel = new Set([...window._aePnlSel].filter(t=>tickers.indexOf(t)>=0));
   if(window._aePnlIdxSel == null) window._aePnlIdxSel = new Set();   // indices agrégés sélectionnés
+  // Indice agrégé actif seulement s'il reste au moins 2 ETF membres détenus. Sinon (ex. un ETF vendu) :
+  // l'indice disparaît et, s'il était affiché, l'ETF restant est affiché à sa place.
+  const _ixMem = ix => tickers.filter(t => ix.members.indexOf(_shortOf(t)) >= 0);
+  AE_INDICES.forEach(ix => {
+    if (_ixMem(ix).length >= 2) return;
+    if (window._aePnlIdxSel.has(ix.key)) { window._aePnlIdxSel.delete(ix.key); _ixMem(ix).forEach(t => window._aePnlSel.add(t)); }
+  });
+  const _ixActive = ix => _ixMem(ix).length >= 2;
   const mode = window._aePnlMode || 'eur';
   const be=document.getElementById('ae_pnl_eur'), bp=document.getElementById('ae_pnl_pct');
   const setBtn=(el,on)=>{ if(!el) return; el.style.background=on?'var(--blue)':'var(--bg3)'; el.style.color=on?'#fff':'var(--text)'; el.style.borderColor=on?'var(--blue)':'var(--border2)'; };
@@ -11293,7 +11308,7 @@ function renderAePnlChart(){
     };
     const row = list => list.length ? '<div data-aerow="1" style="flex:0 0 100%;display:flex;flex-wrap:wrap;gap:6px">'+list.map(pill).join('')+'</div>' : '';
     // Rangée « Indices » : pastilles agrégées (bordure pointillée) sous la ligne ETF.
-    const _ixPresent = ix => tickers.some(t => ix.members.indexOf(_short(t))>=0);
+    const _ixPresent = ix => _ixActive(ix);
     const ixPill = ix => { const on=window._aePnlIdxSel.has(ix.key); const c=ix.color; const mem=tickers.filter(t=>ix.members.indexOf(_short(t))>=0).map(_short).join(', ');
       return '<button onclick="aePnlIdxToggle('+"'"+ix.key+"'"+')" title="Somme de : '+mem+'" style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:12px;font-size:11px;cursor:pointer;font-weight:600;border:1px dashed '+(on?c:'var(--border2)')+';background:'+(on?c:'var(--bg3)')+';color:'+(on?'#fff':'var(--text2)')+'"><span style="width:8px;height:8px;border-radius:2px;background:'+c+';display:inline-block"></span>'+ix.label+'</button>'; };
     const _ixList = AE_INDICES.filter(_ixPresent);
@@ -11302,7 +11317,7 @@ function renderAePnlChart(){
   }
   // Axe temporel calé sur la plage de dates des titres SÉLECTIONNÉS (zoom auto).
   const _idxMembers = new Set();
-  AE_INDICES.forEach(ix=>{ if(window._aePnlIdxSel.has(ix.key)) tickers.forEach(t=>{ if(ix.members.indexOf(_shortOf(t))>=0) _idxMembers.add(t); }); });
+  AE_INDICES.forEach(ix=>{ if(window._aePnlIdxSel.has(ix.key) && _ixActive(ix)) tickers.forEach(t=>{ if(ix.members.indexOf(_shortOf(t))>=0) _idxMembers.add(t); }); });
   const _selT = tickers.filter(t=>window._aePnlSel.has(t) || _idxMembers.has(t));
   const _axisT = _selT.length ? _selT : tickers;
   const dset = new Set();
@@ -11336,7 +11351,7 @@ function renderAePnlChart(){
   AE_INDICES.forEach(ix=>{
     if(!window._aePnlIdxSel.has(ix.key)) return;
     const mem = tickers.filter(t => ix.members.indexOf(_shortOf(t))>=0);
-    if(!mem.length) return;
+    if(mem.length < 2) return;
     const data = dates.map(d=>{
       let val=0, cost=0, has=false;
       mem.forEach(t=>{ const close=PRICE_HISTORY[t][d]; if(close==null) return; let cq=0,cc=0; lotsMap[t].lots.forEach(l=>{ if(l.date<=d){ cq+=l.qty; cc+=l.costEur; } }); if(cq>0){ val+=cq*close; cost+=cc; has=true; } });
