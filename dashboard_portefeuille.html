@@ -9938,12 +9938,13 @@ var CASH_DATA = { deposits: [], cash: {} };
             </div>
           </div>
           <!-- Champ FX — visible uniquement si devise != EUR -->
-          <div id="dep_fx_row" style="display:none;display:grid;grid-template-columns:1fr 1fr;gap:10px;background:var(--bg3);padding:10px;border-radius:6px;border:1px solid var(--border2)">
+          <div id="dep_fx_row" style="display:none;grid-template-columns:1fr 1fr;gap:10px;background:var(--bg3);padding:10px;border-radius:6px;border:1px solid var(--border2)">
             <div>
               <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">Taux de change (1 <span id="dep_fx_ccy">USD</span> = ? EUR)</label>
               <input id="dep_fx" type="number" step="0.000001" placeholder="ex: 0.9215"
                 oninput="cashDepCalcEur()"
                 style="width:100%;box-sizing:border-box;padding:7px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px">
+              <div id="dep_fx_src" style="font-size:10.5px;color:var(--text2);margin-top:3px"></div>
             </div>
             <div>
               <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">Équivalent EUR</label>
@@ -10054,6 +10055,13 @@ function cashSave() {
   try { localStorage.setItem('cash_data', JSON.stringify(CASH_DATA)); } catch(e) {}
 }
 
+// Dernier taux de change connu (EUR pour 1 unité de devise) : celui chargé depuis Google Sheets (onglet Prices, CNB)
+function _fxLatest(ccy) {
+  if (!ccy || ccy === 'EUR') return { rate: 1, src: '' };
+  const r = (typeof FX_RATES !== 'undefined') ? FX_RATES[ccy] : null;
+  const s = (typeof FX_RATES !== 'undefined' && FX_RATES._source) ? FX_RATES._source : 'Google Sheets';
+  return { rate: (r && r > 0) ? r : null, src: '(' + s + ')' };
+}
 function cashDepCurrencyChange() {
   const ccy    = document.getElementById('dep_currency')?.value;
   const fxRow  = document.getElementById('dep_fx_row');
@@ -10064,13 +10072,12 @@ function cashDepCurrencyChange() {
   } else {
     fxRow.style.display = 'grid';
     if (fxCcy) fxCcy.textContent = ccy;
-    // Pré-remplir avec le dernier taux connu
+    // Pré-remplir avec le dernier taux téléchargé dans Google Sheets (onglet Prices, taux CNB) — à chaque changement de devise
     const fxInput = document.getElementById('dep_fx');
-    if (fxInput && !fxInput.value) {
-      const rates = { USD: FX_RATES.USD, GBP: FX_RATES.GBP, CZK: FX_RATES.CZK };
-      const r = rates[ccy];
-      if (r) fxInput.value = r.toFixed(6);
-    }
+    const lf = _fxLatest(ccy);
+    if (fxInput) fxInput.value = lf.rate ? lf.rate.toFixed(6) : '';
+    const src = document.getElementById('dep_fx_src');
+    if (src) src.textContent = lf.rate ? ('Dernier taux ' + lf.src + ' — modifiable') : 'Taux indisponible : connectez Google Sheets ou saisissez-le';
     cashDepCalcEur();
   }
 }
@@ -14186,7 +14193,12 @@ window.addEventListener('load', () => {
   window.kidDepCurrencyChange=function(){
     const cur=kdV('kdep_currency'); const row=document.getElementById('kdep_fx_row');
     const lab=document.getElementById('kdep_fx_ccy');
-    if(cur!=='EUR'){ if(row) row.style.display='grid'; if(lab) lab.textContent=cur; } else { if(row) row.style.display='none'; }
+    if(cur!=='EUR'){
+      if(row) row.style.display='grid'; if(lab) lab.textContent=cur;
+      // Pré-remplir avec le dernier taux téléchargé dans Google Sheets (modifiable)
+      const fxEl=document.getElementById('kdep_fx'); const lf=(typeof _fxLatest==='function')?_fxLatest(cur):{rate:null};
+      if(fxEl) fxEl.value = lf.rate ? lf.rate.toFixed(6) : '';
+    } else { if(row) row.style.display='none'; }
     window.kidDepCalcEur();
   };
   window.kidDepCalcEur=function(){
