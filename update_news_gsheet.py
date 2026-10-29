@@ -177,7 +177,9 @@ def previous():
 
 def write(path=None, data=None, merge=True):
     if data is None: data = json.load(open(path, encoding="utf-8"))
-    data.setdefault("generated_at", datetime.datetime.now().astimezone().isoformat(timespec="minutes"))
+    # Heure de l'édition toujours calculée ici (heure de Prague, été/hiver correct), jamais celle écrite par l'IA
+    from zoneinfo import ZoneInfo
+    data["generated_at"] = datetime.datetime.now(ZoneInfo("Europe/Prague")).isoformat(timespec="minutes")
     if merge: data = merge_with_previous(data)
     s = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
     api = svc(write=True)
@@ -212,8 +214,18 @@ def should_run():
     print("true" if (last is None or last < slot) else "false")
 
 
+def check_since(since):
+    """Échoue (code 1) si l'onglet News n'a pas été mis à jour depuis `since` (ISO) : évite un faux succès sur GitHub."""
+    v = svc().values().get(spreadsheetId=SHEET_ID, range=f"{TAB}!A1:B1").execute().get("values", [])
+    last = v[0][1] if v and len(v[0]) > 1 else None
+    ok = last is not None and datetime.datetime.fromisoformat(last) >= datetime.datetime.fromisoformat(since)
+    print(f"{'✅' if ok else '❌'} Onglet {TAB} : dernière édition {last} (lancement {since})")
+    sys.exit(0 if ok else 1)
+
+
 if __name__ == "__main__":
-    if "--should-run" in sys.argv: should_run()
+    if "--check-since" in sys.argv: check_since(sys.argv[sys.argv.index("--check-since") + 1])
+    elif "--should-run" in sys.argv: should_run()
     elif "--holdings" in sys.argv: holdings()
     elif "--etf-themes" in sys.argv: etf_themes()
     elif "--previous" in sys.argv: previous()
