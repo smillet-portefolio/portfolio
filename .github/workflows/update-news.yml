@@ -54,6 +54,7 @@ jobs:
           echo "Prague : $(TZ=Europe/Prague date '+%a %d/%m %H:%M') — déclencheur ${{ github.event_name }}"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then P=true; else P=$(python update_news_gsheet.py --should-run); fi
           echo "proceed=$P" >> "$GITHUB_OUTPUT"; echo "proceed=$P"
+          echo "start=$(date -u '+%Y-%m-%dT%H:%M+00:00')" >> "$GITHUB_OUTPUT"
 
       - name: Dividendes + calendrier des publications (Yahoo) → onglet Dividends_Cal
         if: steps.guard.outputs.proceed == 'true'
@@ -87,4 +88,9 @@ jobs:
 
       - name: Vérification
         if: steps.guard.outputs.proceed == 'true'
-        run: test -s news_portefeuille.json && python -c "import json;d=json.load(open('news_portefeuille.json',encoding='utf-8'));print(len(d['stocks']),'titres')"
+        env:
+          GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+        run: |
+          test -s news_portefeuille.json && python -c "import json;d=json.load(open('news_portefeuille.json',encoding='utf-8'));print(len(d['stocks']),'titres')"
+          # échoue (croix rouge) si l'onglet News n'a pas reçu la nouvelle édition
+          python update_news_gsheet.py --check-since "${{ steps.guard.outputs.start }}"
