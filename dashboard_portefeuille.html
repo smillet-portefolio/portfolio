@@ -10797,7 +10797,7 @@ const STOCK_BADGE = {
 
 // Country flag by exchange suffix / known ticker
 function stockFlag(ticker) {
-  if (['ORCL','MSFT','VST'].includes(ticker))       return '🇺🇸';
+  if (['ORCL','MSFT','VST','VRT'].includes(ticker)) return '🇺🇸';
   if (['CATL.VI','C7A0.MU','C7A0.DE'].includes(ticker)) return '🇨🇳';   // société chinoise cotée en Europe
   if (ticker.endsWith('.PA'))                        return '🇫🇷';
   if (ticker.endsWith('.DE'))                        return '🇩🇪';
