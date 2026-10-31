@@ -8,6 +8,7 @@ Prérequis : pip install yfinance pandas requests google-auth google-api-python-
 """
 
 import datetime
+from zoneinfo import ZoneInfo
 import os
 import sys
 import json
@@ -121,10 +122,21 @@ def variations_yahoo(yahoo_sym):
     """Retourne {1D,1W,1M,3M,6M,1Y,YTD} en % à partir de l'historique Yahoo."""
     vides = {k: None for k in VAR_KEYS}
     try:
-        hist = yf.Ticker(yahoo_sym).history(period="2y", auto_adjust=False)
+        tk = yf.Ticker(yahoo_sym)
+        hist = tk.history(period="2y", auto_adjust=False)
         if hist.empty:
             return vides
-        closes = hist["Close"].dropna()
+        closes = hist["Close"].copy()
+        # Yahoo crée souvent la ligne du jour SANS clôture (places européennes) : on la
+        # remplit avec le dernier cours coté, sinon 1D comparerait la veille à l'avant-veille.
+        if pd.isna(closes.iloc[-1]):
+            try:
+                lp = tk.fast_info.last_price
+                if lp and float(lp) > 0:
+                    closes.iloc[-1] = float(lp)
+            except Exception:
+                pass
+        closes = closes.dropna()
         if closes.empty:
             return vides
 
@@ -527,7 +539,8 @@ def collecter_prix():
     if btc and btc > 0: PORTFOLIO_EUR_CLOSES["BTC/EUR"] = round(float(btc), 4)
     if eth and eth > 0: PORTFOLIO_EUR_CLOSES["ETH/EUR"] = round(float(eth), 4)
 
-    maintenant = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    # Heure de Prague (le runner GitHub tourne en UTC)
+    maintenant = datetime.datetime.now(ZoneInfo("Europe/Prague")).strftime("%Y-%m-%d %H:%M")
     header = ["Ticker", "Nom", "price last closure", "currency", "Last Update"] + VAR_KEYS
     rows = [header]
 
