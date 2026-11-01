@@ -10135,8 +10135,8 @@ function cashAddDeposit(sign) {
     setTimeout(() => { if (msg) msg.innerHTML = ''; }, 4000);
   }
   document.getElementById('dep_amount').value = '';
-  const fxEl = document.getElementById('dep_fx');
-  if (fxEl) fxEl.value = '';
+  // Re-proposer le dernier taux connu pour la devise toujours sélectionnée (au lieu de vider le champ)
+  cashDepCurrencyChange();
   const prev = document.getElementById('dep_eur_preview');
   if (prev) prev.textContent = '—';
 }
