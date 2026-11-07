@@ -901,7 +901,7 @@
             <th data-col="broker"   onclick="edSort('broker',this)"   style="padding:8px 14px;cursor:pointer;user-select:none;white-space:nowrap;text-align:left">Broker <span class="sort-arrow" style="font-size:9px;opacity:.35">⇅</span></th>
             <th data-col="date"     onclick="edSort('date',this)"     style="padding:8px 14px;cursor:pointer;user-select:none;white-space:nowrap;text-align:left">Date achat <span class="sort-arrow" style="font-size:9px;opacity:.35">⇅</span></th>
             <th data-col="currency" onclick="edSort('currency',this)" style="padding:8px 14px;cursor:pointer;user-select:none;white-space:nowrap;text-align:left">Devise <span class="sort-arrow" style="font-size:9px;opacity:.35">⇅</span></th>
-            <th data-col="qty"      onclick="edSort('qty',this)"      style="padding:8px 14px;cursor:pointer;user-select:none;white-space:nowrap;text-align:right">Qté <span class="sort-arrow" style="font-size:9px;opacity:.35">⇅</span></th>
+            <th data-col="qtyCur"   onclick="edSort('qtyCur',this)"    style="padding:8px 14px;cursor:pointer;user-select:none;white-space:nowrap;text-align:right">Qté <span class="sort-arrow" style="font-size:9px;opacity:.35">⇅</span></th>
             <th data-col="cost"     onclick="edSort('cost',this)"     style="padding:8px 14px;cursor:pointer;user-select:none;white-space:nowrap;text-align:right">Prix achat <span class="sort-arrow" style="font-size:9px;opacity:.35">⇅</span></th>
             <th data-col="costTotal" onclick="edSort('costTotal',this)" style="padding:8px 14px;cursor:pointer;user-select:none;white-space:nowrap;text-align:right">Coût (devise) <span class="sort-arrow" style="font-size:9px;opacity:.35">⇅</span></th>
             <th data-col="costEur"  onclick="edSort('costEur',this)"  style="padding:8px 14px;cursor:pointer;user-select:none;white-space:nowrap;text-align:right">Coût (€) <span class="sort-arrow" style="font-size:9px;opacity:.35">⇅</span></th>
@@ -2778,9 +2778,10 @@ function renderDashboard() {
     const sorted = data.slice().sort((a, b) => {
       let x = a[st.col], y = b[st.col];
       if (typeof x === 'string') return st.dir * x.localeCompare(y);
-      if (x == null) x = -Infinity;
-      if (y == null) y = -Infinity;
-      return st.dir * (x - y);
+      // Valeurs vides toujours en bas, quel que soit le sens du tri
+      if (x == null) x = st.dir === 1 ? Infinity : -Infinity;
+      if (y == null) y = st.dir === 1 ? Infinity : -Infinity;
+      return st.dir * (x - y) || 0;
     });
     let totInv = 0, totVal = 0;
     data.forEach(r => { totInv += r.inv; totVal += r.val; });
@@ -3973,7 +3974,8 @@ function buildPosTable(rebuild) {
       isin: r.isin || '',
       name: r.name, ticker: r.ticker, broker: r.broker,
       date: r.date, currency: r.currency,
-      qty: r.qty, cost: r.cost, costTotal: r.cost * r.qty,
+      // cost = prix unitaire (colonne « Prix achat ») ; costTotal = coût total en devise (colonne « Coût (devise) »)
+      qty: r.qty, cost: (r.pxAchat != null ? Number(r.pxAchat) : (r.qty ? r.cost / r.qty : null)), costTotal: r.cost,
       costEur: costEur ?? 0, pxActuel,
       valEur, pnl, pnlPct,
       typeInv: r.typeInv || '',
@@ -5220,9 +5222,10 @@ function renderClosedPositions() {
     let x = (cs.col==='isin') ? _closedIsin(a) : a[cs.col], y = (cs.col==='isin') ? _closedIsin(b) : b[cs.col];
     if (typeof x === 'string' || typeof y === 'string')
       return cs.dir * String(x==null?'':x).localeCompare(String(y==null?'':y));
-    if (x == null) x = -Infinity;
-    if (y == null) y = -Infinity;
-    return cs.dir * (x - y);
+    // Valeurs vides toujours en bas, quel que soit le sens du tri
+    if (x == null) x = cs.dir === 1 ? Infinity : -Infinity;
+    if (y == null) y = cs.dir === 1 ? Infinity : -Infinity;
+    return cs.dir * (x - y) || 0;
   });
   document.querySelectorAll('th[data-csort]').forEach(th => {
     const s = th.querySelector('.cs-arr');
@@ -5390,7 +5393,7 @@ function renderClosedByPos(){
   const f=window._cbpFilter;
   list=list.filter(a=> (!f.nom||(a.name||'').toLowerCase().includes(f.nom)) && (!f.ticker||(a.ticker||'').toLowerCase().includes(f.ticker)) );
   const s=window._cbpSort;
-  list.sort((x,y)=>{ let a=x[s.col],b=y[s.col]; if(typeof a==='string'||typeof b==='string') return s.dir*String(a==null?'':a).localeCompare(String(b==null?'':b)); if(a==null)a=-Infinity; if(b==null)b=-Infinity; return s.dir*(a-b); });
+  list.sort((x,y)=>{ let a=x[s.col],b=y[s.col]; if(typeof a==='string'||typeof b==='string') return s.dir*String(a==null?'':a).localeCompare(String(b==null?'':b)); if(a==null)a=s.dir===1?Infinity:-Infinity; if(b==null)b=s.dir===1?Infinity:-Infinity; return s.dir*(a-b)||0; });
   document.querySelectorAll('#closedByPosTable th[data-cbp]').forEach(th=>{ const sp=th.querySelector('.cbp-arr'); if(sp) sp.textContent=(th.dataset.cbp===s.col)?(s.dir<0?' ▼':' ▲'):''; });
   el.innerHTML = list.length ? list.map(a=>{ const c=a.pnl>=0?'#4caf82':'#e06c6c'; const sg=a.pnl>=0?'+':'';
     return `<tr style="border-bottom:1px solid var(--border)">
@@ -7656,7 +7659,9 @@ function renderCsqDetail(){
   dates.sort(function(a,b){
     if(st.col==='date') return st.dir*a.localeCompare(b);
     var x,y;
-    if(st.col==='total'){ x=tot(a); y=tot(b); } else { x=(byDate[a][st.col]||{a:0}).a; y=(byDate[b][st.col]||{a:0}).a; }
+    if(st.col==='total'){ x=tot(a); y=tot(b); } else { x=(byDate[a][st.col]||{a:null}).a; y=(byDate[b][st.col]||{a:null}).a; }
+    // Fonds absent à cette date (« — ») : toujours en bas
+    if(x==null && y==null) return 0; if(x==null) return 1; if(y==null) return -1;
     return st.dir*(x-y);
   });
   var Q=String.fromCharCode(39);
@@ -9501,6 +9506,7 @@ function renderObligSection() {
       else if (col==='capRest'){ va=a.capRest;         vb=b.capRest; }
       else if (col==='valFinale'){ va=a.valFinale;     vb=b.valFinale; }
       else if (col==='valAct') { va=a.valAct;          vb=b.valAct; }
+      else if (col==='duree')  { va=parseFloat(a.duree)||0; vb=parseFloat(b.duree)||0; }
       else { va=0; vb=0; }
       if (typeof va==='string') return va.localeCompare(vb)*dir;
       return (va-vb)*dir;
@@ -14281,7 +14287,7 @@ window.addEventListener('load', () => {
       if(f.dateSell && !String(p.dateSell||'').includes(f.dateSell)) return false;
       if(f.pnl && !((+p.pnl||0)>=parseFloat(f.pnl))) return false;
       return true; });
-    rows.sort((a,b2)=>{ let x=a.p[cs.col],y=b2.p[cs.col]; if(typeof x==='string'||typeof y==='string') return cs.dir*String(x==null?'':x).localeCompare(String(y==null?'':y)); if(x==null)x=-Infinity; if(y==null)y=-Infinity; return cs.dir*(x-y); });
+    rows.sort((a,b2)=>{ let x=a.p[cs.col],y=b2.p[cs.col]; if(typeof x==='string'||typeof y==='string') return cs.dir*String(x==null?'':x).localeCompare(String(y==null?'':y)); if(x==null)x=cs.dir===1?Infinity:-Infinity; if(y==null)y=cs.dir===1?Infinity:-Infinity; return cs.dir*(x-y)||0; });
     let tCost=0,tVal=0,tPnl=0,tFees=0,hasCost=false,hasVal=false;
     rows.forEach(o=>{ const p=o.p;
       if(p.costEur!=null){tCost+=+p.costEur;hasCost=true;}
