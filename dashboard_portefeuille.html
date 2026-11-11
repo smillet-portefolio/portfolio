@@ -5569,7 +5569,8 @@ const GS_KEYS = [
   're_rental',
   're_rental2',
   're_rental3',
-  'ae_pnl_order'
+  'ae_pnl_order',
+  'div_proj_ov'
 ];
 
 // ==============================================================================
@@ -5580,7 +5581,7 @@ const GS_AUTOSAVE_SET = new Set(GS_KEYS);
 const GS_USER_SET = new Set([
   'book2_extra_rows','book2_all_rows','book2_overrides','book2_comm',
   'sold_rows','closed_positions','cash_data','oblig_data','dividend_data','conseq_data','conseq_detail_extra','conseq_detail_del','jito_data','kids_div',
-  'direct_sector_overrides'
+  'direct_sector_overrides', 'div_proj_ov'
 ]);
 let _gsReady     = false;
 let _gsLoading   = false;
@@ -7189,6 +7190,18 @@ async function gsLoadDivCal(){
   } catch(e) { console.warn('gsLoadDivCal:', e); }
 }
 function _divCal(){ try { return JSON.parse(localStorage.getItem('div_cal') || 'null'); } catch(e) { return null; } }
+// Dividende/action saisi à la main pour une échéance « estimé » : { 'TICKER|AAAA-MM-JJ': montant }.
+// Ignoré dès que l'échéance devient « annoncé » (la clé ne correspond plus). Synchronisé via Google Sheets.
+function _divProjOv(){ try { return JSON.parse(localStorage.getItem('div_proj_ov') || '{}') || {}; } catch(e) { return {}; } }
+function divProjEdit(key, cur, curr){
+  const v = prompt('Dividende / action pour ' + key.replace('|', ' au ') + ' (' + curr + ')\nValeur estimée actuelle : ' + cur + '\n\nLaisser vide pour revenir à l\'estimation automatique.', String(cur).replace('.', ','));
+  if (v === null) return;
+  const ov = _divProjOv(), s = v.trim().replace(/\s/g, '').replace(',', '.');
+  if (s === '') delete ov[key];
+  else { const n = parseFloat(s); if (!(n >= 0)) { alert('Montant invalide.'); return; } ov[key] = n; }
+  localStorage.setItem('div_proj_ov', JSON.stringify(ov));
+  renderDivProjections();
+}
 function divProjCompute(){
   const DC = _divCal(); if (!DC || !DC.items) return null;
   const today = new Date(); today.setHours(0,0,0,0);
@@ -7204,6 +7217,9 @@ function divProjCompute(){
     rk[k] = rk[k] || {b:0, n:0}; rk[k].b += d.brutEur; rk[k].n += (d.netEur||0); rAll.b += d.brutEur; rAll.n += (d.netEur||0);
   });
   const ratioAll = rAll.b ? rAll.n / rAll.b : 0.75;
+  const OV = _divProjOv();
+  const NEWS_STOCKS = {};
+  try { ((JSON.parse(localStorage.getItem('news_daily') || 'null') || {}).stocks || []).forEach(s => { if (s && s.ticker) NEWS_STOCKS[s.ticker] = s; }); } catch(e) {}
   const ev = [];
   Object.entries(DC.items).forEach(([tk, it]) => {
     const q = qty[tk]; if (!(q > 0)) return;
@@ -7223,9 +7239,27 @@ function divProjCompute(){
       }
     }
     const fx = (DC.fx || {})[it.currency] || (typeof _divEurPerUnit === 'function' ? _divEurPerUnit(it.currency) : 1);
+    // Dividendes ANNONCÉS (montant officiel) : Nasdaq (it.declared) + veille d'actualités (news_daily › stocks[].div).
+    // Ils remplacent l'échéance estimée la plus proche (± 75 jours), sinon ils sont ajoutés.
+    const decl = (it.declared || []).map(x => ({ex: x.ex, amt: +x.amt, cur: x.cur || it.currency, status: x.status || 'déclaré', src: x.src || 'Nasdaq', url: ''}))
+      .concat(((NEWS_STOCKS[tk] || {}).div || []).filter(x => x && x.ex_date && +x.amount > 0)
+        .map(x => ({ex: x.ex_date, amt: +x.amount, cur: x.currency || it.currency, status: x.status === 'proposé' ? 'proposé' : 'déclaré', src: x.source || 'veille', url: x.url || ''})));
+    const seenEx = new Set();
+    decl.sort((a, b) => (a.src === 'Nasdaq' ? -1 : 1) - (b.src === 'Nasdaq' ? -1 : 1)).forEach(x => {
+      const nx = new Date(x.ex + 'T00:00:00'); if (!(nx >= today && nx < end) || seenEx.has(x.ex)) return; seenEx.add(x.ex);
+      const fxX = x.cur === it.currency ? 1 : (((DC.fx || {})[x.cur] || 1) / (fx || 1));   // montant converti dans la devise du titre
+      const a = x.amt * fxX;
+      let best = null; proj.forEach(p => { if (p.decl) return; const g = Math.abs(p.d - nx); if (g < 75*864e5 && (!best || g < Math.abs(best.d - nx))) best = p; });
+      const info = {d: nx, a, src: x.status, decl: true, dsrc: x.src, durl: x.url};
+      if (best) Object.assign(best, info); else proj.push(info);
+    });
     const rt = (rk[it.isin] || rk[tk]) ? ((rk[it.isin] || rk[tk]).n / (rk[it.isin] || rk[tk]).b) : ratioAll;
-    proj.forEach(p => ev.push({ date: iso(p.d), month: iso(p.d).slice(0,7), name: it.name || tk, ticker: tk, qty: q, dps: p.a, cur: it.currency,
-      brutEur: q * p.a * fx, netEur: q * p.a * fx * rt, src: p.src, freq }));
+    proj.forEach(p => {
+      const key = tk + '|' + iso(p.d), man = p.src === 'estimé' && OV[key] != null;
+      const a = man ? +OV[key] : p.a;
+      ev.push({ date: iso(p.d), month: iso(p.d).slice(0,7), name: it.name || tk, ticker: tk, qty: q, dps: a, dpsAuto: p.a, cur: it.currency,
+        brutEur: q * a * fx, netEur: q * a * fx * rt, src: p.src, freq, key, man, dsrc: p.dsrc || '', durl: p.durl || '' });
+    });
   });
   ev.sort((a, b) => a.date.localeCompare(b.date));
   const months = []; const m0 = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -7253,10 +7287,14 @@ function renderDivProjections(){
     const g = byM[m];
     const head = '<tr style="background:var(--bg3);font-weight:700"><td colspan="5">' + new Date(m + '-01T00:00:00').toLocaleDateString('fr', {month: 'long', year: 'numeric'}) + '</td><td class="mono">' + f2(g.b) + '</td><td class="mono" style="color:#4caf82">' + f2(g.n) + '</td><td></td></tr>';
     const rows = g.rows.map(e => '<tr><td class="mono" style="white-space:nowrap">' + e.date + '</td><td><strong>' + _infEsc(e.name) + '</strong> <span style="font-size:11px;color:var(--text2)">' + _infEsc(e.ticker) + '</span></td>'
-      + '<td class="mono">' + (e.qty % 1 ? f2(e.qty) : f0(e.qty)) + '</td><td class="mono">' + e.dps.toLocaleString('fr', {maximumFractionDigits: 4}) + ' ' + _infEsc(e.cur) + '</td>'
+      + '<td class="mono">' + (e.qty % 1 ? f2(e.qty) : f0(e.qty)) + '</td><td class="mono" style="white-space:nowrap"' + (e.man ? ' title="Saisi manuellement — estimation automatique : ' + e.dpsAuto.toLocaleString('fr', {maximumFractionDigits: 4}) + ' ' + _infEsc(e.cur) + '"' : '') + '>'
+      + '<span style="' + (e.man ? 'color:#e8a838;font-weight:700' : '') + '">' + e.dps.toLocaleString('fr', {maximumFractionDigits: 4}) + ' ' + _infEsc(e.cur) + '</span>'
+      + (e.src === 'estimé' ? ' <button onclick="divProjEdit(\'' + _infEsc(e.key) + '\',' + e.dps + ',\'' + _infEsc(e.cur) + '\')" title="Modifier le dividende / action" style="padding:0 5px;background:none;border:1px solid var(--border2);border-radius:4px;cursor:pointer;font-size:11px">✏️</button>' : '')
+      + '</td>'
       + '<td style="font-size:11px;color:var(--text2)">' + (e.freq >= 12 ? 'mensuel' : e.freq >= 4 ? 'trimestriel' : e.freq >= 2 ? 'semestriel' : 'annuel') + '</td>'
       + '<td class="mono">' + f2(e.brutEur) + '</td><td class="mono" style="color:#4caf82">' + f2(e.netEur) + '</td>'
-      + '<td><span style="font-size:10px;border:1px solid var(--border2);border-radius:10px;padding:1px 7px;color:' + (e.src === 'annoncé' ? '#4caf82' : 'var(--text2)') + '">' + e.src + '</span></td></tr>').join('');
+      + '<td><span' + (e.dsrc ? ' title="Source : ' + _infEsc(e.dsrc) + '"' : '') + ' style="font-size:10px;border:1px solid var(--border2);border-radius:10px;padding:1px 7px;color:' + (e.src === 'déclaré' ? '#4caf82;font-weight:700' : e.src === 'proposé' ? '#5a8dee' : e.src === 'annoncé' ? '#4caf82' : e.man ? '#e8a838' : 'var(--text2)') + '">' + e.src + (e.man ? ' · manuel' : '') + '</span>'
+      + (e.durl ? ' <a href="' + _infEsc(e.durl) + '" target="_blank" rel="noopener" title="Voir l\'annonce" style="font-size:11px;text-decoration:none">🔗</a>' : '') + '</td></tr>').join('');
     return head + (rows || '<tr><td colspan="8" style="font-size:12px;color:var(--text2)">—</td></tr>');
   }).join('');
   el.innerHTML =
@@ -7265,7 +7303,7 @@ function renderDivProjections(){
     + '<div class="chart-wrap" style="height:300px;margin-bottom:20px"><canvas id="divProjChart"></canvas></div>'
     + '<div style="max-height:70vh;overflow:auto"><table><thead><tr><th>Date (détachement)</th><th>Titre</th><th>Nb titres</th><th>Dividende / action</th><th>Fréquence</th><th>Brut €</th><th>Net estimé €</th><th>Statut</th></tr></thead><tbody>'
     + table + '<tr style="border-top:2px solid var(--border2);font-weight:700"><td colspan="5">Total 12 mois</td><td class="mono">' + f2(totB) + '</td><td class="mono" style="color:#4caf82">' + f2(totN) + '</td><td></td></tr></tbody></table></div>'
-    + '<p style="font-size:11px;color:var(--text2);margin-top:10px">Estimation basée sur les positions actuelles et l\'historique des dividendes par action (Yahoo Finance, mis à jour le ' + (P.generated ? new Date(P.generated).toLocaleDateString('fr') : '—') + ') : chaque dividende des 12 derniers mois est reconduit un an plus tard ; le montant retenu est le dernier versé (payeurs trimestriels) ou celui de l\'échéance correspondante (acompte / solde). « annoncé » = date de détachement publiée. Le versement intervient en général quelques jours à quelques semaines après la date de détachement. Les ETF capitalisants ne versent pas de dividende.</p>';
+    + '<p style="font-size:11px;color:var(--text2);margin-top:10px">Estimation basée sur les positions actuelles et l\'historique des dividendes par action (Yahoo Finance, mis à jour le ' + (P.generated ? new Date(P.generated).toLocaleDateString('fr') : '—') + ') : chaque dividende des 12 derniers mois est reconduit un an plus tard ; le montant retenu est le dernier versé (payeurs trimestriels) ou celui de l\'échéance correspondante (acompte / solde). « annoncé » = date de détachement publiée (montant estimé) ; « déclaré » = montant et date officiels (Nasdaq ou veille d\'actualités, 🔗 = annonce) ; « proposé » = montant soumis au vote de l\'assemblée générale ; ✏️ = modifier une estimation. Le versement intervient en général quelques jours à quelques semaines après la date de détachement. Les ETF capitalisants ne versent pas de dividende.</p>';
   const cv = document.getElementById('divProjChart');
   if (cv && typeof Chart !== 'undefined') {
     if (window._divProjChart) { try { window._divProjChart.destroy(); } catch(e) {} }

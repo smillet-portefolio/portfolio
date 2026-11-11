@@ -32,6 +32,18 @@ Prépare le résumé des actualités des actions, cryptos et marchés des ETF d�
    Mets-le dans "pub" (voir format). Commence par `python update_news_gsheet.py --previous` qui affiche aussi les "pub" déjà
    connues : ne refais la recherche que si la prochaine date est passée, manquante ou encore "estimée".
 
+   PROCHAIN DIVIDENDE ANNONCÉ : pour chaque ACTION (pas les cryptos), vérifie si la société a ANNONCÉ son prochain dividende
+   (communiqué de résultats, page investisseurs « dividend », avis de convocation / résultats d'assemblée générale, Zonebourse,
+   Boursorama, Nasdaq / NYSE « dividend declared »). Recherche ex. "<nom> dividend declared <année>", "<nom> dividende
+   <année> détachement", "<nom> Dividende <année> Hauptversammlung". Ne retiens QUE un dividende dont la date de détachement
+   (ex-date) est AUJOURD'HUI ou PLUS TARD, avec un montant publié par la société :
+     - status "déclaré" : montant décidé (conseil d'administration ou assemblée générale déjà tenue) ;
+     - status "proposé" : montant proposé, soumis au vote d'une assemblée à venir.
+   Indique le montant brut PAR ACTION dans la devise de cotation du titre, la date de détachement et, si connue, la date de
+   paiement. S'il y a un acompte ET un solde à venir, mets les deux. Si rien n'est annoncé : "div": [] (n'invente aucun
+   montant ; une estimation ou un consensus d'analystes ne compte pas). `--previous` affiche les "div" déjà connus : ne refais
+   la recherche que s'ils sont absents, passés ou encore "proposé".
+
 2 bis. Marchés & ETF : exécute
    python update_news_gsheet.py --etf-themes
    Il renvoie les ETF / fonds détenus regroupés par THÈME de marché : [{key, label, scope, etfs:[{name, ticker, isin, owner}]}].
@@ -52,7 +64,10 @@ Prépare le résumé des actualités des actions, cryptos et marchés des ETF d�
  "stocks": [ {"name": "...", "ticker": "...", "kind": "action|crypto", "owner": [...repris de l'étape 1...],
               "items": [ {"sentiment": "pos|neg|neu", "text": "<1-2 phrases, chiffres précis>", "source": "<média>", "url": "<lien de l'article>", "date": "JJ/MM"} ],
               "pub": {"last": {"date": "AAAA-MM-JJ", "label": "<ex. CA T3 2026>"},
-                      "next": {"date": "AAAA-MM-JJ", "label": "<ex. Résultats annuels 2026>", "status": "confirmée|estimée"}} } ],
+                      "next": {"date": "AAAA-MM-JJ", "label": "<ex. Résultats annuels 2026>", "status": "confirmée|estimée"}},
+              "div": [ {"amount": <montant brut par action, nombre>, "currency": "<EUR|USD|GBP…>", "ex_date": "AAAA-MM-JJ",
+                        "pay_date": "AAAA-MM-JJ ou null", "status": "déclaré|proposé", "label": "<ex. solde 2026>",
+                        "source": "<média ou société>", "url": "<lien>"} ] } ],
  "themes": [ {"key": "...", "label": "...", "etfs": [...repris tels quels de l'étape 2 bis...],
               "items": [ {"sentiment": "pos|neg|neu", "text": "...", "source": "...", "url": "...", "date": "JJ/MM"} ],
               "fund_events": [ {"etf": "<nom de l'ETF>", "text": "<événement propre au fonds>", "source": "...", "url": "...", "date": "JJ/MM"} ] } ],

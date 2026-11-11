@@ -36,6 +36,33 @@ def _d(x):
     except Exception: return None
 
 
+NASDAQ_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+                  "Accept": "application/json, text/plain, */*", "Origin": "https://www.nasdaq.com", "Referer": "https://www.nasdaq.com/"}
+
+
+def nasdaq_declared(sym):
+    """Dividendes DÉCLARÉS à venir (montant + dates) via l'API publique Nasdaq.
+    Ne couvre que les titres cotés au Nasdaq (ex. MSFT) ; les autres (NYSE, Europe) passent par la veille d'actualités."""
+    import requests
+    def iso(s):
+        try: return datetime.datetime.strptime(s, "%m/%d/%Y").date().isoformat()
+        except Exception: return None
+    try:
+        j = requests.get(f"https://api.nasdaq.com/api/quote/{sym}/dividends?assetclass=stocks", headers=NASDAQ_HEADERS, timeout=20).json()
+        rows = ((j.get("data") or {}).get("dividends") or {}).get("rows") or []
+    except Exception:
+        return []
+    out = []
+    for r in rows:
+        ex = iso(r.get("exOrEffDate") or "")
+        try: amt = float(str(r.get("amount") or "").replace("$", "").replace(",", ""))
+        except Exception: continue
+        if ex and ex >= TODAY.isoformat() and amt > 0 and (r.get("type") or "Cash") == "Cash":
+            out.append({"ex": ex, "pay": iso(r.get("paymentDate") or ""), "decl": iso(r.get("declarationDate") or ""),
+                        "amt": amt, "cur": r.get("currency") or "USD", "status": "déclaré", "src": "Nasdaq"})
+    return out
+
+
 def fetch(ticker):
     sym = VAR_OVERRIDE.get(ticker) or YS_OVERRIDE.get(ticker) or ticker   # CATL.VI -> 3750.HK (dividendes en HKD)
     t = yf.Ticker(sym)
@@ -57,6 +84,10 @@ def fetch(ticker):
     if ex and ex >= TODAY: res["next_ex"] = str(ex)
     pay = _d(cal.get("Dividend Date")) if cal.get("Dividend Date") else None
     if pay and pay >= TODAY: res["next_pay"] = str(pay)
+    # Dividendes déclarés (montant officiel) : titres US cotés au Nasdaq
+    if res["currency"] == "USD" and "." not in sym:
+        dec = nasdaq_declared(sym)
+        if dec: res["declared"] = dec
     # Publications de résultats : historique + prochaines dates connues de Yahoo
     dates = set()
     for x in (cal.get("Earnings Date") or []):
@@ -96,7 +127,7 @@ def main():
     for tk, meta in h.items():
         try:
             r = fetch(tk); r.update(meta); items[tk] = r
-            print(f"  {tk:<10} {r['ysym']:<9} {r['currency']:<4} divs={len(r['divs'])} next_ex={r.get('next_ex','-')} "
+            print(f"  {tk:<10} {r['ysym']:<9} {r['currency']:<4} divs={len(r['divs'])} next_ex={r.get('next_ex','-')} declared={r.get('declared','-')} "
                   f"last_earn={r.get('last_earn','-')} next_earn={r.get('next_earn','-')} ({r.get('next_earn_src','-')})")
         except Exception as e:
             print(f"  {tk}: erreur {e}")

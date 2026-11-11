@@ -156,6 +156,9 @@ def merge_with_previous(data):
         s["items"] = _merge(s.get("items"), o.get("items"), ref, MAX_ITEMS, gen)
         # Agenda des publications : garder l'ancien si la nouvelle édition n'en donne pas
         if not s.get("pub") and o.get("pub"): s["pub"] = o["pub"]
+        # Dividendes annoncés : garder les anciens encore à venir si la nouvelle édition n'en donne pas
+        if not s.get("div") and o.get("div"):
+            s["div"] = [x for x in o["div"] if str(x.get("ex_date") or "") >= ref.isoformat()]
     p_th = {t.get("key"): t for t in prev.get("themes", [])}
     for t in data.get("themes", []):
         o = p_th.get(t.get("key"), {})
@@ -171,6 +174,7 @@ def previous():
     prev = read_current() or {}
     out = {"stocks": {s.get("ticker"): [i.get("text") for i in s.get("items", [])] for s in prev.get("stocks", [])},
            "pub": {s.get("ticker"): s.get("pub") for s in prev.get("stocks", []) if s.get("pub")},
+           "div": {s.get("ticker"): s.get("div") for s in prev.get("stocks", []) if s.get("div")},
            "themes": {t.get("key"): [i.get("text") for i in t.get("items", [])] for t in prev.get("themes", [])}}
     print(json.dumps(out, ensure_ascii=False, indent=1))
 
