@@ -1378,7 +1378,7 @@ function renderReSumYear(){
   var cellA = function(v, col, tip){ return '<td style="' + tdc + (col ? ';color:' + col : '') + '"' + (tip ? ' title="' + tip + '"' : '') + '>' + (v ? f(v) : '—') + '</td>'; };
   var C = al ? cellA : cell;
   var lbl = function(t, sub, tv, col){ return '<td style="padding:9px 10px;font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + t
-    + '<div style="font-size:10.5px;font-weight:400;color:' + (col || 'var(--text2)') + '">' + sub + (tv != null ? ' · total ' + f(tv) : '') + '</div></td>'; };
+    + (sub ? '<div style="font-size:10.5px;font-weight:400;color:' + (col || 'var(--text2)') + '">' + sub + '</div>' : '') + '</td>'; };
   var nt = netOf(tot);
   var tipInt = function(o){ return 'Intérêts ' + f(o.mi || 0) + ' · Assurance de prêt ' + f(o.mx || 0) + ' Kč'; };
   var totMi = 0, totMx = 0; years.forEach(function(y){ totMi += Y[y].mi || 0; totMx += Y[y].mx || 0; });
@@ -1398,7 +1398,7 @@ function renderReSumYear(){
     + '<div style="display:flex;gap:6px">' + btn('all', 'Tous les biens') + btn('pec', 'Pec') + btn('nuselsky', 'Nuselsky Pivovar') + btn('tisno', 'Tisno') + '</div></div>'
     + '<div style="overflow:auto"><table style="' + (al ? 'width:' + al.w + 'px;table-layout:fixed;' : 'width:100%;') + 'border-collapse:collapse;font-size:13px">' + cg
     + '<thead><tr style="background:var(--bg2);text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2)">' + head + '</tr></thead><tbody>'
-    + rowRev + rowCost + rowInt + rowNet + '</tbody></table></div>'
+    + rowRev + rowCost + (tot.int ? rowInt : '') + rowNet + '</tbody></table></div>'
     + '<p style="font-size:10.5px;color:var(--text2);margin:8px 0 0">Survolez une case « Coûts » pour le détail. Pec : les remboursements de charges (énergie, copropriété) sont déduits des charges de l\'année de versement. Tisno : montants saisis en EUR, convertis en CZK au taux d\'acquisition (' + tisnoAcq + ' CZK/€).</p>';
 }
 
