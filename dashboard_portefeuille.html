@@ -1104,7 +1104,7 @@ const _reEUR   = n => _reGrp(n)+' €';
 function _reLoadEst(){ try{ return JSON.parse(localStorage.getItem('re_estimates')||'{}'); }catch(e){ return {}; } }
 function _reEst(a){ const m=_reLoadEst(); return (m[a.id]!=null)? m[a.id] : a.sellEst; }  // en CZK
 function reSetEstimate(id,val){ const m=_reLoadEst(); const v=parseFloat(String(val).replace(/[^\d.,-]/g,'').replace(/\s/g,'').replace(',','.')); if(isFinite(v)) m[id]=v; try{ localStorage.setItem('re_estimates',JSON.stringify(m)); }catch(e){} renderImmo(); if(typeof _gsToken!=='undefined' && _gsToken && typeof gsSaveAll==='function') gsSaveAll({silent:true}); }
-function _reSwitch(id){ window._reActive=id; document.querySelectorAll('#immo .re-tab').forEach(t=>{ const on=t.dataset.re===id; t.style.background=on?'var(--card)':'var(--bg2)'; t.style.borderBottom=on?'2px solid var(--blue)':'2px solid transparent'; }); document.querySelectorAll('#immo .re-pane').forEach(p=>{ p.style.display=(p.dataset.re===id?'':'none'); }); if(id==='summary'){ try{ renderReRevChart(); }catch(e){} } }
+function _reSwitch(id){ window._reActive=id; document.querySelectorAll('#immo .re-tab').forEach(t=>{ const on=t.dataset.re===id; t.style.background=on?'var(--card)':'var(--bg2)'; t.style.borderBottom=on?'2px solid var(--blue)':'2px solid transparent'; }); document.querySelectorAll('#immo .re-pane').forEach(p=>{ p.style.display=(p.dataset.re===id?'':'none'); }); if(id==='summary'){ try{ renderReRevChart(); renderReSumYear(); }catch(e){} } }
 const RE_RENT2_SEED = { pec: [{"m": "2019-02", "ins": 8915, "fees": 0, "rev": 0}, {"m": "2019-05", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2019-06", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2019-07", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2019-08", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2019-09", "ins": 0, "fees": 21743, "rev": 73961}, {"m": "2019-10", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2019-11", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2019-12", "ins": 0, "fees": 3551, "rev": 10955}, {"m": "2020-01", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2020-02", "ins": 8915, "fees": 3551, "rev": 0}, {"m": "2020-03", "ins": 0, "fees": 14268, "rev": 50152}, {"m": "2020-04", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2020-05", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2020-06", "ins": 0, "fees": 3551, "rev": 8460}, {"m": "2020-07", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2020-08", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2020-09", "ins": 0, "fees": 14488, "rev": 54980}, {"m": "2020-10", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2020-11", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2020-12", "ins": 0, "fees": 3551, "rev": 12803}, {"m": "2021-01", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2021-02", "ins": 8915, "fees": 3551, "rev": 0}, {"m": "2021-03", "ins": 0, "fees": 24531, "rev": 31644}, {"m": "2021-04", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2021-05", "ins": 0, "fees": 3551, "rev": 0}, {"m": "2021-06", "ins": 0, "fees": 8946, "rev": 18288}, {"m": "2021-07", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2021-08", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2021-09", "ins": 0, "fees": 13997, "rev": 67828}, {"m": "2021-10", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2021-11", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2021-12", "ins": 0, "fees": 14003, "rev": 71540}, {"m": "2022-01", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2022-02", "ins": 8915, "fees": 2951, "rev": 0}, {"m": "2022-03", "ins": 0, "fees": 23193, "rev": 97412}, {"m": "2022-04", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2022-05", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2022-06", "ins": 0, "fees": 15472, "rev": 33202}, {"m": "2022-07", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2022-08", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2022-09", "ins": 0, "fees": 9753, "rev": 47140}, {"m": "2022-10", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2022-11", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2022-12", "ins": 0, "fees": 13164, "rev": 31149}, {"m": "2023-01", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2023-02", "ins": 10140, "fees": 2951, "rev": 0}, {"m": "2023-03", "ins": 0, "fees": 24271, "rev": 52049}, {"m": "2023-04", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2023-05", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2023-06", "ins": 0, "fees": 10238, "rev": 28300}, {"m": "2023-07", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2023-08", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2023-09", "ins": 0, "fees": 18251, "rev": 54272}, {"m": "2023-10", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2023-11", "ins": 0, "fees": 2951, "rev": 0}, {"m": "2023-12", "ins": 0, "fees": 16617, "rev": 36909}, {"m": "2024-01", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2024-02", "ins": 10140, "fees": 3979, "rev": 0}, {"m": "2024-03", "ins": 0, "fees": 27380, "rev": 32157}, {"m": "2024-04", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2024-05", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2024-06", "ins": 0, "fees": 18039, "rev": 13853}, {"m": "2024-07", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2024-08", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2024-09", "ins": 0, "fees": 17248, "rev": 33102}, {"m": "2024-10", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2024-11", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2024-12", "ins": 0, "fees": 16700, "rev": 30809}, {"m": "2025-01", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2025-02", "ins": 10557, "fees": 3979, "rev": 0}, {"m": "2025-03", "ins": 0, "fees": 21784, "rev": 117993}, {"m": "2025-04", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2025-05", "ins": 0, "fees": 3979, "rev": 0}, {"m": "2025-06", "ins": 0, "fees": 10599, "rev": 46518}, {"m": "2025-07", "ins": 0, "fees": 4029, "rev": 0}, {"m": "2025-08", "ins": 0, "fees": 4029, "rev": 0}, {"m": "2025-09", "ins": 0, "fees": 10259, "rev": 67778}, {"m": "2025-10", "ins": 0, "fees": 4029, "rev": 0}, {"m": "2025-11", "ins": 0, "fees": 4029, "rev": 0}, {"m": "2025-12", "ins": 0, "fees": 13491, "rev": 102726}, {"m": "2026-01", "ins": 0, "fees": 4029, "rev": 0}, {"m": "2026-02", "ins": 11108, "fees": 4029, "rev": 0}, {"m": "2026-03", "ins": 0, "fees": 11403, "rev": 105574}, {"m": "2026-04", "ins": 0, "fees": 4029, "rev": 0}, {"m": "2026-05", "ins": 0, "fees": 4029, "rev": 0}] };
 function _reRent2List(id){ const m=_reLoadJSON('re_rental2'); return Array.isArray(m[id])? m[id] : ((RE_RENT2_SEED[id]||[]).map(x=>({...x}))); }
 function _reRent2Rev(id){ return _reRent2List(id).reduce((s,x)=>s+(+x.rev||0),0); }
@@ -1269,6 +1269,7 @@ function renderImmo(){
       <tfoot><tr style="border-top:2px solid var(--border2);font-weight:700"><td style="padding:9px 12px">TOTAL</td><td></td><td></td><td></td><td></td><td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(tI)}<div style="font-size:10px;color:var(--text2);font-weight:400">${_reEUR(tIe)}</div></td><td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(tT)}<div style="font-size:10px;color:var(--text2);font-weight:400">${_reEUR(tTe)}</div></td><td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace;color:#f0956e">${_reCZK(tCapDue)}</td><td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace">${_reCZK(tS)}<div style="font-size:10px;color:var(--text2);font-weight:400">${_reEUR(tSe)}</div></td><td style="padding:9px 12px;text-align:right;color:${tpc}">${tPv>=0?'+':''}${_reCZK(tPv)}<div style="font-size:10px;font-weight:400">${tPvE>=0?'+':''}${_reEUR(tPvE)}</div></td></tr></tfoot>
     </table></div>
     <p style="font-size:11px;color:var(--text2);margin-top:10px">💡 Devise principale : CZK. EUR des coûts au <strong>taux d'acquisition</strong> ; EUR de l'estimation au <strong>taux courant</strong> (${(1/_reFxNow()).toFixed(2)} CZK/€). Estimation éditable (indicative — Prague ≈ 145–150k Kč/m² en 2026).</p>
+      <div class="card" id="reSumYearCard" style="padding:18px;margin-top:18px"></div>
       <div class="card" style="padding:18px;margin-top:18px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
         <p style="font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin:0">Revenus locatifs par bien (CZK)</p>
@@ -1307,7 +1308,51 @@ function renderImmo(){
     </div>`;
   });
   cont.innerHTML = `<div style="display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--border);margin-bottom:18px">${tabs}</div>${summary}${panes}`;
-  try{ requestAnimationFrame(function(){ if((window._reActive||'summary')==='summary') renderReRevChart(); }); }catch(e){}
+  try{ requestAnimationFrame(function(){ if((window._reActive||'summary')==='summary'){ renderReRevChart(); renderReSumYear(); } }); }catch(e){}
+}
+
+// ── Synthèse annuelle des biens locatifs (Pec + Nuselsky Pivovar) : revenu brut / coûts / revenu net, en CZK ──
+// Coûts = assurance + charges + électricité (Nuselsky) ; assurance + charges (Pec, pas d'électricité séparée).
+// Colonnes = années du graphique « Revenus locatifs par bien ». Sélection : les 2 biens ou un seul.
+window._reSumSel = window._reSumSel || 'all';
+function reSumSetSel(s){ window._reSumSel = s; renderReSumYear(); }
+function renderReSumYear(){
+  var el = document.getElementById('reSumYearCard'); if(!el) return;
+  var sel = window._reSumSel || 'all';
+  var props = [
+    {id:'pec', name:'Pec', list:(typeof _reRent2List==='function'?_reRent2List('pec'):[])},
+    {id:'nuselsky', name:'Nuselsky Pivovar', list:(typeof _reRentList==='function'?_reRentList('nuselsky'):[])}
+  ];
+  var years = (_reRevSeries('year').labels || []).slice();
+  var Y = {}; years.forEach(function(y){ Y[y] = {rev:0, ins:0, fees:0, elec:0}; });
+  props.forEach(function(p){
+    if(sel !== 'all' && sel !== p.id) return;
+    (p.list || []).forEach(function(x){
+      var y = String(x.m || '').slice(0,4); if(!y) return;
+      if(!Y[y]){ Y[y] = {rev:0, ins:0, fees:0, elec:0}; years.push(y); }
+      Y[y].rev += +x.rev || 0; Y[y].ins += +x.ins || 0; Y[y].fees += +x.fees || 0; Y[y].elec += +x.elec || 0;
+    });
+  });
+  years.sort();
+  var f = function(n){ return Math.round(n).toLocaleString('fr'); };
+  var tot = {rev:0, ins:0, fees:0, elec:0}; years.forEach(function(y){ ['rev','ins','fees','elec'].forEach(function(k){ tot[k] += Y[y][k]; }); });
+  var cost = function(o){ return o.ins + o.fees + o.elec; };
+  var td = 'padding:7px 10px;text-align:right;font-family:\'DM Mono\',monospace;white-space:nowrap';
+  var cell = function(v, col, tip){ return '<td style="' + td + (col ? ';color:' + col : '') + '"' + (tip ? ' title="' + tip + '"' : '') + '>' + (v ? f(v) : '—') + '</td>'; };
+  var tipOf = function(o){ return 'Assurance ' + f(o.ins) + ' · Charges ' + f(o.fees) + (o.elec ? ' · Électricité ' + f(o.elec) : '') + ' Kč'; };
+  var btn = function(id, lab){ return '<button class="filter-btn' + (sel === id ? ' active' : '') + '" onclick="reSumSetSel(\'' + id + '\')">' + lab + '</button>'; };
+  var head = '<th style="padding:8px 10px;text-align:left">CZK</th>' + years.map(function(y){ return '<th style="padding:8px 10px;text-align:right">' + y + '</th>'; }).join('') + '<th style="padding:8px 10px;text-align:right">Total</th>';
+  var rowRev = '<tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 10px;font-weight:600">Revenu brut</td>' + years.map(function(y){ return cell(Y[y].rev); }).join('') + cell(tot.rev) + '</tr>';
+  var rowCost = '<tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 10px;font-weight:600">Coûts <span style="font-size:10px;font-weight:400;color:var(--text2)">(assurance / charges / électricité)</span></td>'
+    + years.map(function(y){ var c = cost(Y[y]); return cell(c ? -c : 0, '#e06c6c', tipOf(Y[y])); }).join('') + cell(cost(tot) ? -cost(tot) : 0, '#e06c6c', tipOf(tot)) + '</tr>';
+  var rowNet = '<tr style="border-top:2px solid var(--border2);font-weight:700"><td style="padding:7px 10px">Revenu net</td>'
+    + years.map(function(y){ var n = Y[y].rev - cost(Y[y]); return cell(n, n >= 0 ? '#4caf82' : '#e06c6c'); }).join('') + (function(){ var n = tot.rev - cost(tot); return cell(n, n >= 0 ? '#4caf82' : '#e06c6c'); })() + '</tr>';
+  el.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">'
+    + '<p style="font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin:0">Revenus nets par année (CZK)</p>'
+    + '<div style="display:flex;gap:6px">' + btn('all', 'Pec + Nuselsky') + btn('pec', 'Pec') + btn('nuselsky', 'Nuselsky Pivovar') + '</div></div>'
+    + '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--bg2);text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2)">' + head + '</tr></thead><tbody>'
+    + rowRev + rowCost + rowNet + '</tbody></table></div>'
+    + '<p style="font-size:10.5px;color:var(--text2);margin:8px 0 0">Survolez une case « Coûts » pour le détail. Pec : les remboursements de charges (énergie, copropriété) sont déduits des charges de l\'année de versement. Tisno n\'est pas inclus (pas de coûts saisis).</p>';
 }
 
 
