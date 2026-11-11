@@ -1338,19 +1338,30 @@ function renderReSumYear(){
     {id:'tisno', name:'Tisno', list:tisno}
   ];
   var years = (_reRevSeries('year').labels || []).slice();
-  var Y = {}; years.forEach(function(y){ Y[y] = {rev:0, ins:0, fees:0, elec:0}; });
+  var Y = {}; var blank = function(){ return {rev:0, ins:0, fees:0, elec:0, int:0}; };
+  years.forEach(function(y){ Y[y] = blank(); });
   props.forEach(function(p){
     if(sel !== 'all' && sel !== p.id) return;
     (p.list || []).forEach(function(x){
       var y = String(x.m || '').slice(0,4); if(!y) return;
-      if(!Y[y]){ Y[y] = {rev:0, ins:0, fees:0, elec:0}; years.push(y); }
+      if(!Y[y]){ Y[y] = blank(); years.push(y); }
       Y[y].rev += +x.rev || 0; Y[y].ins += +x.ins || 0; Y[y].fees += +x.fees || 0; Y[y].elec += +x.elec || 0;
     });
   });
+  // Intérêts d'emprunt : prêt de Nuselsky Pivovar (part « intérêts » de chaque mensualité)
+  if (sel === 'all' || sel === 'nuselsky') {
+    (typeof _reMortList==='function' ? _reMortList('nuselsky') : []).forEach(function(x){
+      var y = String(x.m || '').slice(0,4); if(!y) return;
+      if(!Y[y]){ Y[y] = blank(); years.push(y); }
+      Y[y].int += (+x.interest || 0) + (+x.insur || 0);       // intérêts + assurance de prêt
+      Y[y].mi = (Y[y].mi || 0) + (+x.interest || 0); Y[y].mx = (Y[y].mx || 0) + (+x.insur || 0);
+    });
+  }
   years.sort();
   var f = function(n){ return Math.round(n).toLocaleString('fr'); };
-  var tot = {rev:0, ins:0, fees:0, elec:0}; years.forEach(function(y){ ['rev','ins','fees','elec'].forEach(function(k){ tot[k] += Y[y][k]; }); });
+  var tot = blank(); years.forEach(function(y){ ['rev','ins','fees','elec','int'].forEach(function(k){ tot[k] += Y[y][k]; }); });
   var cost = function(o){ return o.ins + o.fees + o.elec; };
+  var netOf = function(o){ return o.rev - cost(o) - o.int; };
   var td = 'padding:7px 10px;text-align:right;font-family:\'DM Mono\',monospace;white-space:nowrap';
   var cell = function(v, col, tip){ return '<td style="' + td + (col ? ';color:' + col : '') + '"' + (tip ? ' title="' + tip + '"' : '') + '>' + (v ? f(v) : '—') + '</td>'; };
   var tipOf = function(o){ return 'Assurance ' + f(o.ins) + ' · Charges ' + f(o.fees) + (o.elec ? ' · Électricité ' + f(o.elec) : '') + ' Kč'; };
@@ -1359,7 +1370,7 @@ function renderReSumYear(){
   var ch = window._reRevChartInst, al = null;
   if (ch && ch.chartArea && (window._reRevGran || 'year') === 'year' && ch.data && ch.data.labels) {
     var lab = ch.data.labels.map(String);
-    lab.forEach(function(y){ if(!Y[y]) Y[y] = {rev:0, ins:0, fees:0, elec:0}; });
+    lab.forEach(function(y){ if(!Y[y]) Y[y] = blank(); });
     years = lab;                                         // mêmes années, même ordre que les barres
     al = {w: ch.width, left: ch.chartArea.left, col: (ch.chartArea.right - ch.chartArea.left) / Math.max(1, lab.length), right: ch.width - ch.chartArea.right};
   }
@@ -1368,7 +1379,11 @@ function renderReSumYear(){
   var C = al ? cellA : cell;
   var lbl = function(t, sub, tv, col){ return '<td style="padding:7px 10px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + t
     + '<div style="font-size:10px;font-weight:400;color:' + (col || 'var(--text2)') + '">' + sub + (tv != null ? ' · total ' + f(tv) : '') + '</div></td>'; };
-  var nt = tot.rev - cost(tot);
+  var nt = netOf(tot);
+  var tipInt = function(o){ return 'Intérêts ' + f(o.mi || 0) + ' · Assurance de prêt ' + f(o.mx || 0) + ' Kč'; };
+  var totMi = 0, totMx = 0; years.forEach(function(y){ totMi += Y[y].mi || 0; totMx += Y[y].mx || 0; });
+  var rowInt = '<tr style="border-bottom:1px solid var(--border)">' + (al ? lbl('Intérêts d\'emprunt', 'intérêts + assur. prêt Nuselsky', tot.int ? -tot.int : null, '#e06c6c') : '<td style="padding:7px 10px;font-weight:600">Intérêts d\'emprunt <span style="font-size:10px;font-weight:400;color:var(--text2)">(intérêts + assurance de prêt, Nuselsky Pivovar)</span></td>')
+    + years.map(function(y){ return C(Y[y].int ? -Y[y].int : 0, '#e06c6c', Y[y].int ? tipInt(Y[y]) : ''); }).join('') + (al ? '<td></td>' : cell(tot.int ? -tot.int : 0, '#e06c6c', tipInt({mi: totMi, mx: totMx}))) + '</tr>';
   var head = '<th style="padding:8px 10px;text-align:left">CZK</th>' + years.map(function(y){ return '<th style="padding:8px 4px;text-align:' + (al ? 'center' : 'right') + '">' + y + '</th>'; }).join('')
     + (al ? '<th></th>' : '<th style="padding:8px 10px;text-align:right">Total</th>');
   var rowRev = '<tr style="border-bottom:1px solid var(--border)">' + (al ? lbl('Revenu brut', '', tot.rev) : '<td style="padding:7px 10px;font-weight:600">Revenu brut</td>')
@@ -1376,14 +1391,14 @@ function renderReSumYear(){
   var rowCost = '<tr style="border-bottom:1px solid var(--border)">' + (al ? lbl('Coûts', 'assur. / charges / élec.', -cost(tot), '#e06c6c') : '<td style="padding:7px 10px;font-weight:600">Coûts <span style="font-size:10px;font-weight:400;color:var(--text2)">(assurance / charges / électricité)</span></td>')
     + years.map(function(y){ var c = cost(Y[y]); return C(c ? -c : 0, '#e06c6c', tipOf(Y[y])); }).join('') + (al ? '<td></td>' : cell(cost(tot) ? -cost(tot) : 0, '#e06c6c', tipOf(tot))) + '</tr>';
   var rowNet = '<tr style="border-top:2px solid var(--border2);font-weight:700">' + (al ? lbl('Revenu net', '', nt, nt >= 0 ? '#4caf82' : '#e06c6c') : '<td style="padding:7px 10px">Revenu net</td>')
-    + years.map(function(y){ var n = Y[y].rev - cost(Y[y]); return C(n, n >= 0 ? '#4caf82' : '#e06c6c'); }).join('') + (al ? '<td></td>' : cell(nt, nt >= 0 ? '#4caf82' : '#e06c6c')) + '</tr>';
+    + years.map(function(y){ var n = netOf(Y[y]); return C(n, n >= 0 ? '#4caf82' : '#e06c6c'); }).join('') + (al ? '<td></td>' : cell(nt, nt >= 0 ? '#4caf82' : '#e06c6c')) + '</tr>';
   var cg = al ? '<colgroup><col style="width:' + al.left + 'px">' + years.map(function(){ return '<col style="width:' + al.col + 'px">'; }).join('') + '<col style="width:' + al.right + 'px"></colgroup>' : '';
   el.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">'
     + '<p style="font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin:0">Revenus nets par année (CZK)</p>'
     + '<div style="display:flex;gap:6px">' + btn('all', 'Tous les biens') + btn('pec', 'Pec') + btn('nuselsky', 'Nuselsky Pivovar') + btn('tisno', 'Tisno') + '</div></div>'
     + '<div style="overflow:auto"><table style="' + (al ? 'width:' + al.w + 'px;table-layout:fixed;' : 'width:100%;') + 'border-collapse:collapse;font-size:12px">' + cg
     + '<thead><tr style="background:var(--bg2);text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2)">' + head + '</tr></thead><tbody>'
-    + rowRev + rowCost + rowNet + '</tbody></table></div>'
+    + rowRev + rowCost + rowInt + rowNet + '</tbody></table></div>'
     + '<p style="font-size:10.5px;color:var(--text2);margin:8px 0 0">Survolez une case « Coûts » pour le détail. Pec : les remboursements de charges (énergie, copropriété) sont déduits des charges de l\'année de versement. Tisno : montants saisis en EUR, convertis en CZK au taux d\'acquisition (' + tisnoAcq + ' CZK/€).</p>';
 }
 
@@ -1416,7 +1431,7 @@ function renderReRevChart(){
   var d=_reRevSeries(gran);
   var fb=document.getElementById('reRevFilters');
   if(fb) fb.querySelectorAll('.re-rev-btn').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-g')===gran); });
-  var datasets=d.props.map(function(p){ return {label:p.name,data:d.labels.map(function(l){return Math.round(d.byProp[p.id][l]||0);}),backgroundColor:p.color,stack:'re',borderRadius:3,borderSkipped:false}; });
+  var datasets=d.props.map(function(p){ return {label:p.name,data:d.labels.map(function(l){return Math.round(d.byProp[p.id][l]||0);}),backgroundColor:p.color,stack:'re',borderRadius:3,borderSkipped:false,maxBarThickness:(gran==='year'?42:18)}; });
   if(window._reRevChartInst){try{window._reRevChartInst.destroy();}catch(e){}}
   window._reRevChartInst=new Chart(cv.getContext('2d'),{type:'bar',data:{labels:d.labels,datasets:datasets},options:{responsive:true,maintainAspectRatio:false,
     onResize:function(){ setTimeout(function(){ try{ renderReSumYear(); }catch(e){} },0); },
