@@ -7813,7 +7813,8 @@ function renderCsqDetail(){
   var nf4=function(x){return x.toLocaleString('fr',{minimumFractionDigits:4,maximumFractionDigits:4});};
   var cU={},cA={},grand=0; funds.forEach(function(f){cU[f]=0;cA[f]=0;});
   dates.forEach(function(dt){var d=byDate[dt];funds.forEach(function(f){if(d[f]){cU[f]+=d[f].u;cA[f]+=d[f].a;grand+=d[f].a;}});});
-  var totalRow='<tr class="csq-tot"><td>Total</td>'+funds.map(function(f){return '<td class="mono" style="text-align:right">'+nf2(cU[f])+'</td><td class="mono" style="text-align:right">'+(Math.abs(cU[f])>1e-4?nf4(cA[f]/cU[f]):'—')+'</td><td class="mono" style="text-align:right">'+nf0(cA[f])+'</td>';}).join('')+'<td class="mono" style="text-align:right">'+nf0(grand)+'</td><td></td></tr>';
+  // Moins d'une part au total (fonds soldé, reliquat d'arrondi) : parts = 0 et pas de valeur de part moyenne
+  var totalRow='<tr class="csq-tot"><td>Total</td>'+funds.map(function(f){ var cl=Math.abs(cU[f])<1; return '<td class="mono" style="text-align:right">'+(cl?'0':nf2(cU[f]))+'</td><td class="mono" style="text-align:right">'+(cl?'—':nf4(cA[f]/cU[f]))+'</td><td class="mono" style="text-align:right">'+nf0(cA[f])+'</td>';}).join('')+'<td class="mono" style="text-align:right">'+nf0(grand)+'</td><td></td></tr>';
   var dataHtml=dates.map(function(dt){
     var d=byDate[dt],rt=0;
     var cells=funds.map(function(f){
@@ -8427,16 +8428,18 @@ function csqFundDetail(){
   var pc=function(n){return n>=0?'#4caf82':'#e06c6c';};
   var tA=0,tI=0,tn=0,tt=0;
   tb.innerHTML=funds.map(function(f,i){
-    var val=(f.qty!=null&&f.nav!=null)?(f.qty*f.nav):(f.value||0);
+    // Fonds soldé : moins d'une part restante (reliquat d'arrondi après une vente totale) -> considéré à 0
+    var closed=(f.qty!=null && Math.abs(f.qty)<1);
+    var val=closed?0:((f.qty!=null&&f.nav!=null)?(f.qty*f.nav):(f.value||0));
     var inv=f.invested||0;
-    var avg=(Math.abs(f.qty)>1e-4)?inv/f.qty:null;
+    var avg=(!closed && f.qty)?inv/f.qty:null;
     var pnl=val-inv;
-    var pnlPct=(Math.abs(f.qty)>1e-4 && inv>0)?pnl/inv*100:null;
+    var pnlPct=(!closed && inv>0)?pnl/inv*100:null;
     var tot=val+(f.nonInvest||0);
     tA+=val; tI+=inv; tn+=(f.nonInvest||0); tt+=tot;
     var sn=f.name.replace('Conseq ','').replace(' účastnický fond','').replace(' fond','');
     return '<tr><td title="'+f.name+'"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:'+(CSQ_FUNDCOL[i%CSQ_FUNDCOL.length])+';margin-right:7px;vertical-align:middle"></span>'+sn+'</td>'+
-      '<td class="mono" style="text-align:right">'+(f.qty!=null?f.qty.toLocaleString('fr',{maximumFractionDigits:2}):'—')+'</td>'+
+      '<td class="mono" style="text-align:right">'+(f.qty!=null?(closed?'0':f.qty.toLocaleString('fr',{maximumFractionDigits:2})):'—')+'</td>'+
       '<td style="text-align:right"><input type="number" step="0.0001" value="'+(f.nav!=null?f.nav:'')+'" onchange="csqSetNav('+i+',this.value)" style="'+inpS+'"><div style="font-size:9px;color:var(--text2);margin-top:2px">maj '+(f.navDate||'—')+'</div></td>'+
       '<td class="mono" style="text-align:right">'+(avg!=null?nf4(avg):'—')+'</td>'+
       '<td class="mono" style="text-align:right">'+csqFmt(inv)+' CZK</td>'+
