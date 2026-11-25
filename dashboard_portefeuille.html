@@ -5932,6 +5932,9 @@ async function gsLoadPriceHistory() {
     if (Object.keys(hist).length) {
       PRICE_HISTORY = applyPriceHistAliases(hist);
       try { localStorage.setItem('price_history', JSON.stringify(hist)); localStorage.setItem('price_history_date', new Date().toISOString()); } catch(e){}
+      // Conseq (Évolution / Performance fonds) : intégrer les nouvelles valeurs de part dès qu'elles sont chargées
+      try { if (document.getElementById('csq_evo_tbody') && typeof renderCsqEvoTab === 'function') renderCsqEvoTab(); } catch(e){}
+      try { if (typeof renderCsqPerfTab === 'function') renderCsqPerfTab(); } catch(e){}
       const sec = document.getElementById('actetf');
       if (sec && sec.classList.contains('active') && typeof renderActEtf === 'function') renderActEtf();
     }
@@ -8126,19 +8129,23 @@ function renderCsqEvoTab(){
   var weeks=Object.keys(dset).sort();
   if(!weeks.length) return;
   // live nav (dernier point) via CONSEQ_DATA
-  var liveNav={};
+  var liveNav={}, liveDate=null;
   if(typeof CONSEQ_DATA!=='undefined'&&CONSEQ_DATA&&CONSEQ_DATA.funds&&typeof CSQ_NAME2CODE!=='undefined'){
-    CONSEQ_DATA.funds.forEach(function(fo){ var c=CSQ_NAME2CODE[fo.name]; if(c&&fo.nav>0) liveNav[c]=fo.nav; });
+    CONSEQ_DATA.funds.forEach(function(fo){ var c=CSQ_NAME2CODE[fo.name]; if(c&&fo.nav>0) liveNav[c]=fo.nav; if(fo.navDate&&(!liveDate||fo.navDate>liveDate)) liveDate=fo.navDate; });
   }
+  // Point final à la date de la dernière valeur de part connue (si plus récente que l'historique) :
+  // la valeur « live » est appliquée aux parts détenues À CETTE DATE, pas à celles d'une semaine plus ancienne.
+  if(liveDate && liveDate<=today && liveDate>weeks[weeks.length-1]) weeks.push(liveDate);
   // points hebdo : valeur = parts cumulées × NAV (report), investi cumulé
   var navIdx={},navCur={}; funds.forEach(function(f){navIdx[f]=-1;navCur[f]=null;});
   var ti=0, cu={GLAK:0,RAF:0,DL:0,BOND35:0}, inv=0, wk=[];
   for(var i=0;i<weeks.length;i++){
     var d=weeks[i];
-    while(ti<txs.length && txs[ti].date<=d){ var t=txs[ti]; if(cu[t.fund]==null)cu[t.fund]=0; cu[t.fund]+=(t.units||0); if(t.type==='AC') inv+=(t.amount||0); ti++; }
+    // Investi = flux nets (achats + ventes) : un arbitrage entre fonds (vente + rachat le même jour) s'annule
+    while(ti<txs.length && txs[ti].date<=d){ var t=txs[ti]; if(cu[t.fund]==null)cu[t.fund]=0; cu[t.fund]+=(t.units||0); inv+=(t.amount||0); ti++; }
     funds.forEach(function(f){ var a=navArr[f]; while(navIdx[f]+1<a.length && a[navIdx[f]+1][0]<=d){ navIdx[f]++; navCur[f]=a[navIdx[f]][1]; } });
-    var isLast=(i===weeks.length-1);
-    var val=0; funds.forEach(function(f){ var nv=navCur[f]; if(isLast&&liveNav[f]!=null)nv=liveNav[f]; if(nv!=null) val+=cu[f]*nv; });
+    var isLast=(i===weeks.length-1), useLive=isLast && (!liveDate || liveDate>=d);
+    var val=0; funds.forEach(function(f){ var nv=navCur[f]; if(useLive&&liveNav[f]!=null)nv=liveNav[f]; if(nv!=null && Math.abs(cu[f])>=1) val+=cu[f]*nv; });
     wk.push({d:d,val:val,inv:inv});
   }
   // agrège en mensuel = dernier point hebdo de chaque mois
@@ -8298,8 +8305,9 @@ function renderCsqPerfTab(){
   });
   var dset={}; held.forEach(function(f){ navArr[f].forEach(function(p){ if(p[0]>=startDate&&p[0]<=today) dset[p[0]]=1; }); });
   var weeks=Object.keys(dset).sort(); if(!weeks.length) return;
-  var liveNav={};
-  if(typeof CONSEQ_DATA!=='undefined'&&CONSEQ_DATA&&CONSEQ_DATA.funds){ CONSEQ_DATA.funds.forEach(function(fo){ var c=CSQ_NAME2CODE[fo.name]; if(c&&fo.nav>0) liveNav[c]=fo.nav; }); }
+  var liveNav={}, liveDate=null;
+  if(typeof CONSEQ_DATA!=='undefined'&&CONSEQ_DATA&&CONSEQ_DATA.funds){ CONSEQ_DATA.funds.forEach(function(fo){ var c=CSQ_NAME2CODE[fo.name]; if(c&&fo.nav>0) liveNav[c]=fo.nav; if(fo.navDate&&(!liveDate||fo.navDate>liveDate)) liveDate=fo.navDate; }); }
+  if(liveDate && liveDate<=today && liveDate>weeks[weeks.length-1]) weeks.push(liveDate);
   // Points hebdo par fonds : {d, val:{f}, inv:{f}}
   var navIdx={},navCur={},cu={},iv={},gross={},first={},sold={}; held.forEach(function(f){navIdx[f]=-1;navCur[f]=null;cu[f]=0;iv[f]=0;gross[f]=0;});
   var ti=0, wk=[];
@@ -8307,10 +8315,10 @@ function renderCsqPerfTab(){
     var d=weeks[i];
     while(ti<txs.length && txs[ti].date<=d){ var t=txs[ti]; if(cu[t.fund]!=null){ cu[t.fund]+=(t.units||0); iv[t.fund]+=(t.amount||0); if((t.amount||0)>0) gross[t.fund]+=t.amount; if(!first[t.fund]) first[t.fund]=t.date;
         // Fonds entièrement vendu / transféré -> courbe arrêtée (plus-value réalisée au tableau)
-        if(Math.abs(cu[t.fund])<1e-6) sold[t.fund]=t.date; else delete sold[t.fund]; } ti++; }
+        if(Math.abs(cu[t.fund])<1) sold[t.fund]=t.date; else delete sold[t.fund]; } ti++; }
     held.forEach(function(f){ var a=navArr[f]; while(navIdx[f]+1<a.length && a[navIdx[f]+1][0]<=d){ navIdx[f]++; navCur[f]=a[navIdx[f]][1]; } });
-    var isLast=(i===weeks.length-1), p={d:d,val:{},inv:{}};
-    held.forEach(function(f){ var nv=navCur[f]; if(isLast&&liveNav[f]!=null) nv=liveNav[f];
+    var isLast=(i===weeks.length-1), useLive=isLast && (!liveDate || liveDate>=d), p={d:d,val:{},inv:{}};
+    held.forEach(function(f){ var nv=navCur[f]; if(useLive&&liveNav[f]!=null) nv=liveNav[f];
       var open=first[f] && !(sold[f] && sold[f]<d);
       p.val[f]=(nv!=null && open) ? cu[f]*nv : null; p.inv[f]=open ? iv[f] : null; });
     wk.push(p);
