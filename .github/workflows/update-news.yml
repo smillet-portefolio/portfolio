@@ -77,6 +77,9 @@ jobs:
 
       - name: Résumé des actualités (Claude Code, abonnement) → onglet News
         if: steps.guard.outputs.proceed == 'true'
+        # Une erreur de fin d'exécution (ex. limite d'actions) ne doit pas masquer une édition publiée :
+        # c'est l'étape « Vérification » qui décide du succès.
+        continue-on-error: true
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
@@ -84,7 +87,7 @@ jobs:
         run: |
           claude -p "$(cat news_prompt.md)" \
             --allowedTools "WebSearch" "WebFetch" "Read" "Write" "Bash(python update_news_gsheet.py:*)" "Bash(date:*)" \
-            --max-turns 300
+            --max-turns 500
 
       - name: Vérification
         if: steps.guard.outputs.proceed == 'true'
@@ -92,5 +95,12 @@ jobs:
           GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
         run: |
           test -s news_portefeuille.json && python -c "import json;d=json.load(open('news_portefeuille.json',encoding='utf-8'));print(len(d['stocks']),'titres')"
-          # échoue (croix rouge) si l'onglet News n'a pas reçu la nouvelle édition
+          # Publication de secours : Claude a préparé le fichier mais ne l'a pas publié -> on le publie ici
+          if ! python update_news_gsheet.py --check-since "${{ steps.guard.outputs.start }}"; then
+            if test -s news_portefeuille.json; then
+              echo "Publication de secours de news_portefeuille.json"
+              python update_news_gsheet.py --write news_portefeuille.json
+            fi
+          fi
+          # échoue (croix rouge) si l'onglet News n'a toujours pas reçu la nouvelle édition
           python update_news_gsheet.py --check-since "${{ steps.guard.outputs.start }}"
