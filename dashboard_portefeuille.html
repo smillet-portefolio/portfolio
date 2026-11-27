@@ -8784,7 +8784,7 @@ function jtFundDetail(){
     '</div>'+
     '<div id="jt_filters" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap"></div>'+
     '<div class="csq-scroll1"><table id="jt_tx_tbl"><thead><tr>'+
-      _jtTh('date','Date','left')+_jtTh('ctr','Contrat','left')+_jtTh('PU','Participant','right')+_jtTh('PZ','Employeur','right')+_jtTh('SP',"Allocation de l'État",'right')+_jtTh('ZH','Valorisation','right')+_jtTh('total','Total','right')+'<th style="text-align:center">Actions</th>'+
+      _jtTh('date','Date','left')+_jtTh('PZ','Cotisation employeur','right')+_jtTh('PU','Contribution participant','right')+_jtTh('SP',"Allocation de l'État",'right')+_jtTh('TR','Transfert','right')+_jtTh('ZH','Valorisation','right')+_jtTh('total','Total','right')+'<th style="text-align:center">Actions</th>'+
     '</tr></thead><tbody id="jt_tx_body"></tbody></table></div>'+
     '</div>'+
     '<div id="jt_view_stmt" style="display:none">'+
@@ -9032,6 +9032,13 @@ function jtDel(id,silent){
   else JITO_STATE.extra=JITO_STATE.extra.filter(function(m){return m.id!==id;});
   if(!silent) jtNotify();
 }
+// Supprime tous les versements d'une ligne de l'historique (clé « date|contrat »), comme le 🗑 de Retraite Seb
+function jtDelRow(key){
+  var p=key.split('|'), items=jtAllMoves().filter(function(m){ return m.date===p[0] && (m.ctr||'NN')===p[1]; });
+  if(!items.length) return;
+  if(!confirm('Supprimer la ligne du '+p[0]+' ('+(p[1]==='CSQ'?'Conseq':'NN')+') ?\n\n'+items.map(function(m){return '• '+JT_LABELS[m.type]+' : '+jtFmt2(m.amt)+' CZK';}).join('\n'))) return;
+  items.forEach(function(m){ jtDel(m.id,true); }); jtNotify();
+}
 // ---- Génération des versements attendus
 function jtOpenGen(){ var p=JITO_STATE.params; document.getElementById('jtg_pu').value=p.pu; document.getElementById('jtg_pz').value=p.pz; document.getElementById('jtg_sp').value=p.sp; document.getElementById('jtg_daypu').value=p.dayPu||5; document.getElementById('jtg_daypz').value=p.dayPz||5; document.getElementById('jtg_until').value=new Date().toISOString().slice(0,10); document.getElementById('jtg_prev').textContent=''; document.getElementById('jtGenModal').style.display='flex'; }
 function jtCloseGen(){ document.getElementById('jtGenModal').style.display='none'; }
@@ -9147,8 +9154,8 @@ function renderJitoSection(){
   // Historique
   var fel=document.getElementById('jt_filters');
   if(fel){
-    var ys=['all'].concat(Object.keys(mv.reduce(function(o,m){o[m.date.slice(0,4)]=1;return o;},{})).sort().reverse());
-    var _b=function(on,c){ return 'border:1px solid '+(on?c:'var(--border2)')+';background:'+(on?c:'var(--bg2)')+';color:'+(on?'#fff':'var(--text)')+';border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer'; };
+    var ys=['all'].concat(Object.keys(mv.reduce(function(o,m){o[m.date.slice(0,4)]=1;return o;},{})).sort());
+    var _b=function(on,c){ return 'border:1px solid '+(on?c:'var(--border2)')+';background:'+(on?c:'var(--bg2)')+';color:'+(on?'#fff':'var(--text)')+';border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer'; };
     var cf=window._jtCtrF||'all', nN=mv.filter(function(m){return m.ctr!=='CSQ';}).length, nC=mv.length-nN;
     fel.innerHTML=[['all','Tous contrats','var(--blue)'],['NN','NN ('+nN+')','#f97316'],['CSQ','Conseq ('+nC+')','#4caf82']].map(function(x){ return '<button onclick="jtSetCtr(\''+x[0]+'\')" style="'+_b(cf===x[0],x[2])+'">'+x[1]+'</button>'; }).join('')
       +'<span style="display:inline-block;width:1px;align-self:stretch;background:var(--border2);margin:2px 6px"></span>'
@@ -9156,26 +9163,33 @@ function renderJitoSection(){
   }
   var tb=document.getElementById('jt_tx_body');
   if(tb){
-    var cols=['PU','PZ','SP','ZH'];
+    // Même structure que Retraite Seb Conseq : Date | Employeur | Participant | État | Transfert | Valorisation | Total | Actions
+    var cols=['PZ','PU','SP','TR','ZH'];
     var byd={}, cfl=window._jtCtrF||'all';
     mv.forEach(function(m){
       if(_jtFilter!=='all'&&m.date.slice(0,4)!==_jtFilter) return;
       if(cfl!=='all' && (m.ctr||'NN')!==cfl) return;
       var key=m.date+'|'+(m.ctr||'NN');   // une ligne par date ET par contrat
-      if(!byd[key]) byd[key]={PU:0,PZ:0,SP:0,ZH:0,items:[],ctr:(m.ctr||'NN')};
-      var k=(m.type==='ZH_SP')?'ZH':(m.type==='PO'?'PU':m.type);
+      if(!byd[key]) byd[key]={PU:0,PZ:0,SP:0,TR:0,ZH:0,items:[],ctr:(m.ctr||'NN')};
+      var k=(m.src==='transfer')?'TR':(m.type==='ZH_SP'?'ZH':(m.type==='PO'?'PU':m.type));
       byd[key][k]+=m.amt; byd[key].items.push(m);
     });
     var dts=Object.keys(byd), st=_jtSort;
-    var tt=function(d){return byd[d].PU+byd[d].PZ+byd[d].SP+byd[d].ZH;};
+    var tt=function(d){return byd[d].PU+byd[d].PZ+byd[d].SP+byd[d].TR+byd[d].ZH;};
     dts.sort(function(a,b){ if(st.col==='date') return st.dir*a.localeCompare(b); if(st.col==='ctr') return st.dir*byd[a].ctr.localeCompare(byd[b].ctr) || b.localeCompare(a); if(st.col==='total') return st.dir*(tt(a)-tt(b)); return st.dir*((byd[a][st.col]||0)-(byd[b][st.col]||0)); });
-    var cT={PU:0,PZ:0,SP:0,ZH:0},grand=0; dts.forEach(function(d){cols.forEach(function(c){cT[c]+=byd[d][c];}); grand+=tt(d);});
-    var totalRow='<tr class="csq-tot"><td>Total ('+dts.length+')</td><td></td>'+cols.map(function(c){return '<td class="mono" style="text-align:right">'+fmt(cT[c])+' CZK</td>';}).join('')+'<td class="mono" style="text-align:right">'+fmt(grand)+' CZK</td><td></td></tr>';
+    var cT={PU:0,PZ:0,SP:0,TR:0,ZH:0},grand=0; dts.forEach(function(d){cols.forEach(function(c){cT[c]+=byd[d][c];}); grand+=tt(d);});
+    var totalRow='<tr class="csq-tot"><td>Total ('+dts.length+')</td>'+cols.map(function(c){return '<td class="mono" style="text-align:right">'+fmt(cT[c])+' CZK</td>';}).join('')+'<td class="mono" style="text-align:right">'+fmt(grand)+' CZK</td><td></td></tr>';
+    var BTN_E='background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;margin-right:4px';
     var dataHtml=dts.map(function(d){
       var b=byd[d];
-      var acts=b.items.map(function(m){ var tag=(m.src==='gen')?'<span title="Généré (versement attendu)" style="font-size:9px;color:#f0956e">⚙</span>':(m.src==='user'?'<span title="Saisie manuelle" style="font-size:9px;color:#5a8dee">✎</span>':''); return '<span style="white-space:nowrap;margin:0 3px" title="'+JT_LABELS[m.type]+' '+jtFmt2(m.amt)+'">'+tag+'<button onclick="jtEdit(\''+m.id+'\')" title="Modifier '+JT_SHORT[m.type]+'" style="background:none;border:none;cursor:pointer;font-size:12px">✏️</button><button onclick="jtDel(\''+m.id+'\')" title="Supprimer '+JT_SHORT[m.type]+'" style="background:none;border:none;cursor:pointer;font-size:12px">🗑️</button></span>'; }).join('');
+      // Actions (style Seb) : un ✏️ par versement de la ligne (libellé si plusieurs) + un 🗑 pour toute la ligne
+      var edits=b.items.map(function(m){ return '<button onclick="jtEdit(\''+m.id+'\')" title="Modifier : '+JT_LABELS[m.type]+' '+jtFmt2(m.amt)+'" style="'+BTN_E+'">✏️'+(b.items.length>1?' <span style="font-size:9px;color:var(--text2)">'+JT_SHORT[m.type]+'</span>':'')+'</button>'; }).join('');
+      var acts='<td style="text-align:center;white-space:nowrap">'+edits+'<button onclick="jtDelRow(\''+d+'\')" title="Supprimer la ligne" style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#e06c6c">🗑</button></td>';
       var isC=b.ctr==='CSQ', cc=isC?'#4caf82':'#f97316';
-      return '<tr><td class="mono">'+d.split('|')[0].split('-').reverse().join('/')+'</td><td><span style="padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:'+cc+'22;color:'+cc+'">'+(isC?'Conseq':'NN')+'</span></td>'+cols.map(function(c){var v=b[c];return '<td class="mono" style="text-align:right;color:'+(v?(c==='ZH'?'#9b87d4':'var(--text)'):'var(--text2)')+'">'+(v?fmt(v):'·')+'</td>';}).join('')+'<td class="mono" style="text-align:right;font-weight:600">'+fmt(tt(d))+'</td><td style="text-align:center">'+acts+'</td></tr>';
+      var gen=b.items.some(function(m){return m.src==='gen';}), usr=b.items.some(function(m){return m.src==='user';});
+      return '<tr><td class="mono" style="white-space:nowrap">'+d.split('|')[0]+' <span style="padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600;background:'+cc+'22;color:'+cc+'">'+(isC?'Conseq':'NN')+'</span>'+(gen?' <span title="Versement attendu (généré)" style="font-size:9px;color:#f0956e">⚙</span>':'')+(usr?' <span title="Saisie manuelle" style="font-size:9px;color:#5a8dee">✎</span>':'')+'</td>'
+        +cols.map(function(c){var v=b[c];return '<td class="mono" style="text-align:right'+(v?(c==='ZH'?';color:#9b87d4':(v<0?';color:#e06c6c':'')):';color:var(--text2)')+'">'+(v?fmt(v):'—')+'</td>';}).join('')
+        +'<td class="mono" style="text-align:right;font-weight:600">'+fmt(tt(d))+'</td>'+acts+'</tr>';
     }).join('');
     tb.innerHTML=totalRow+dataHtml;
     var tbl=document.getElementById('jt_tx_tbl');
