@@ -2069,16 +2069,38 @@ function renderPatrimoine(){
   // Pension (Conseq, CZK)
   const funds = (typeof CONSEQ_DATA!=='undefined' && CONSEQ_DATA && CONSEQ_DATA.funds) ? CONSEQ_DATA.funds : [];
   let penT='', penInv=0, penVal=0, penPnl=0;
+  const _short = n => String(n||'').replace(/^Conseq\s+/,'').replace(/\s+účastnický fond$/,'');
+  // Deux blocs séparés : Retraite Seb (Conseq) puis Retraite Jito, chacun avec son sous-total
+  const grpHead = t=>`<tr><td colspan="4" style="padding:9px 12px 5px;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--text2);background:var(--bg2)">${t}</td></tr>`;
+  const subT = (label,i,v,p)=>`<tr style="border-bottom:2px solid var(--border2);background:var(--bg3);font-weight:700"><td style="padding:7px 12px">${label}</td>${cell(czk(i))}${cell(czk(v))}${pvCell(p)}</tr>`;
+  const rowF = (label,c2,c3,pnl)=>rowT('<span style="font-weight:400;padding-left:10px">'+label+'</span>',c2,c3,pnl);
+  // Seb : fonds détenus (une ligne par fonds) + fonds soldés regroupés (plus-value réalisée)
+  let soldInv=0, soldNames=[], sebT='', sI=0, sV=0, sP=0;
   funds.slice().sort((a,b)=>(b.total||0)-(a.total||0)).forEach(f=>{
     const inv=f.invested||0, val=f.total||0, pv=(f.value||0)-(f.invested||0);
-    penInv+=inv; penVal+=val; penPnl+=pv;
-    penT+=rowT(f.name, czk(inv), czk(val), pv);
+    penInv+=inv; penVal+=val; penPnl+=pv; sI+=inv; sV+=val; sP+=pv;
+    if (f.qty!=null && Math.abs(f.qty)<1 && !(f.nonInvest>0)) { soldInv+=inv; soldNames.push(_short(f.name)); return; }
+    sebT+=rowF('Conseq '+_short(f.name), czk(inv), czk(val), pv);
   });
+  if (soldNames.length) sebT+=rowF('Fonds soldés ('+soldNames.join(', ')+') — plus-value réalisée', czk(soldInv), czk(0), -soldInv);
   let pensionCzk = (typeof CONSEQ_DATA!=='undefined' && CONSEQ_DATA && CONSEQ_DATA.valueNow) ? CONSEQ_DATA.valueNow : penVal;
-  // Retraite Jito (NN penzijní připojištění, CZK)
+  if (sebT) penT += grpHead('Retraite Seb — Conseq') + sebT + subT('Sous-total Seb', sI, pensionCzk, pensionCzk-sI);
+  // Retraite Jito : contrat Conseq (NN transféré le 20/11/2026), une ligne par fonds.
+  // Investi de Jito réparti entre les fonds au prorata de leur valeur (le total reste celui de l'onglet Jito).
   if (typeof jtValueNow==='function' && typeof JITO_STATE!=='undefined' && JITO_STATE) {
     const jVal=jtValueNow(), jInv=jtInvestedNow();
-    if (jVal>0) { penInv+=jInv; penVal+=jVal; penPnl+=(jVal-jInv); pensionCzk+=jVal; penT+=rowT('NN Penzijní připojištění — Jito', czk(jInv), czk(jVal), jVal-jInv); }
+    if (jVal>0) {
+      penInv+=jInv; penVal+=jVal; penPnl+=(jVal-jInv); pensionCzk+=jVal;
+      const S=(typeof jtCsqSummary==='function')?jtCsqSummary():null;
+      const ks=S?Object.keys(S.byF).filter(k=>(S.byF[k].val+S.byF[k].nonInv)>0.5):[];
+      const nn=jVal-(S?S.val:0);
+      const parts=ks.map(k=>({lab:'Conseq '+_short(JTC_FUNDS[k]||k), v:S.byF[k].val+S.byF[k].nonInv}));
+      if (Math.abs(nn)>0.5) parts.push({lab:'NN Penzijní připojištění', v:nn});
+      if (!parts.length) parts.push({lab:'Retraite', v:jVal});
+      penT += grpHead('Retraite Jito — Conseq (NN transféré le 20/11/2026)');
+      parts.forEach(p=>{ const i=jVal?jInv*p.v/jVal:0; penT+=rowF(p.lab, czk(i), czk(p.v), p.v-i); });
+      penT += subT('Sous-total Jito', jInv, jVal, jVal-jInv);
+    }
   }
 
   // Band
@@ -9174,10 +9196,12 @@ function jtEvoChart(years){
   var labels=years.map(function(y){return String(y.year);});
   var vals=years.map(function(y){return Math.round(y.valueEnd);});
   var cum=years.map(function(y){return Math.round(y.cumInv);});
-  var cr=years.map(function(y){return y.yieldY!=null?Math.round(y.yieldY):null;});
+  // Plus-value annuelle (comme Retraite Seb Conseq) = (valeur fin d'année − valeur fin d'année précédente) − investi de l'année
+  var cr=years.map(function(y,i){ var prev=i>0?years[i-1].valueEnd:0; return Math.round((y.valueEnd-prev)-(y.invested||0)); });
+  var barCols=cr.map(function(x){return x>=0?'rgba(76,175,130,0.55)':'rgba(224,108,108,0.6)';});
   if(window._jtEvoChart){try{window._jtEvoChart.destroy();}catch(e){}}
   window._jtEvoChart=new Chart(cv.getContext('2d'),{type:'bar',data:{labels:labels,datasets:[
-    {type:'bar',label:'Valorisation (année)',data:cr,backgroundColor:'rgba(155,135,212,0.55)',yAxisID:'y1',borderRadius:4,order:3,categoryPercentage:0.55,barPercentage:0.8},
+    {type:'bar',label:'Plus-value annuelle',data:cr,backgroundColor:barCols,yAxisID:'y1',borderRadius:4,order:3,categoryPercentage:0.55,barPercentage:0.8},
     {type:'line',label:'Valeur',data:vals,borderColor:'#4caf82',backgroundColor:'rgba(76,175,130,0.12)',fill:true,tension:0.25,borderWidth:2,pointRadius:3,spanGaps:true,yAxisID:'y',order:1},
     {type:'line',label:'Versé cumulé',data:cum,borderColor:'#5a8dee',backgroundColor:'transparent',borderDash:[5,4],fill:false,tension:0.25,borderWidth:2,pointRadius:3,yAxisID:'y',order:2}
   ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{color:'#8b95a8',font:{size:12},boxWidth:14,usePointStyle:true}},tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+jtFmt(c.parsed.y)+' CZK';}}}},scales:{y:{position:'left',ticks:{callback:function(v){return (v/1000).toFixed(0)+'k';},color:'#8b95a8'},grid:{color:'rgba(0,0,0,0.06)'}},y1:{position:'right',ticks:{callback:function(v){return (v/1000).toFixed(1)+'k';},color:'#9b87d4'},grid:{display:false}},x:{ticks:{color:'#8b95a8'},grid:{display:false}}}}});
